@@ -1,0 +1,28 @@
+.{
+    .name = .protobuzig,
+    .version = "0.1.0",
+    .fingerprint = 0xa244400df9842bda, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{
+        .mecha = .{
+            .url = "https://github.com/Hejsil/mecha/archive/refs/tags/0.11.0/.tar.gz",
+            .hash = "mecha-0.11.0-dVGaSDNfAQA6B-SiB1TGG0HoOBdw1BFGMdQJV44pEgB4",
+        },
+    },
+    // Specifies the set of files and directories that are included in this package.
+    // Only files and directories listed here are included in the `hash` that
+    // is computed for this package. Only files listed here will remain on disk
+    // when using the zig package manager. As a rule of thumb, one should list
+    // files required for compilation plus any license(s).
+    // Paths are relative to the build root. Use the empty string (`""`) to refer to
+    // the build root itself.
+    // A directory listed here means that all files within, recursively, are included.
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        // For example...
+        //"LICENSE",
+        //"README.md",
+    },
+}

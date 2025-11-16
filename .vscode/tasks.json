@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "zig",
+            "args":[
+                "build",
+                "-freference-trace=10",
+                // "-fllvm",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+        },
+        {
+            "label": "build test",
+            "type": "shell",
+            "command": "zig",
+            "args": [
+                "build-exe",
+                "src_test/testo_main.zig",
+                "-femit-bin=zig-out/bin/testo",
+                "-fllvm",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+        }
+    ]
+}

@@ -1,0 +1,1089 @@
+const std = @import("std");
+const equal = std.mem.eql;
+const prs = @import("mecha_prs.zig");
+const pf = prs.ProtoFile;
+const tpj = prs.Tipoj;
+
+const auks = @import("kgen_auks.zig");
+
+var verkisto: *std.Io.Writer = undefined;
+
+pub fn generiZigKodon(dosiera_nomo: []const u8, proto: *pf) !void {
+    var buffer: [256]u8 = .{0} ** 256;
+
+    const nuda = std.fs.path.basename(dosiera_nomo);
+    const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse dosiera_nomo.len;
+    const basa_nomo = nuda[0..punkta_indekso];
+    const zig_nomo = try std.fmt.bufPrint(&buffer, "src_test/generated/{s}.zig", .{basa_nomo});
+
+    var zig_dosiero = try std.fs.cwd().createFile(zig_nomo, .{ .truncate = true });
+    defer zig_dosiero.close();
+
+    const TAM = 65536;
+    var zig_buffero: [TAM]u8 = .{0} ** TAM;
+    var zig_verkisto = zig_dosiero.writer(&zig_buffero);
+    verkisto = &zig_verkisto.interface;
+
+    // La tuta kodoj por generiĝas ĉi tie:
+    try skribiKaplinion(proto);
+    const tabs = try skribiIniPakaghon(proto.package_name);
+    try skribiEnums(proto.enums, "");
+    try skribiMesaghojn(proto.messages, "");
+    try skribiFiniPakaghon(proto.package_name, tabs);
+    try skribiGeneralajnFunkciojn();
+}
+
+/////////////////////////////////////
+/// Chefa Funkcioj:
+/// - skribiKaplinion
+/// - skribiIniPakaghon
+/// - skribiEnums
+/// - skribiMesaghojn
+/// - skribiFiniPakaghon
+/// - skribiGeneralajnFunkciojn
+/////////////////////////////////////
+
+fn skribiKaplinion(proto: *pf) !void {
+    try verkisto.print(
+        \\const std = @import("std");
+        \\const dbg = std.debug;
+        \\const all = std.mem;
+        \\const equal = std.mem.eql;
+        \\const  io = std.Io;
+        \\const encdec = @import("../encdec.zig");
+        \\const EncodeBuffer = encdec.EncodeBuffer;
+        \\const DecodeBuffer = encdec.DecodeBuffer;
+        \\
+        \\
+    , .{});
+
+    for (proto.imports) |imp| {
+        const punkta_indekso = std.mem.lastIndexOfScalar(u8, imp, '.') orelse imp.len;
+        const basa_nomo = imp[1 .. punkta_indekso - 1]; // elimini gvidliniojn
+
+        try verkisto.print(
+            \\const {s} = @import("{s}.zig");
+            \\
+        , .{ basa_nomo, basa_nomo });
+    }
+    try verkisto.print("\n", .{});
+}
+
+fn skribiIniPakaghon(pnamo: ?[]const u8) !u8 {
+    var i: u8 = 0;
+    if (pnamo) |pkg_name| {
+        if (pkg_name.len == 0) return 0;
+        var tokenizer = std.mem.splitAny(u8, pkg_name, ".");
+        while (tokenizer.next()) |parto| : (i = i + 1) {
+            for (0..i) |_| {
+                try verkisto.print("    ", .{});
+            }
+            try verkisto.print("pub const {s} = struct {{\n\n", .{parto});
+        }
+        try verkisto.print("\n", .{});
+    }
+    return i;
+}
+
+fn skribiEnums(enums: []prs.Enum, ind: []u8) !void {
+    for (enums) |enm| {
+        try verkisto.print(
+            \\{s}pub const {s} = enum(u64) {{
+            \\
+        , .{ ind, enm.name });
+
+        for (enm.values) |val| {
+            try verkisto.print("{s}   {s} = {d},\n", .{ ind, val.name, val.number });
+        }
+        try verkisto.print("{s}}};\n\n", .{ind});
+    }
+}
+
+fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
+    for (messages) |msg| {
+        try verkisto.print("{s}pub const {s} = struct {{\n", .{ ind, msg.name });
+
+        if (msg.internal_enums.len > 0) {
+            const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+            try skribiEnums(msg.internal_enums, indent);
+        }
+
+        if (msg.internal_msgs.len > 0) {
+            const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+            try skribiMesaghojn(msg.internal_msgs, indent);
+        }
+
+        // /////////////
+        // Skribi kampoj
+        for (msg.fields, 0..) |field, i| {
+            var default_value_string: []const u8 = field.default_value orelse "null";
+            if (field.default_value != null and msg.fields[i].field_type_enum == .TYPE_ENUM) {
+                default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default_value_string }, 0) catch unreachable;
+                const zigType = auks.mapiZigType(field.field_type, field.label, default_value_string);
+                try verkisto.print("{s}    {s}: {s},\n", .{ ind, field.name, zigType });
+            } else {
+                const zigType = auks.mapiZigType(field.field_type, field.label, field.default_value);
+                try verkisto.print("{s}    {s}: {s},\n", .{ ind, field.name, zigType });
+            }
+        }
+        try verkisto.print("\n", .{});
+
+        try skribiInitDefault(msg, ind);
+
+        try skribiAlTeksto(msg, ind);
+        try legiElTeksto(msg, ind);
+
+        // /////////////
+        // Skribi funkcion por deseriigi al protobuf kaj Json teksto
+        try skribiAlPBTeksto(msg, ind);
+
+        // /////////////
+        // Skribi funkcion por seriigi al binara formato
+        try skribiSeriigi(msg, ind);
+
+        // /////////////
+        // Skribi funkcion por deseriigi al binara formato
+        try skribiDeseriigi(msg, ind);
+
+        try verkisto.print("\n{s}}};\n\n", .{ind});
+        try verkisto.flush();
+    }
+}
+
+fn skribiFiniPakaghon(pnamo: ?[]const u8, tabs: u8) !void {
+    var j = tabs;
+    if (pnamo) |pkg_name| {
+        if (pkg_name.len == 0) return;
+        var tokenizer = std.mem.splitBackwardsAny(u8, pkg_name, ".");
+        while (tokenizer.next()) |parto| : (j -= 1) {
+            for (0..j - 1) |_| {
+                try verkisto.print("    ", .{});
+            }
+            try verkisto.print("}};   // {s}\n", .{parto});
+        }
+        try verkisto.print("\n", .{});
+    }
+}
+
+fn skribiGeneralajnFunkciojn() !void {
+    try verkisto.print(
+        \\//////////////////////////////////////////////
+        \\/// //////////////////////////////////////////
+        \\/// //////////////////////////////////////////
+        \\//////////////////////////////////////////////
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    //////////////////////////////////////////////
+    //// Seriigi Binaran Tipon
+    //////////////////////////////////////////////
+
+    try verkisto.print(
+        \\//////////////////////////////////////////////
+        \\/// Seriigi Binaran Tipon
+        \\/// //////////////////////////////////////////
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: *T) ![]const u8 {{
+        \\    var mia_enc = try EncodeBuffer.init(allocator, 48 * 1024);
+        \\    defer mia_enc.deinit();
+        \\
+        \\    const longo = try value.seriigi(&mia_enc);
+        \\    const bytes = try allocator.alloc(u8, longo);
+        \\    std.mem.copyForwards(u8, bytes, mia_enc.data());
+        \\    return bytes;
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato) ![]const u8 {{
+        \\    var parsed: []const u8 = undefined;
+        \\    switch (b_formato) {{
+        \\        .BF_PROTOBUF => {{
+        \\            parsed = try seriigiTipon(allocator, T, value);
+        \\        }},
+        \\        .BF_BASE64 => {{
+        \\            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+        \\            defer allocator.free(binaraj_bitoj);
+        \\
+        \\            const enc=std.base64.standard.Encoder;
+        \\            const base64_longo = enc.calcSize(binaraj_bitoj.len);
+        \\            const base64_bitoj = try allocator.alloc(u8, base64_longo);
+        \\            parsed = enc.encode(base64_bitoj, binaraj_bitoj);
+        \\        }},
+        \\        .BF_BIN2TEKSTO => {{
+        \\            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+        \\            defer allocator.free(binaraj_bitoj);
+        \\
+        \\            var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
+        \\            const hex = "0123456789ABCDEF";
+        \\            for (binaraj_bitoj, 0..) |val, i| {{
+        \\                const hi: u8 = @intCast((val >> 4) & 0xF);
+        \\                const lo: u8 = @intCast(val & 0xF);
+        \\                try bin2teksto_bitoj.print(allocator,"0x{{c}}{{c}} ", .{{ hex[hi], hex[lo] }});
+        \\
+        \\                if ((i + 1) % 20 == 0) try bin2teksto_bitoj.print(allocator,"\n", .{{}});
+        \\            }}
+        \\            parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
+        \\        }},
+        \\        else => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\    }}
+        \\
+        \\    return parsed;
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato, path: []const u8) !void {{
+        \\    const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
+        \\
+        \\    var dosiero = try std.fs.cwd().createFile(path, .{{ .truncate = true }});
+        \\    defer dosiero.close();
+        \\    try dosiero.writeAll(teksto);
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    //////////////////////////////////////////////
+    //// Deseriigi Binaran Tipon
+    //////////////////////////////////////////////
+
+    try verkisto.print(
+        \\//////////////////////////////////////////////
+        \\//// Deseriigi Binaran Tipon
+        \\//////////////////////////////////////////////
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn deseriigiTipon(allocator: all.Allocator, comptime T: type, input: []const u8) !T {{
+        \\    var mia_dec = DecodeBuffer.init(allocator, input, 0, -1);
+        \\    defer mia_dec.deinit();
+        \\
+        \\    const obj = try T.deseriigi(allocator, &mia_dec, null);
+        \\    return obj;
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: encdec.BinaraFormato) !T {{
+        \\    var parsed: []const u8 = undefined;
+        \\    switch (b_formato) {{
+        \\        .BF_PROTOBUF => {{
+        \\            parsed = input;
+        \\        }},
+        \\        .BF_BASE64 => {{
+        \\            const dec=std.base64.standard.Decoder;
+        \\            const base64_decoded_longo = try dec.calcSizeForSlice(input);
+        \\            const base64_decoded = try allocator.alloc(u8, base64_decoded_longo);
+        \\
+        \\            dec.decode(base64_decoded,input) catch |err| {{
+        \\                std.debug.print("eraro dum deseriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\            parsed = base64_decoded;
+        \\        }},
+        \\        .BF_BIN2TEKSTO => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\        else => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\    }}
+        \\
+        \\    return deseriigiTipon(allocator, T, parsed);
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: encdec.BinaraFormato) !T {{
+        \\    var dosiero = try std.fs.cwd().openFile(path, .{{}});
+        \\    defer dosiero.close();
+        \\
+        \\    const dosiera_long = try dosiero.getEndPos();
+        \\    var enhavo = allocator.alloc(u8, dosiera_long + 1) catch return error.OutOfMemory;
+        \\    defer allocator.free(enhavo);
+        \\
+        \\    _ = try dosiero.readAll(enhavo[0..dosiera_long]);
+        \\    enhavo[dosiera_long] = 0;
+        \\
+        \\    return deseriigiTiponElBin(allocator, T, enhavo[0..dosiera_long :0], b_formato);
+        \\}}
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+}
+
+/////////////////////////////////////
+/// Seriigi kaj Deseriigi Funkcioj:
+/// -Teksta formato: ZON, Protobuf, JSON
+// /     - skribiAlTeksto: generica por ZON, Protobuf, JSON
+// /     - legiElTeksto:  generica por ZON, Protobuf, JSON
+// /     - skribiAlPBTeksto
+/// -Binara formato: Protobuf
+///     - skribiSeriigi
+///     - skribiDeseriigi
+/////////////////////////////////////
+
+fn skribiAlTeksto(msg: prs.Message, ind: []const u8) !void {
+    // /////////////
+    // Skribi funkcion por seriigi al teksta bufro
+    try verkisto.print(
+        \\{s}    pub fn skribiAlTeksto(self: *{s}, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {{
+        \\{s}        return try encdec.skribiTiponAlTeksto(allocator, {s}, @as(*{s}, self), t_formato);
+        \\{s}    }}
+        \\
+    , .{ ind, msg.name, ind, msg.name, msg.name, ind });
+    try verkisto.print("\n", .{});
+
+    // /////////////
+    // Skribi funkcion por seriigi al dosiero
+    try verkisto.print(
+        \\{s}    pub fn skribiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {{
+        \\{s}        try encdec.skribiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, t_formato);
+        \\{s}    }}
+        \\
+    , .{ ind, msg.name, ind, msg.name, msg.name, ind });
+    try verkisto.print("\n", .{});
+}
+
+fn legiElTeksto(msg: prs.Message, ind: []const u8) !void {
+    // /////////////
+    // Skribi funkcion por deseriigi el teksta bufro
+    try verkisto.print(
+        \\{s}    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !{s} {{
+        \\{s}        return try encdec.legiTiponElTeksto(allocator, {s}, input, t_formato);
+        \\{s}    }}
+        \\
+    , .{ ind, msg.name, ind, msg.name, ind });
+    try verkisto.print("\n", .{});
+
+    // /////////////
+    // Skribi funkcion por deseriigi el dosiero
+    try verkisto.print(
+        \\{s}    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !{s} {{
+        \\{s}        return try encdec.legiTiponElDosiero(allocator, {s}, path, t_formato);
+        \\{s}    }}
+        \\
+    , .{ ind, msg.name, ind, msg.name, ind });
+    try verkisto.print("\n", .{});
+}
+
+fn skribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
+    try verkisto.print(
+        \\{s}    pub fn skribiAlProtobufTeksto(self: *const {s}, allocator: all.Allocator,ind: []const u8) ![]const u8 {{
+        \\{s}       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
+        \\{s}       var bufro:std.ArrayList(u8)= .empty;
+        \\{s}       if( equal(u8,indent,"") ) {{ {{}} }} 
+        \\
+        \\
+    , .{ ind, msg.name, ind, ind, ind });
+
+    for (msg.fields) |f| {
+        if (f.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}        for(self.{s}) |obj| 
+                \\    
+            , .{
+                ind, f.name,
+            });
+        } else if (f.label_enum == .LABEL_OPTIONAL) {
+            try verkisto.print(
+                \\{s}        if( self.{s} ) |val|  
+                \\    
+            , .{ ind, f.name });
+        }
+
+        if (f.field_type_enum == .TYPE_MESSAGE) {
+            if (f.label_enum == .LABEL_OPTIONAL) {
+                try verkisto.print(
+                    \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind }});
+                    \\
+                , .{ ind, f.name });
+            } else {
+                try verkisto.print(
+                    \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ind, try {s}{s}.skribiAlProtobufTeksto(allocator,indent),ind }});
+                    \\
+                , .{
+                    ind,
+                    f.name,
+                    if (f.label_enum == .LABEL_REPEATED) "" else "self.",
+                    if (f.label_enum == .LABEL_REPEATED) "obj" else f.name,
+                });
+            }
+        } else {
+            if (f.label_enum == .LABEL_REPEATED) {
+                try verkisto.print(
+                    \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, obj }});
+                    \\
+                , .{
+                    ind,                                                   f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                });
+            } else if (f.label_enum == .LABEL_OPTIONAL) {
+                try verkisto.print(
+                    \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ ind, val }});
+                    \\
+                , .{
+                    ind,                                                   f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                });
+            } else {
+                try verkisto.print(
+                    \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, self.{s} }});
+                    \\
+                , .{
+                    ind,                                                   f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", f.name,
+                });
+            }
+        }
+    }
+    try verkisto.print(
+        \\
+        \\{s}        return bufro.toOwnedSlice(allocator);
+        \\{s}    }}
+        \\
+    , .{ ind, ind });
+    try verkisto.print("\n", .{});
+}
+
+fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
+    const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+
+    try verkisto.print(
+        \\{s}pub fn seriigiAlBin(self: *{s}, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {{
+        \\{s}    return try seriigiTiponAlBin(allocator, {s}, @as(*{s},self), b_formato);
+        \\{s}}}
+        \\
+        \\
+    , .{
+        indent, msg.name, // fn
+        indent, msg.name, msg.name, // return
+        indent, // }
+    });
+
+    try verkisto.print(
+        \\{s}pub fn seriigiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {{
+        \\{s}    return try seriigiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, b_formato);
+        \\{s}}}
+        \\
+        \\
+    , .{
+        indent, msg.name, // fn
+        indent, msg.name, msg.name, // return
+        indent, // }
+    });
+
+    try verkisto.print(
+        \\{s}fn seriigi(self: *const {s}, buffer: *EncodeBuffer) !usize {{
+        \\{s}    var tuta_longo: usize = 0;
+        \\ 
+        \\
+    , .{
+        indent, msg.name,
+        indent,
+    });
+
+    const nf = msg.fields.len;
+    for (msg.fields, 0..) |_, i| {
+        const field = msg.fields[nf - 1 - i];
+        const field_name = field.name;
+        const field_type_enum = field.field_type_enum;
+        const wire_type = if (field.label_enum == .LABEL_REPEATED) 2 else auks.getWireType(field_type_enum);
+        const default_value: []const u8 = field.default_value orelse "null";
+        const packed_value = field.packed_value;
+
+        const estas_variabla_longo = auks.estasLongaVar(field_type_enum);
+        const havas_default = field.default_value != null;
+
+        switch (field.label_enum) {
+            .LABEL_OPTIONAL => {
+                if (!havas_default and !estas_variabla_longo) {
+                    skribiOptionalNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    continue;
+                }
+
+                if (havas_default and !estas_variabla_longo) {
+                    skribiOptionalDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    continue;
+                }
+
+                if (!havas_default and estas_variabla_longo) {
+                    skribiOptionalNoDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    continue;
+                }
+
+                if (havas_default and estas_variabla_longo) {
+                    skribiOptionalDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    continue;
+                }
+            },
+            .LABEL_REQUIRED => {
+                if (!havas_default and !estas_variabla_longo) {
+                    skribiRequiredNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    continue;
+                }
+
+                if (havas_default and !estas_variabla_longo) {
+                    skribiRequiredDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    continue;
+                }
+
+                if (!havas_default and estas_variabla_longo) {
+                    skribiRequiredNoDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    continue;
+                }
+
+                if (havas_default and estas_variabla_longo) {
+                    skribiRequiredDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    continue;
+                }
+            },
+            .LABEL_REPEATED => {
+                if (!havas_default and !estas_variabla_longo) {
+                    skribiRepeatedNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, packed_value) catch {};
+                    continue;
+                }
+
+                if (!havas_default and estas_variabla_longo) {
+                    skribiRepeatedNoDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    continue;
+                }
+            },
+        }
+    }
+    try verkisto.print("{s}    return tuta_longo;\n{s}}}\n\n", .{ indent, indent });
+
+    try verkisto.flush();
+}
+
+fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
+    const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+
+    try verkisto.print(
+        \\{s}pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !{s} {{
+        \\{s}    return try deseriigiTiponElBin(allocator, {s}, input, b_formato);
+        \\{s}}}
+        \\
+        \\
+    , .{
+        indent, msg.name, // fn
+        indent, msg.name, // return
+        indent, // }
+    });
+
+    try verkisto.print(
+        \\{s}    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !{s} {{
+        \\{s}        return try deseriigiTiponElDosiero(allocator, {s}, path, b_formato);
+        \\{s}    }}
+        \\
+        \\
+    , .{ ind, msg.name, ind, msg.name, ind });
+
+    try verkisto.print(
+        \\{s}fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !{s} {{
+        \\{s}    var mia_Mesagho= try {s}.initDefault(allocator);
+        \\
+        \\{s}    var end: usize = undefined;
+        \\{s}    if (data_length) |val|
+        \\{s}        end = buffer.read_index + val
+        \\{s}    else
+        \\{s}        end = buffer.buffer.len;
+        \\
+        \\
+    , .{
+        indent, msg.name,
+        indent, msg.name,
+        indent, indent,
+        indent, indent,
+        indent,
+    });
+
+    for (msg.fields) |field| {
+        if (field.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}    var {s}_list: std.ArrayList({s}) = .empty; 
+                \\
+            , .{
+                indent, field.name, auks.mapiProtoTiponAlZig(field.field_type),
+            });
+        }
+    }
+
+    try verkisto.print(
+        \\
+        \\{s}    while (buffer.read_index < end) {{
+        \\{s}        const key: u64 = buffer.decodeVarint() catch 0 ;    
+        \\{s}        const wire_type = key & 0x7;  
+        \\{s}        const field_number = key >> 3;
+        \\
+        \\
+    , .{
+        indent, // while
+        indent,
+        indent,
+        indent,
+    });
+
+    var unua = true;
+    const field_nums = msg.fields.len;
+    for (msg.fields, 0..) |field, i| {
+        const field_name = field.name;
+        const field_type = field.field_type;
+        const field_type_enum = field.field_type_enum;
+        const field_label = field.label_enum;
+        const field_number = field.number;
+        const wire_type = if (field.label_enum == .LABEL_REPEATED) 2 else auks.getWireType(field_type_enum);
+
+        try verkisto.print(
+            \\{s}        {s} ( field_number == {d} and wire_type == {d} ) 
+            \\
+        , .{
+            indent, if (unua) "if" else "else if", field_number, wire_type,
+        });
+
+        switch (field_label) {
+            .LABEL_REPEATED => {
+                if (field.packed_value == true) {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const {s}_len = try buffer.decodeVarint();
+                        \\{s}            const {s}_end = buffer.read_index + {s}_len;
+                        \\{s}            while (buffer.read_index < {s}_end)
+                        \\{s}                try {s}_list.append( allocator, try  
+                    , .{
+                        indent,
+                        indent, field_name, // const _len
+                        indent, field_name, field_name, // const _end
+                        indent, field_name, // while
+                        indent, field_name, // append
+                    });
+                    auks.printDecodeMethod(verkisto, field_type_enum, "", "");
+                    try verkisto.print(
+                        \\ );
+                        \\{s}            if (buffer.read_index != {s}_end) return error.AllocationFailed;
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent, field_name,
+                        indent,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}            {{ try {s}_list.append( allocator, try 
+                    , .{
+                        indent, field_name,
+                    });
+                    auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "");
+                    try verkisto.print(" ); }}\n", .{});
+                }
+            },
+            .LABEL_REQUIRED => {
+                try verkisto.print(
+                    \\{s}            mia_Mesagho.{s} = try 
+                , .{
+                    indent, field.name,
+                });
+                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n");
+            },
+            else => {
+                try verkisto.print(
+                    \\{s}            mia_Mesagho.{s} = try 
+                , .{
+                    indent, field.name,
+                });
+                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n");
+            },
+        }
+
+        unua = false;
+    }
+
+    try verkisto.print(
+        \\{s}    }}
+        \\
+        \\
+    , .{indent});
+
+    for (msg.fields) |field| {
+        if (field.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
+                \\
+            , .{
+                indent, field.name, field.name,
+            });
+        }
+    }
+
+    try verkisto.print(
+        \\
+        \\{s}    return mia_Mesagho;
+        \\{s}}}
+    , .{
+        indent, indent,
+    });
+
+    try verkisto.flush();
+}
+
+/////////////////////////////////////
+/// skribiSeriigi: Optional Funkcioj
+/////////////////////////////////////
+///
+fn skribiOptionalNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+    try verkisto.print(
+        \\{s}    if( self.{s} ) |val| {{
+        \\{s}        tuta_longo += try 
+    , .{
+        indent, field_name, // if (non-null )
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try verkisto.print(
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}   //1 opt - no def - no varlong
+        \\
+        \\
+    , .{
+        indent, (@as(u32, field_number) << 3) | wire_type, // if (non-null )
+        indent,
+    });
+}
+
+fn skribiOptionalDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+    var default_value_string = default;
+
+    if (field_type == .TYPE_ENUM) {
+        if (!equal(u8, default, "null"))
+            default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
+        else
+            default_value_string = "null";
+    }
+
+    try verkisto.print(
+        \\{s}    if( self.{s} ) |val| {{
+        \\{s}        if( val != {s} )  {{
+        \\{s}            tuta_longo += try 
+    , .{
+        indent, field_name, // if (non-null )
+        indent, default_value_string, // if !default )
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try verkisto.print(
+        \\{s}            tuta_longo += try buffer.encodeVarint({d});
+        \\{s}        }}
+        \\{s}    }}  //2 opt - def - no varlong
+        \\
+        \\
+    , .{
+        indent, (@as(u32, field_number) << 3) | wire_type, // if (non-null )
+        indent, indent,
+    });
+}
+
+fn skribiOptionalNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+    try verkisto.print(
+        \\{s}    if ( self.{s} ) |val| {{
+        \\{s}        const st_longa = try 
+    , .{
+        indent, field_name, // if (non-null )
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try verkisto.print(
+        \\{s}        tuta_longo += st_longa;
+        \\{s}        tuta_longo += try buffer.encodeVarint(st_longa);
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}  //3  opt - no def - varlong
+        \\
+        \\
+    , .{
+        indent,
+        indent,
+        indent,
+        (@as(u32, field_number) << 3) | wire_type,
+        indent,
+    });
+}
+
+fn skribiOptionalDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+    if (field_type != .TYPE_STRING) {
+        skribiOptionalNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
+        return;
+    }
+
+    try verkisto.print(
+        \\{s}    if ( self.{s} ) |val| {{
+        \\{s}        if ( ! equal(u8, val, {s}) ) {{
+        \\{s}            const st_longa = try 
+    , .{
+        indent, field_name, // if (non-null )
+        indent, default,
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try verkisto.print(
+        \\{s}            tuta_longo += st_longa;
+        \\{s}            tuta_longo += try buffer.encodeVarint(st_longa);
+        \\{s}            tuta_longo += try buffer.encodeVarint({d});
+        \\{s}        }}  
+        \\{s}    }}  //4  opt - def - varlong
+        \\
+        \\
+    , .{
+        indent,
+        indent,
+        indent,
+        (@as(u32, field_number) << 3) | wire_type,
+        indent,
+        indent,
+    });
+}
+
+/////////////////////////////////////
+/// skribiSeriigi: Required Funkcioj
+/////////////////////////////////////
+///
+fn skribiRequiredNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+    try verkisto.print(
+        \\{s}    tuta_longo += try 
+    , .{
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try verkisto.print(
+        \\{s}    tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    //5 req - no def - no varlong
+        \\
+        \\
+    , .{
+        indent, (@as(u32, field_number) << 3) | wire_type,
+        indent,
+    });
+}
+
+fn skribiRequiredDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+    var default_value_string = default;
+
+    if (field_type == .TYPE_ENUM) {
+        if (!equal(u8, default, "null"))
+            default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
+        else
+            default_value_string = "null";
+    }
+
+    try verkisto.print(
+        \\{s}    if( self.{s} != {s} )  {{
+        \\{s}        tuta_longo += try 
+    , .{
+        indent, field_name, default_value_string, // if !default )
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try verkisto.print(
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}  //6  req - def - no varlong
+        \\
+        \\
+    , .{
+        indent, (@as(u32, field_number) << 3) | wire_type,
+        indent,
+    });
+}
+
+fn skribiRequiredNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+    try verkisto.print(
+        \\{s}    const {s}_longa = try 
+    , .{
+        indent, field_name,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try verkisto.print(
+        \\{s}    tuta_longo += {s}_longa;
+        \\{s}    tuta_longo += try buffer.encodeVarint({s}_longa);
+        \\{s}    tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    //7  req - no def - varlong
+        \\
+        \\
+    , .{
+        indent, field_name,
+        indent, field_name,
+        indent, (@as(u32, field_number) << 3) | wire_type,
+        indent,
+    });
+}
+
+fn skribiRequiredDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+    if (field_type != .TYPE_STRING) {
+        skribiRequiredNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
+        return;
+    }
+
+    try verkisto.print(
+        \\{s}    if ( ! equal(u8, self.{s}, {s}) ) {{
+        \\{s}        const st_longa = try 
+    , .{
+        indent, field_name, default, // if !def
+        indent,
+    });
+    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try verkisto.print(
+        \\{s}        tuta_longo += st_longa;
+        \\{s}        tuta_longo += try buffer.encodeVarint(st_longa);
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}  //8 req - def - varlong
+        \\
+        \\
+    , .{
+        indent,
+        indent,
+        indent,
+        (@as(u32, field_number) << 3) | wire_type,
+        indent,
+    });
+}
+
+/////////////////////////////////////
+/// skribiSeriigi: Repeted Funkcioj
+/////////////////////////////////////
+///
+fn skribiRepeatedNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, pck: bool) !void {
+    if (pck) {
+        try verkisto.print(
+            \\{s}    var {s}_longa: usize = 0; 
+            \\{s}    for (self.{s}) |item| 
+            \\{s}        {s}_longa += try 
+        , .{
+            indent, field_name, // s_longa
+            indent, field_name, // for
+            indent, field_name, // try
+        });
+        auks.printEncodeMethod(verkisto, field_type, "", "item");
+        try verkisto.print(
+            \\{s}    tuta_longo += {s}_longa;
+            \\{s}    tuta_longo += try buffer.encodeVarint({s}_longa);
+            \\{s}    tuta_longo += try buffer.encodeVarint({d});
+            \\{s}    // 9 rept - no def - no varlong  PACKED
+            \\
+            \\
+        , .{
+            indent, field_name, // tuta = {s}_long
+            indent, field_name, // tuta = encode {s}_long
+            indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+            indent,
+        });
+        return;
+    }
+
+    try verkisto.print(
+        \\{s}    for (self.{s}) |item| {{
+        \\{s}        tuta_longo += try 
+    , .{
+        indent, field_name, // for
+        indent, // try
+    });
+    auks.printEncodeMethod(verkisto, field_type, "", "item");
+    try verkisto.print(
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}  // 9 rept - no def - no varlong 
+        \\
+        \\
+    , .{
+        indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+        indent,
+    });
+}
+
+fn skribiRepeatedNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+    try verkisto.print(
+        \\{s}    for (self.{s}) |item| {{
+        \\{s}        const {s}_longa = try 
+    , .{
+        indent, field_name, // for
+        indent, field_name, // try
+    });
+    auks.printEncodeMethod(verkisto, field_type, "", "item");
+    try verkisto.print(
+        \\{s}        tuta_longo += {s}_longa;
+        \\{s}        tuta_longo += try buffer.encodeVarint({s}_longa);
+        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\{s}    }}  // 11  rept - no def - varlong 
+        \\
+        \\
+    , .{
+        indent, field_name,
+        indent, field_name,
+        indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+        indent,
+    });
+}
+
+/////////////////////////////////////
+/// Konstruktoriloj
+/////////////////////////////////////
+///
+fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
+    const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+    try verkisto.print(
+        \\{s}pub fn initDefault(allocator: all.Allocator) !{s} {{
+        \\{s}    const self = try allocator.create({s});
+        \\{s}    self.* = {s}{{
+        \\
+    , .{
+        indent, msg.name,
+        indent, msg.name,
+        indent, msg.name,
+    });
+
+    for (msg.fields) |field| {
+        try verkisto.print(
+            \\{s}        .{s} = 
+        , .{
+            indent, field.name,
+        });
+        try auks.skribiFieldInit(verkisto, field);
+    }
+
+    try verkisto.print(
+        \\{s}    }};
+        \\{s}    return self.*;
+        \\{s}}}
+        \\
+        \\
+    , .{
+        indent, indent, indent,
+    });
+
+    return;
+}
