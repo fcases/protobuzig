@@ -1,6 +1,5 @@
 const std = @import("std");
 const dbg = std.debug;
-const zon = std.zon;
 const all = std.mem;
 const equal = std.mem.eql;
 const  io = std.Io;
@@ -19,27 +18,60 @@ pub const AppConfig = struct {
     TraceLevel: ?i32 = 0 ,
     Domains: []DomainCfg,
 
-    pub fn skribiAlZonTeksto(self: *AppConfig, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, AppConfig, @as(*AppConfig,self));
+    pub fn initDefault(allocator: all.Allocator) !AppConfig {
+        const self = try allocator.create(AppConfig);
+        self.* = AppConfig{
+            .ActivateTrace = false,
+            .TraceLevel = 0,
+            .Domains = try allocator.alloc(DomainCfg, 0),
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !AppConfig {
-        return legiTiponElZonTeksto(allocator, AppConfig, input);
+    pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, AppConfig, @as(*AppConfig, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, AppConfig, @as(*AppConfig, self), path);
+    pub fn skribiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !AppConfig {
-        return legiTiponElZonDosiero(allocator, AppConfig, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !AppConfig {
+        return try encdec.legiTiponElTeksto(allocator, AppConfig, input, t_formato);
     }
 
-    pub fn encode(self: *const AppConfig, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !AppConfig {
+        return try encdec.legiTiponElDosiero(allocator, AppConfig, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const AppConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        if( self.ActivateTrace ) |val|  
+            try bufro.print(allocator,"{s}ActivateTrace: {any}\n",.{ ind, val });
+        if( self.TraceLevel ) |val|  
+            try bufro.print(allocator,"{s}TraceLevel: {any}\n",.{ ind, val });
+        for(self.Domains) |obj| 
+            try bufro.print(allocator, "{s}Domains {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *AppConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, AppConfig, @as(*AppConfig,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const AppConfig, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         for (self.Domains) |item| {
-            const Domains_longa = try item.encode( buffer );
+            const Domains_longa = try item.seriigi( buffer );
             tuta_longo += Domains_longa;
             tuta_longo += try buffer.encodeVarint(Domains_longa);
             tuta_longo += try buffer.encodeVarint(26);
@@ -62,12 +94,42 @@ pub const AppConfig = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const AppConfig, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !AppConfig {
+        return try deseriigiTiponElBin(allocator, AppConfig, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !AppConfig {
+        return try deseriigiTiponElDosiero(allocator, AppConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !AppConfig {
+        var mia_Mesagho= try AppConfig.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+        var Domains_list: std.ArrayList(DomainCfg) = .empty; 
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 0 ) 
+                mia_Mesagho.ActivateTrace = try buffer.decodeBool()
+            else if ( field_number == 2 and wire_type == 0 ) 
+                mia_Mesagho.TraceLevel = try buffer.decodeInt32()
+            else if ( field_number == 3 and wire_type == 2 ) 
+                { try Domains_list.append( allocator, try DomainCfg.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+        }
+
+        mia_Mesagho.Domains = try Domains_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
+    }
 };
 
 pub const DomainCfg = struct {
@@ -78,34 +140,74 @@ pub const DomainCfg = struct {
     Transports: []TransportDef,
     CrossConnector: ?CrossConnectorDef = null,
 
-    pub fn skribiAlZonTeksto(self: *DomainCfg, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, DomainCfg, @as(*DomainCfg,self));
+    pub fn initDefault(allocator: all.Allocator) !DomainCfg {
+        const self = try allocator.create(DomainCfg);
+        self.* = DomainCfg{
+            .Id = 0,
+            .ActivateDefaultTransport = false,
+            .DirectDispacthToSubs = false,
+            .KeyFile = null,
+            .Transports = try allocator.alloc(TransportDef, 0),
+            .CrossConnector = null,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !DomainCfg {
-        return legiTiponElZonTeksto(allocator, DomainCfg, input);
+    pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, DomainCfg, @as(*DomainCfg, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path);
+    pub fn skribiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !DomainCfg {
-        return legiTiponElZonDosiero(allocator, DomainCfg, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !DomainCfg {
+        return try encdec.legiTiponElTeksto(allocator, DomainCfg, input, t_formato);
     }
 
-    pub fn encode(self: *const DomainCfg, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !DomainCfg {
+        return try encdec.legiTiponElDosiero(allocator, DomainCfg, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const DomainCfg, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}Id: {any}\n",.{ind, self.Id });
+        try bufro.print(allocator,"{s}ActivateDefaultTransport: {any}\n",.{ind, self.ActivateDefaultTransport });
+        if( self.DirectDispacthToSubs ) |val|  
+            try bufro.print(allocator,"{s}DirectDispacthToSubs: {any}\n",.{ ind, val });
+        if( self.KeyFile ) |val|  
+            try bufro.print(allocator,"{s}KeyFile: \"{s}\"\n",.{ ind, val });
+        for(self.Transports) |obj| 
+            try bufro.print(allocator, "{s}Transports {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
+        if( self.CrossConnector ) |val|  
+            try bufro.print(allocator, "{s}CrossConnector {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *DomainCfg, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, DomainCfg, @as(*DomainCfg,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const DomainCfg, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if ( self.CrossConnector ) |val| {
-            const st_longa = try val.encode( buffer );
+            const st_longa = try val.seriigi( buffer );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(50);
         }  //3  opt - no def - varlong
 
         for (self.Transports) |item| {
-            const Transports_longa = try item.encode( buffer );
+            const Transports_longa = try item.seriigi( buffer );
             tuta_longo += Transports_longa;
             tuta_longo += try buffer.encodeVarint(Transports_longa);
             tuta_longo += try buffer.encodeVarint(42);
@@ -137,12 +239,48 @@ pub const DomainCfg = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const DomainCfg, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !DomainCfg {
+        return try deseriigiTiponElBin(allocator, DomainCfg, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !DomainCfg {
+        return try deseriigiTiponElDosiero(allocator, DomainCfg, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !DomainCfg {
+        var mia_Mesagho= try DomainCfg.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+        var Transports_list: std.ArrayList(TransportDef) = .empty; 
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 0 ) 
+                mia_Mesagho.Id = try buffer.decodeInt32()
+            else if ( field_number == 2 and wire_type == 0 ) 
+                mia_Mesagho.ActivateDefaultTransport = try buffer.decodeBool()
+            else if ( field_number == 3 and wire_type == 0 ) 
+                mia_Mesagho.DirectDispacthToSubs = try buffer.decodeBool()
+            else if ( field_number == 4 and wire_type == 2 ) 
+                mia_Mesagho.KeyFile = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 5 and wire_type == 2 ) 
+                { try Transports_list.append( allocator, try TransportDef.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            else if ( field_number == 6 and wire_type == 2 ) 
+                mia_Mesagho.CrossConnector = try CrossConnectorDef.deseriigi(allocator, buffer, try buffer.decodeVarint() );
+        }
+
+        mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
+    }
 };
 
 pub const TransportDef = struct {
@@ -154,41 +292,83 @@ pub const TransportDef = struct {
     BCastParams: ?BCastDefConfig = null,
     UDPStarParams: ?UDPStarDefConfig = null,
 
-    pub fn skribiAlZonTeksto(self: *TransportDef, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, TransportDef, @as(*TransportDef,self));
+    pub fn initDefault(allocator: all.Allocator) !TransportDef {
+        const self = try allocator.create(TransportDef);
+        self.* = TransportDef{
+            .TransportName = "MCastDefault0",
+            .DllImport = "Default",
+            .TransportClass = "Default",
+            .ReceiveOwnMsgs = false,
+            .MCastParams = null,
+            .BCastParams = null,
+            .UDPStarParams = null,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !TransportDef {
-        return legiTiponElZonTeksto(allocator, TransportDef, input);
+    pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, TransportDef, @as(*TransportDef, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, TransportDef, @as(*TransportDef, self), path);
+    pub fn skribiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !TransportDef {
-        return legiTiponElZonDosiero(allocator, TransportDef, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !TransportDef {
+        return try encdec.legiTiponElTeksto(allocator, TransportDef, input, t_formato);
     }
 
-    pub fn encode(self: *const TransportDef, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !TransportDef {
+        return try encdec.legiTiponElDosiero(allocator, TransportDef, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const TransportDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}TransportName: \"{s}\"\n",.{ind, self.TransportName });
+        try bufro.print(allocator,"{s}DllImport: \"{s}\"\n",.{ind, self.DllImport });
+        try bufro.print(allocator,"{s}TransportClass: \"{s}\"\n",.{ind, self.TransportClass });
+        if( self.ReceiveOwnMsgs ) |val|  
+            try bufro.print(allocator,"{s}ReceiveOwnMsgs: {any}\n",.{ ind, val });
+        if( self.MCastParams ) |val|  
+            try bufro.print(allocator, "{s}MCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+        if( self.BCastParams ) |val|  
+            try bufro.print(allocator, "{s}BCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+        if( self.UDPStarParams ) |val|  
+            try bufro.print(allocator, "{s}UDPStarParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *TransportDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, TransportDef, @as(*TransportDef,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const TransportDef, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if ( self.UDPStarParams ) |val| {
-            const st_longa = try val.encode( buffer );
+            const st_longa = try val.seriigi( buffer );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(58);
         }  //3  opt - no def - varlong
 
         if ( self.BCastParams ) |val| {
-            const st_longa = try val.encode( buffer );
+            const st_longa = try val.seriigi( buffer );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(50);
         }  //3  opt - no def - varlong
 
         if ( self.MCastParams ) |val| {
-            const st_longa = try val.encode( buffer );
+            const st_longa = try val.seriigi( buffer );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(42);
@@ -225,12 +405,48 @@ pub const TransportDef = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const TransportDef, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !TransportDef {
+        return try deseriigiTiponElBin(allocator, TransportDef, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !TransportDef {
+        return try deseriigiTiponElDosiero(allocator, TransportDef, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !TransportDef {
+        var mia_Mesagho= try TransportDef.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                mia_Mesagho.TransportName = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 2 and wire_type == 2 ) 
+                mia_Mesagho.DllImport = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 3 and wire_type == 2 ) 
+                mia_Mesagho.TransportClass = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 4 and wire_type == 0 ) 
+                mia_Mesagho.ReceiveOwnMsgs = try buffer.decodeBool()
+            else if ( field_number == 5 and wire_type == 2 ) 
+                mia_Mesagho.MCastParams = try MCastDefConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+            else if ( field_number == 6 and wire_type == 2 ) 
+                mia_Mesagho.BCastParams = try BCastDefConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+            else if ( field_number == 7 and wire_type == 2 ) 
+                mia_Mesagho.UDPStarParams = try UDPStarDefConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() );
+        }
+
+
+        return mia_Mesagho;
+    }
 };
 
 pub const MCastDefConfig = struct {
@@ -241,23 +457,62 @@ pub const MCastDefConfig = struct {
     ReceiveBuffer: ?i32 = 134217727 ,
     SendBuffer: ?i32 = 134217727 ,
 
-    pub fn skribiAlZonTeksto(self: *MCastDefConfig, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, MCastDefConfig, @as(*MCastDefConfig,self));
+    pub fn initDefault(allocator: all.Allocator) !MCastDefConfig {
+        const self = try allocator.create(MCastDefConfig);
+        self.* = MCastDefConfig{
+            .LocalAddress = "Any",
+            .MCastAddress = "239.255.0.1",
+            .Port = 40069,
+            .TTL = 1,
+            .ReceiveBuffer = 134217727,
+            .SendBuffer = 134217727,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !MCastDefConfig {
-        return legiTiponElZonTeksto(allocator, MCastDefConfig, input);
+    pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, MCastDefConfig, @as(*MCastDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path);
+    pub fn skribiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !MCastDefConfig {
-        return legiTiponElZonDosiero(allocator, MCastDefConfig, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !MCastDefConfig {
+        return try encdec.legiTiponElTeksto(allocator, MCastDefConfig, input, t_formato);
     }
 
-    pub fn encode(self: *const MCastDefConfig, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !MCastDefConfig {
+        return try encdec.legiTiponElDosiero(allocator, MCastDefConfig, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const MCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
+        try bufro.print(allocator,"{s}MCastAddress: \"{s}\"\n",.{ind, self.MCastAddress });
+        try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
+        if( self.TTL ) |val|  
+            try bufro.print(allocator,"{s}TTL: {any}\n",.{ ind, val });
+        if( self.ReceiveBuffer ) |val|  
+            try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
+        if( self.SendBuffer ) |val|  
+            try bufro.print(allocator,"{s}SendBuffer: {any}\n",.{ ind, val });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *MCastDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, MCastDefConfig, @as(*MCastDefConfig,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const MCastDefConfig, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if( self.SendBuffer ) |val| {
@@ -303,12 +558,46 @@ pub const MCastDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const MCastDefConfig, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !MCastDefConfig {
+        return try deseriigiTiponElBin(allocator, MCastDefConfig, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !MCastDefConfig {
+        return try deseriigiTiponElDosiero(allocator, MCastDefConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !MCastDefConfig {
+        var mia_Mesagho= try MCastDefConfig.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                mia_Mesagho.LocalAddress = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 2 and wire_type == 2 ) 
+                mia_Mesagho.MCastAddress = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 3 and wire_type == 0 ) 
+                mia_Mesagho.Port = try buffer.decodeInt32()
+            else if ( field_number == 4 and wire_type == 0 ) 
+                mia_Mesagho.TTL = try buffer.decodeInt32()
+            else if ( field_number == 5 and wire_type == 0 ) 
+                mia_Mesagho.ReceiveBuffer = try buffer.decodeInt32()
+            else if ( field_number == 6 and wire_type == 0 ) 
+                mia_Mesagho.SendBuffer = try buffer.decodeInt32();
+        }
+
+
+        return mia_Mesagho;
+    }
 };
 
 pub const BCastDefConfig = struct {
@@ -318,23 +607,59 @@ pub const BCastDefConfig = struct {
     ReceiveBuffer: ?i32 = 134217727 ,
     SendBuffer: ?i32 = 134217727 ,
 
-    pub fn skribiAlZonTeksto(self: *BCastDefConfig, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, BCastDefConfig, @as(*BCastDefConfig,self));
+    pub fn initDefault(allocator: all.Allocator) !BCastDefConfig {
+        const self = try allocator.create(BCastDefConfig);
+        self.* = BCastDefConfig{
+            .LocalAddress = "Any",
+            .BCastAddress = "192.168.2.255",
+            .Port = 40069,
+            .ReceiveBuffer = 134217727,
+            .SendBuffer = 134217727,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !BCastDefConfig {
-        return legiTiponElZonTeksto(allocator, BCastDefConfig, input);
+    pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, BCastDefConfig, @as(*BCastDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path);
+    pub fn skribiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !BCastDefConfig {
-        return legiTiponElZonDosiero(allocator, BCastDefConfig, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !BCastDefConfig {
+        return try encdec.legiTiponElTeksto(allocator, BCastDefConfig, input, t_formato);
     }
 
-    pub fn encode(self: *const BCastDefConfig, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !BCastDefConfig {
+        return try encdec.legiTiponElDosiero(allocator, BCastDefConfig, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const BCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
+        try bufro.print(allocator,"{s}BCastAddress: \"{s}\"\n",.{ind, self.BCastAddress });
+        try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
+        if( self.ReceiveBuffer ) |val|  
+            try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
+        if( self.SendBuffer ) |val|  
+            try bufro.print(allocator,"{s}SendBuffer: {any}\n",.{ ind, val });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *BCastDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, BCastDefConfig, @as(*BCastDefConfig,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const BCastDefConfig, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if( self.SendBuffer ) |val| {
@@ -373,12 +698,44 @@ pub const BCastDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const BCastDefConfig, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !BCastDefConfig {
+        return try deseriigiTiponElBin(allocator, BCastDefConfig, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !BCastDefConfig {
+        return try deseriigiTiponElDosiero(allocator, BCastDefConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !BCastDefConfig {
+        var mia_Mesagho= try BCastDefConfig.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                mia_Mesagho.LocalAddress = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 2 and wire_type == 2 ) 
+                mia_Mesagho.BCastAddress = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 3 and wire_type == 0 ) 
+                mia_Mesagho.Port = try buffer.decodeInt32()
+            else if ( field_number == 4 and wire_type == 0 ) 
+                mia_Mesagho.ReceiveBuffer = try buffer.decodeInt32()
+            else if ( field_number == 5 and wire_type == 0 ) 
+                mia_Mesagho.SendBuffer = try buffer.decodeInt32();
+        }
+
+
+        return mia_Mesagho;
+    }
 };
 
 pub const UDPStarDefConfig = struct {
@@ -388,23 +745,60 @@ pub const UDPStarDefConfig = struct {
     ReceiveBuffer: ?i32 = 134217727 ,
     SendBuffer: ?i32 = 134217727 ,
 
-    pub fn skribiAlZonTeksto(self: *UDPStarDefConfig, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig,self));
+    pub fn initDefault(allocator: all.Allocator) !UDPStarDefConfig {
+        const self = try allocator.create(UDPStarDefConfig);
+        self.* = UDPStarDefConfig{
+            .LocalAddress = "Any",
+            .Port = 40069,
+            .EndPoint = try allocator.alloc(EndPointDef, 0),
+            .ReceiveBuffer = 134217727,
+            .SendBuffer = 134217727,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !UDPStarDefConfig {
-        return legiTiponElZonTeksto(allocator, UDPStarDefConfig, input);
+    pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path);
+    pub fn skribiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !UDPStarDefConfig {
-        return legiTiponElZonDosiero(allocator, UDPStarDefConfig, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !UDPStarDefConfig {
+        return try encdec.legiTiponElTeksto(allocator, UDPStarDefConfig, input, t_formato);
     }
 
-    pub fn encode(self: *const UDPStarDefConfig, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !UDPStarDefConfig {
+        return try encdec.legiTiponElDosiero(allocator, UDPStarDefConfig, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const UDPStarDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
+        try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
+        for(self.EndPoint) |obj| 
+            try bufro.print(allocator, "{s}EndPoint {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
+        if( self.ReceiveBuffer ) |val|  
+            try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
+        if( self.SendBuffer ) |val|  
+            try bufro.print(allocator,"{s}SendBuffer: {any}\n",.{ ind, val });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *UDPStarDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const UDPStarDefConfig, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if( self.SendBuffer ) |val| {
@@ -422,7 +816,7 @@ pub const UDPStarDefConfig = struct {
         }  //2 opt - def - no varlong
 
         for (self.EndPoint) |item| {
-            const EndPoint_longa = try item.encode( buffer );
+            const EndPoint_longa = try item.seriigi( buffer );
             tuta_longo += EndPoint_longa;
             tuta_longo += try buffer.encodeVarint(EndPoint_longa);
             tuta_longo += try buffer.encodeVarint(26);
@@ -443,35 +837,97 @@ pub const UDPStarDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const UDPStarDefConfig, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !UDPStarDefConfig {
+        return try deseriigiTiponElBin(allocator, UDPStarDefConfig, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !UDPStarDefConfig {
+        return try deseriigiTiponElDosiero(allocator, UDPStarDefConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !UDPStarDefConfig {
+        var mia_Mesagho= try UDPStarDefConfig.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+        var EndPoint_list: std.ArrayList(EndPointDef) = .empty; 
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                mia_Mesagho.LocalAddress = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 2 and wire_type == 0 ) 
+                mia_Mesagho.Port = try buffer.decodeInt32()
+            else if ( field_number == 3 and wire_type == 2 ) 
+                { try EndPoint_list.append( allocator, try EndPointDef.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            else if ( field_number == 4 and wire_type == 0 ) 
+                mia_Mesagho.ReceiveBuffer = try buffer.decodeInt32()
+            else if ( field_number == 5 and wire_type == 0 ) 
+                mia_Mesagho.SendBuffer = try buffer.decodeInt32();
+        }
+
+        mia_Mesagho.EndPoint = try EndPoint_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
+    }
 };
 
 pub const EndPointDef = struct {
     Host: []const u8,
     Port: i32 = 40069 ,
 
-    pub fn skribiAlZonTeksto(self: *EndPointDef, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, EndPointDef, @as(*EndPointDef,self));
+    pub fn initDefault(allocator: all.Allocator) !EndPointDef {
+        const self = try allocator.create(EndPointDef);
+        self.* = EndPointDef{
+            .Host = "", 
+            .Port = 40069,
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !EndPointDef {
-        return legiTiponElZonTeksto(allocator, EndPointDef, input);
+    pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, EndPointDef, @as(*EndPointDef, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path);
+    pub fn skribiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !EndPointDef {
-        return legiTiponElZonDosiero(allocator, EndPointDef, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !EndPointDef {
+        return try encdec.legiTiponElTeksto(allocator, EndPointDef, input, t_formato);
     }
 
-    pub fn encode(self: *const EndPointDef, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !EndPointDef {
+        return try encdec.legiTiponElDosiero(allocator, EndPointDef, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const EndPointDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        try bufro.print(allocator,"{s}Host: \"{s}\"\n",.{ind, self.Host });
+        try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *EndPointDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, EndPointDef, @as(*EndPointDef,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const EndPointDef, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         if( self.Port != 40069 )  {
@@ -488,34 +944,87 @@ pub const EndPointDef = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const EndPointDef, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !EndPointDef {
+        return try deseriigiTiponElBin(allocator, EndPointDef, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !EndPointDef {
+        return try deseriigiTiponElDosiero(allocator, EndPointDef, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !EndPointDef {
+        var mia_Mesagho= try EndPointDef.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                mia_Mesagho.Host = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 2 and wire_type == 0 ) 
+                mia_Mesagho.Port = try buffer.decodeInt32();
+        }
+
+
+        return mia_Mesagho;
+    }
 };
 
 pub const CrossConnectorDef = struct {
     Transports: [][]const u8,
 
-    pub fn skribiAlZonTeksto(self: *CrossConnectorDef, allocator: all.Allocator) ![]u8 {
-        return skribiTiponAlZonTeksto(allocator, CrossConnectorDef, @as(*CrossConnectorDef,self));
+    pub fn initDefault(allocator: all.Allocator) !CrossConnectorDef {
+        const self = try allocator.create(CrossConnectorDef);
+        self.* = CrossConnectorDef{
+            .Transports = try allocator.alloc([]const u8, 0),
+        };
+        return self.*;
     }
 
-    pub fn legiElZonTeksto(allocator: all.Allocator, input: [:0]const u8) !CrossConnectorDef {
-        return legiTiponElZonTeksto(allocator, CrossConnectorDef, input);
+    pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
+        return try encdec.skribiTiponAlTeksto(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), t_formato);
     }
 
-    pub fn skribiAlZonDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8) !void {
-        try skribiTiponAlZonDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path);
+    pub fn skribiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
+        try encdec.skribiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, t_formato);
     }
 
-    pub fn legiElZonDosiero(allocator: all.Allocator, path: [:0]const u8) !CrossConnectorDef {
-        return legiTiponElZonDosiero(allocator, CrossConnectorDef, path);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !CrossConnectorDef {
+        return try encdec.legiTiponElTeksto(allocator, CrossConnectorDef, input, t_formato);
     }
 
-    pub fn encode(self: *const CrossConnectorDef, buffer: *EncodeBuffer) !usize {
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !CrossConnectorDef {
+        return try encdec.legiTiponElDosiero(allocator, CrossConnectorDef, path, t_formato);
+    }
+
+    pub fn skribiAlProtobufTeksto(self: *const CrossConnectorDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+       var bufro:std.ArrayList(u8)= .empty;
+       if( equal(u8,indent,"") ) { {} } 
+
+        for(self.Transports) |obj| 
+            try bufro.print(allocator,"{s}Transports: \"{s}\"\n",.{ind, obj });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    pub fn seriigiAlBin(self: *CrossConnectorDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, CrossConnectorDef, @as(*CrossConnectorDef,self), b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const CrossConnectorDef, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
         for (self.Transports) |item| {
@@ -528,12 +1037,38 @@ pub const CrossConnectorDef = struct {
         return tuta_longo;
     }
 
-    pub fn decode(self: *const CrossConnectorDef, buffer: *EncodeBuffer) !usize {
-        var tuta_longo: usize = 0;
-       _=self;_=buffer;tuta_longo=3;
-        return tuta_longo;
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !CrossConnectorDef {
+        return try deseriigiTiponElBin(allocator, CrossConnectorDef, input, b_formato);
     }
 
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !CrossConnectorDef {
+        return try deseriigiTiponElDosiero(allocator, CrossConnectorDef, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !CrossConnectorDef {
+        var mia_Mesagho= try CrossConnectorDef.initDefault(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+        var Transports_list: std.ArrayList([]const u8) = .empty; 
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+                { try Transports_list.append( allocator, try buffer.decodeString(  try buffer.decodeVarint() ) ); }
+        }
+
+        mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
+    }
 };
 
     };   // Config
@@ -544,37 +1079,107 @@ pub const CrossConnectorDef = struct {
 /// //////////////////////////////////////////
 //////////////////////////////////////////////
 
-fn skribiTiponAlZonTeksto(allocator: all.Allocator, comptime T: type, value: *T) ![]u8 {
-    var skribila_asignilo = std.Io.Writer.Allocating.init(allocator);
-    // defer skribila_asignilo.deinit();
+//////////////////////////////////////////////
+/// Seriigi Binaran Tipon
+/// //////////////////////////////////////////
 
-    const self = @as(T, value.*);
-    zon.stringify.serialize(self, .{}, &skribila_asignilo.writer) catch |err| {
-        std.debug.print("eraro dum seriigo: {}\n", .{err});
-        return err;
-    };
+fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: *T) ![]const u8 {
+    var mia_enc = try EncodeBuffer.init(allocator, 48 * 1024);
+    defer mia_enc.deinit();
 
-    return skribila_asignilo.writer.buffered();
+    const longo = try value.seriigi(&mia_enc);
+    const bytes = try allocator.alloc(u8, longo);
+    std.mem.copyForwards(u8, bytes, mia_enc.data());
+    return bytes;
 }
 
-fn skribiTiponAlZonDosiero(allocator: all.Allocator, comptime T: type, value: *T, path: []const u8) !void {
-    const teksto = try skribiTiponAlZonTeksto(allocator,T, value);
+fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato) ![]const u8 {
+    var parsed: []const u8 = undefined;
+    switch (b_formato) {
+        .BF_PROTOBUF => {
+            parsed = try seriigiTipon(allocator, T, value);
+        },
+        .BF_BASE64 => {
+            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+            defer allocator.free(binaraj_bitoj);
+
+            const enc=std.base64.standard.Encoder;
+            const base64_longo = enc.calcSize(binaraj_bitoj.len);
+            const base64_bitoj = try allocator.alloc(u8, base64_longo);
+            parsed = enc.encode(base64_bitoj, binaraj_bitoj);
+        },
+        .BF_BIN2TEKSTO => {
+            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+            defer allocator.free(binaraj_bitoj);
+
+            var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
+            const hex = "0123456789ABCDEF";
+            for (binaraj_bitoj, 0..) |val, i| {
+                const hi: u8 = @intCast((val >> 4) & 0xF);
+                const lo: u8 = @intCast(val & 0xF);
+                try bin2teksto_bitoj.print(allocator,"0x{c}{c} ", .{ hex[hi], hex[lo] });
+
+                if ((i + 1) % 20 == 0) try bin2teksto_bitoj.print(allocator,"\n", .{});
+            }
+            parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
+        },
+        else => {
+            return error.UnsupportedFormat;
+        },
+    }
+
+    return parsed;
+}
+
+fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato, path: []const u8) !void {
+    const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
 
     var dosiero = try std.fs.cwd().createFile(path, .{ .truncate = true });
     defer dosiero.close();
     try dosiero.writeAll(teksto);
 }
 
-fn legiTiponElZonTeksto(allocator: all.Allocator, comptime T: type, input: [:0]const u8) !T {
-    const parsed = zon.parse.fromSlice(T, allocator, input, null, .{}) catch |err| {
-        std.debug.print("eraro dun deseriigo: {}\n", .{err});
-        return err;
-    };
+//////////////////////////////////////////////
+//// Deseriigi Binaran Tipon
+//////////////////////////////////////////////
 
-    return parsed;
+fn deseriigiTipon(allocator: all.Allocator, comptime T: type, input: []const u8) !T {
+    var mia_dec = DecodeBuffer.init(allocator, input, 0, -1);
+    defer mia_dec.deinit();
+
+    const obj = try T.deseriigi(allocator, &mia_dec, null);
+    return obj;
 }
 
-fn legiTiponElZonDosiero(allocator: all.Allocator, comptime T: type, path: []const u8) !T {
+fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: encdec.BinaraFormato) !T {
+    var parsed: []const u8 = undefined;
+    switch (b_formato) {
+        .BF_PROTOBUF => {
+            parsed = input;
+        },
+        .BF_BASE64 => {
+            const dec=std.base64.standard.Decoder;
+            const base64_decoded_longo = try dec.calcSizeForSlice(input);
+            const base64_decoded = try allocator.alloc(u8, base64_decoded_longo);
+
+            dec.decode(base64_decoded,input) catch |err| {
+                std.debug.print("eraro dum deseriigo: {}\n", .{err});
+                return err;
+            };
+            parsed = base64_decoded;
+        },
+        .BF_BIN2TEKSTO => {
+            return error.UnsupportedFormat;
+        },
+        else => {
+            return error.UnsupportedFormat;
+        },
+    }
+
+    return deseriigiTipon(allocator, T, parsed);
+}
+
+fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: encdec.BinaraFormato) !T {
     var dosiero = try std.fs.cwd().openFile(path, .{});
     defer dosiero.close();
 
@@ -585,6 +1190,6 @@ fn legiTiponElZonDosiero(allocator: all.Allocator, comptime T: type, path: []con
     _ = try dosiero.readAll(enhavo[0..dosiera_long]);
     enhavo[dosiera_long] = 0;
 
-    return legiTiponElZonTeksto(allocator, T, enhavo[0..dosiera_long :0]);
+    return deseriigiTiponElBin(allocator, T, enhavo[0..dosiera_long :0], b_formato);
 }
 

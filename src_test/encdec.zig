@@ -568,7 +568,10 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]
             };
         },
         .TF_JSON => {
-            return error.UnsupportedFormat;
+            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{ .ignore_unknown_fields = true }) catch |err| {
+                std.debug.print("eraro dun deseriigo: {}\n", .{err});
+                return err;
+            };
         },
         .TF_PROTOBUF => {
             return error.UnsupportedFormat;

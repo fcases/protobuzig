@@ -673,7 +673,8 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 
         switch (field_label) {
             .LABEL_REPEATED => {
-                if (field.packed_value == true) {
+                if (field.packed_value == true and field_type_enum != .TYPE_STRING and field_type_enum != .TYPE_MESSAGE and field_type_enum != .TYPE_BYTES) {
+                    const typename_len = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ field_name, "_len" }, 0) catch unreachable;
                     try verkisto.print(
                         \\{s}        {{
                         \\{s}            const {s}_len = try buffer.decodeVarint();
@@ -687,7 +688,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         indent, field_name, // while
                         indent, field_name, // append
                     });
-                    auks.printDecodeMethod(verkisto, field_type_enum, "", "");
+                    auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
                     try verkisto.print(
                         \\ );
                         \\{s}            if (buffer.read_index != {s}_end) return error.AllocationFailed;
@@ -703,7 +704,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                     , .{
                         indent, field_name,
                     });
-                    auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "");
+                    auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "", "try buffer.decodeVarint()");
                     try verkisto.print(" ); }}\n", .{});
                 }
             },
@@ -713,7 +714,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                 , .{
                     indent, field.name,
                 });
-                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n");
+                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
             },
             else => {
                 try verkisto.print(
@@ -721,7 +722,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                 , .{
                     indent, field.name,
                 });
-                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n");
+                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
             },
         }
 

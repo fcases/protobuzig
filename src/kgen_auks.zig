@@ -143,9 +143,9 @@ pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []co
     };
 }
 
-pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8) void {
+pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8, extra: []const u8) void {
     return switch (field_type) {
-        .TYPE_MESSAGE => verkisto.print("{s}.deseriigi(allocator, buffer, try buffer.decodeVarint() ){s}", .{ prefix, field_name }) catch {},
+        .TYPE_MESSAGE => verkisto.print("{s}.deseriigi(allocator, buffer, {s} ){s}", .{ prefix, extra, field_name }) catch {},
         .TYPE_ENUM => verkisto.print("std.meta.intToEnum({s}, try buffer.decodeVarint() ) {s}", .{ prefix, field_name }) catch {},
         .TYPE_BOOL => verkisto.print("buffer.decodeBool(){s}", .{field_name}) catch {},
         .TYPE_STRING => verkisto.print("buffer.decodeString( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }) catch {},

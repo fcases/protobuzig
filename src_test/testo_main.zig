@@ -4,7 +4,7 @@ const zon = @import("std").zon;
 
 const EncodeBuffer = @import("encdec.zig").EncodeBuffer;
 const DecodeBuffer = @import("encdec.zig").DecodeBuffer;
-const pbz = @import("generated/example.zig").ProtocolBus;
+const pbz = @import("generated/AppCfg.zig").ProtocolBus.Config;
 
 var buffer: [512 * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&buffer);
@@ -18,10 +18,10 @@ pub fn main() !void {
 }
 
 fn fariChiujnTestojn() !void {
-    try fariTeston1();
-    try fariTeston2();
-    try fariTeston3();
-    try fariTeston4();
+    // try fariTeston1();
+    // try fariTeston2();
+    // try fariTeston3();
+    // try fariTeston4();
     try fariTeston5();
 }
 
@@ -113,7 +113,6 @@ fn fariTeston2() !void {
         \\          }},
         \\          .CrossConnector = null,
         \\      }},
-        // \\      .a = .EAA_STARTED,
         \\}
     ;
     var app_config = pbz.AppConfig.legiElTeksto(mia_asignilo, teksto, .TF_ZIG_ZON) catch unreachable;
@@ -186,7 +185,7 @@ fn fariTeston4() !void {
     // Kvara testo
     /////////////////
 
-    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App.cfg", .TF_ZIG_ZON) catch unreachable;
+    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App.zon.cfg", .TF_ZIG_ZON) catch unreachable;
 
     const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BIN2TEKSTO);
     presiMesagho("Testo 4.1:");
@@ -212,10 +211,10 @@ fn fariTeston5() !void {
     // Kvina  testo
     /////////////////
 
-    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App.cfg", .TF_ZIG_ZON) catch unreachable;
+    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/protocolBus.App.json.cfg", .TF_JSON) catch unreachable;
     // nun, app_config1 enhavas la legitan objekton.
 
-    const skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
+    const skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
     presiMesagho("Testo 5.1:");
     dbgPresi("\n{s}\n{d}\n\n", .{ skribilo, skribilo.len });
     const la_biteoj = try app_config.seriigiAlBin(mia_asignilo, .BF_PROTOBUF);
@@ -225,7 +224,7 @@ fn fariTeston5() !void {
 
     var app_config2 = try pbz.AppConfig.deseriigiElBin(mia_asignilo, la_biteoj, .BF_PROTOBUF);
     // nun, app_config2 enhavas la app_config1 objekton de serializita el la_biteoj.
-    app_config2.Hola = 3;
+    app_config2.TraceLevel = 3;
     const skribilo2 = try app_config2.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
 
     presiMesagho("Testo 5.2:");
