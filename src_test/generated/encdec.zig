@@ -501,14 +501,14 @@ pub const EncodeBuffer = struct {
 const all = std.mem;
 const zon = std.zon;
 
-pub const TekstaFormato = enum(u32) {
+pub const TekstaFormato = enum(u8) {
     TF_ZIG_ZON,
     TF_PROTOBUF,
     TF_JSON,
     TF_ASN1,
 };
 
-pub const BinaraFormato = enum(u32) {
+pub const BinaraFormato = enum(u8) {
     BF_PROTOBUF,
     BF_ASN1_DER,
     BF_OMG_CDR,
