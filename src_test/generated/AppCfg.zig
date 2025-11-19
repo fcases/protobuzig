@@ -13,7 +13,7 @@ pub const ProtocolBus = struct {
     pub const Config = struct {
 
 
-pub const AppConfig = struct {
+pub const AppConfig = export struct {
     ActivateTrace: ?bool = false ,
     TraceLevel: ?i32 = 0 ,
     Domains: []DomainCfg,
