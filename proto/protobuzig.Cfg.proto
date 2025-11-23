@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+
+message protobuzigCfg 
+{
+	required string  ProtoDir=1 [default="./proto"];
+	required string ObjectsGeneratedDir=2 [default="."];
+};
+

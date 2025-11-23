@@ -7,8 +7,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/protobuzig",
             "args": ["proto/AppCfg.proto"],
-            // "args": ["proto/example.proto"],
-            // "args": ["proto/pruebas.proto"],
             "cwd": "${workspaceFolder}",
             "env": {},
             "console": "integratedTerminal",

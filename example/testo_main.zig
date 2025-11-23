@@ -1,9 +1,6 @@
 const std = @import("std");
 const dbgPresi = std.debug.print;
-const zon = @import("std").zon;
 
-const EncodeBuffer = @import("encdec.zig").EncodeBuffer;
-const DecodeBuffer = @import("encdec.zig").DecodeBuffer;
 const pbz = @import("generated/AppCfg.zig").ProtocolBus.Config;
 
 var buffer: [512 * 1024]u8 = undefined;
@@ -18,16 +15,18 @@ pub fn main() !void {
 }
 
 fn fariChiujnTestojn() !void {
-    // try fariTeston1();
-    // try fariTeston2();
-    // try fariTeston3();
-    // try fariTeston4();
+    try fariTeston1();
+    try fariTeston2();
+    try fariTeston3();
+    try fariTeston4();
     try fariTeston5();
 }
 
+test "Unua testo: skribi kodan objekton al tri tekstaj formatoj" {
+    try fariTeston1();
+}
+
 fn fariTeston1() !void {
-    // // var arena = std.heap.ArenaAllocator.init(fba_allocator);
-    // defer arena.deinit();
     defer _ = arena.reset(.free_all);
 
     const mia_asignilo = arena.allocator();
@@ -57,7 +56,6 @@ fn fariTeston1() !void {
     }};
     var app_config = pbz.AppConfig{
         .Domains = mia_dom[0..],
-        // .a = .EAA_RUNNING,
     };
 
     const mia_appcfg_txt1 = try app_config.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
@@ -75,9 +73,11 @@ fn fariTeston1() !void {
     presiMesagho("Fino de Testo 1");
 }
 
+test "Dua testo: legi el kodan zon tekston al objekto kaj skribi al tri tekstaj formatoj" {
+    try fariTeston2();
+}
+
 fn fariTeston2() !void {
-    // var arena = std.heap.ArenaAllocator.init(fba_allocator);
-    // defer arena.deinit();
     defer _ = arena.reset(.free_all);
 
     const mia_asignilo = arena.allocator();
@@ -115,6 +115,7 @@ fn fariTeston2() !void {
         \\      }},
         \\}
     ;
+
     var app_config = pbz.AppConfig.legiElTeksto(mia_asignilo, teksto, .TF_ZIG_ZON) catch unreachable;
     var aux: std.ArrayList([]const u8) = .empty;
     defer aux.deinit(mia_asignilo);
@@ -141,9 +142,11 @@ fn fariTeston2() !void {
     presiMesagho("Fino de Testo 2");
 }
 
+test "Tria testo: legi el kodan zon tekston kaj skribi al PB formata teksto" {
+    try fariTeston3();
+}
+
 fn fariTeston3() !void {
-    // var arena = std.heap.ArenaAllocator.init(fba_allocator);
-    // defer arena.deinit();
     defer _ = arena.reset(.free_all);
 
     const mia_asignilo = arena.allocator();
@@ -174,9 +177,11 @@ fn fariTeston3() !void {
     presiMesagho("Fino de Testo 3");
 }
 
+test "Kvara testo: legi el malsamaj formataj tekstoj kaj skribi al binaraj formatoj" {
+    try fariTeston4();
+}
+
 fn fariTeston4() !void {
-    // var arena = std.heap.ArenaAllocator.init(fba_allocator);
-    // defer arena.deinit();
     defer _ = arena.reset(.free_all);
 
     const mia_asignilo = arena.allocator();
@@ -187,19 +192,53 @@ fn fariTeston4() !void {
 
     var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App.zon.cfg", .TF_ZIG_ZON) catch unreachable;
 
-    const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BIN2TEKSTO);
-    presiMesagho("Testo 4.1:");
-    dbgPresi("{s}\n", .{skribilo1});
+    {
+        presiMesagho("Testo 4.1:");
+        const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BINPB2TEKSTO_HEX);
+        dbgPresi("{s}\n", .{skribilo1});
 
-    const skribilo2 = try app_config.seriigiAlBin(mia_asignilo, .BF_BASE64);
-    presiMesagho("Testo 4.2:");
-    dbgPresi("{s}\n", .{skribilo2});
+        var app_config1 = pbz.AppConfig.deseriigiElBin(mia_asignilo, skribilo1, .BF_BINPB2TEKSTO_HEX) catch unreachable;
+        const skribilo2 = try app_config1.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
+        dbgPresi("{s}\n", .{skribilo2});
+    }
+    {
+        presiMesagho("Testo 4.2:");
+        const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BINPB2TEKSTO_DEC);
+        dbgPresi("{s}\n", .{skribilo1});
 
-    const skribilo3 = try app_config.seriigiAlBin(mia_asignilo, .BF_PROTOBUF);
-    presiMesagho("Testo 4.3:");
-    dbgPresi("{any}\n", .{skribilo3});
+        var app_config1 = pbz.AppConfig.deseriigiElBin(mia_asignilo, skribilo1, .BF_BINPB2TEKSTO_DEC) catch unreachable;
+        const skribilo2 = try app_config1.skribiAlTeksto(mia_asignilo, .TF_JSON);
+        dbgPresi("{s}\n", .{skribilo2});
+    }
+    {
+        presiMesagho("Testo 4.3:");
+        const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BASE64);
+        dbgPresi("{s}\n", .{skribilo1});
+
+        var app_config1 = pbz.AppConfig.deseriigiElBin(mia_asignilo, skribilo1, .BF_BASE64) catch unreachable;
+        const skribilo2 = try app_config1.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
+        dbgPresi("{s}\n", .{skribilo2});
+    }
+    {
+        presiMesagho("Testo 4.4:");
+        const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_BINPB2TEKSTO_DEC);
+        dbgPresi("{s}\n", .{skribilo1});
+
+        var app_config1 = pbz.AppConfig.deseriigiElBin(mia_asignilo, skribilo1, .BF_BINPB2TEKSTO_DEC) catch unreachable;
+        const skribilo2 = try app_config1.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
+        dbgPresi("{s}\n", .{skribilo2});
+    }
+    {
+        presiMesagho("Testo 4.5:");
+        const skribilo1 = try app_config.seriigiAlBin(mia_asignilo, .BF_PROTOBUF);
+        dbgPresi("{any}\n", .{skribilo1});
+    }
 
     presiMesagho("Fino de Testo 4");
+}
+
+test "Kvina testo: Serializo protobuf al kaj dosiero kaj reen" {
+    try fariTeston5();
 }
 
 fn fariTeston5() !void {
@@ -231,26 +270,6 @@ fn fariTeston5() !void {
     dbgPresi("\n{s}\n{d}\n\n", .{ skribilo2, skribilo2.len });
 
     /////////////////
-}
-
-test "Unua testo: skribi objekton al zon formato" {
-    try fariTeston1();
-}
-
-test "Dua testo: legi zon tekston al objekto" {
-    try fariTeston2();
-}
-
-test "Tria testo: legi kaj skribi al kaj el Zon formata teksto" {
-    try fariTeston3();
-}
-
-test "Kvara testo: legi kaj skribi al kaj el Zon formata dosiero" {
-    try fariTeston4();
-}
-
-test "Kvina testo: Serializo protobuf" {
-    try fariTeston5();
 }
 
 fn presiMesagho(msg: []const u8) void {

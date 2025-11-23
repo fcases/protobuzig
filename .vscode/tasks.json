@@ -22,7 +22,7 @@
             "command": "zig",
             "args": [
                 "build-exe",
-                "src_test/testo_main.zig",
+                "example/testo_main.zig",
                 "-femit-bin=zig-out/bin/testo",
                 "-fllvm",
             ],
@@ -31,6 +31,26 @@
                 "isDefault": false
             },
             "problemMatcher": [],
-        }
+            "dependsOn": [
+                "Copy encdec"
+            ]
+        },
+        {
+            "label": "Copy encdec",
+            "type": "shell",
+            "command": "cp",
+            "args": [
+                "${workspaceFolder}/src/encdec.zig",
+                "${workspaceFolder}/example/generated/encdec.zig",
+            ],
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+        },
     ]
 }

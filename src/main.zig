@@ -1,7 +1,6 @@
 const std = @import("std");
 const analizilo = @import("analizilo.zig");
 const kgen = @import("kgeneratoro.zig");
-const cgen = @import("genC.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -18,5 +17,4 @@ pub fn main() !void {
 
     // Koda Generatoro: generi kodan dosieron
     try kgen.generiZigKodon(dosiero, &ast_proto_dosiero);
-    try cgen.generateCBindings(&ast_proto_dosiero, "appcfg.c");
 }

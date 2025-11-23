@@ -3,7 +3,8 @@ const dbg = std.debug;
 const all = std.mem;
 const equal = std.mem.eql;
 const  io = std.Io;
-const encdec = @import("../encdec.zig");
+
+const encdec = @import("encdec.zig");
 const EncodeBuffer = encdec.EncodeBuffer;
 const DecodeBuffer = encdec.DecodeBuffer;
 
@@ -13,7 +14,7 @@ pub const ProtocolBus = struct {
     pub const Config = struct {
 
 
-pub const AppConfig = export struct {
+pub const AppConfig = struct {
     ActivateTrace: ?bool = false ,
     TraceLevel: ?i32 = 0 ,
     Domains: []DomainCfg,
@@ -28,42 +29,49 @@ pub const AppConfig = export struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, AppConfig, @as(*AppConfig, self), t_formato);
+    pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, AppConfig, @as(*AppConfig, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !AppConfig {
-        return try encdec.legiTiponElTeksto(allocator, AppConfig, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
+        return try legiTiponElTeksto(allocator, AppConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !AppConfig {
-        return try encdec.legiTiponElDosiero(allocator, AppConfig, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
+        return try legiTiponElDosiero(allocator, AppConfig, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const AppConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const AppConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         if( self.ActivateTrace ) |val|  
             try bufro.print(allocator,"{s}ActivateTrace: {any}\n",.{ ind, val });
         if( self.TraceLevel ) |val|  
             try bufro.print(allocator,"{s}TraceLevel: {any}\n",.{ ind, val });
-        for(self.Domains) |obj| 
+        for(self.Domains) |obj| {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}Domains {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
+        } 
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *AppConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *AppConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, AppConfig, @as(*AppConfig,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, b_formato);
     }
 
@@ -94,11 +102,11 @@ pub const AppConfig = export struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !AppConfig {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !AppConfig {
         return try deseriigiTiponElBin(allocator, AppConfig, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !AppConfig {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !AppConfig {
         return try deseriigiTiponElDosiero(allocator, AppConfig, path, b_formato);
     }
 
@@ -153,26 +161,24 @@ pub const DomainCfg = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, DomainCfg, @as(*DomainCfg, self), t_formato);
+    pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, DomainCfg, @as(*DomainCfg, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !DomainCfg {
-        return try encdec.legiTiponElTeksto(allocator, DomainCfg, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
+        return try legiTiponElTeksto(allocator, DomainCfg, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !DomainCfg {
-        return try encdec.legiTiponElDosiero(allocator, DomainCfg, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
+        return try legiTiponElDosiero(allocator, DomainCfg, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const DomainCfg, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const DomainCfg, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}Id: {any}\n",.{ind, self.Id });
         try bufro.print(allocator,"{s}ActivateDefaultTransport: {any}\n",.{ind, self.ActivateDefaultTransport });
@@ -180,19 +186,30 @@ pub const DomainCfg = struct {
             try bufro.print(allocator,"{s}DirectDispacthToSubs: {any}\n",.{ ind, val });
         if( self.KeyFile ) |val|  
             try bufro.print(allocator,"{s}KeyFile: \"{s}\"\n",.{ ind, val });
-        for(self.Transports) |obj| 
+        for(self.Transports) |obj| {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}Transports {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
-        if( self.CrossConnector ) |val|  
+        } 
+        if( self.CrossConnector ) |val|  {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}CrossConnector {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+        } 
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *DomainCfg, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *DomainCfg, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, DomainCfg, @as(*DomainCfg,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, b_formato);
     }
 
@@ -239,11 +256,11 @@ pub const DomainCfg = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !DomainCfg {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !DomainCfg {
         return try deseriigiTiponElBin(allocator, DomainCfg, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !DomainCfg {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !DomainCfg {
         return try deseriigiTiponElDosiero(allocator, DomainCfg, path, b_formato);
     }
 
@@ -306,47 +323,58 @@ pub const TransportDef = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, TransportDef, @as(*TransportDef, self), t_formato);
+    pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, TransportDef, @as(*TransportDef, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !TransportDef {
-        return try encdec.legiTiponElTeksto(allocator, TransportDef, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
+        return try legiTiponElTeksto(allocator, TransportDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !TransportDef {
-        return try encdec.legiTiponElDosiero(allocator, TransportDef, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
+        return try legiTiponElDosiero(allocator, TransportDef, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const TransportDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const TransportDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}TransportName: \"{s}\"\n",.{ind, self.TransportName });
         try bufro.print(allocator,"{s}DllImport: \"{s}\"\n",.{ind, self.DllImport });
         try bufro.print(allocator,"{s}TransportClass: \"{s}\"\n",.{ind, self.TransportClass });
         if( self.ReceiveOwnMsgs ) |val|  
             try bufro.print(allocator,"{s}ReceiveOwnMsgs: {any}\n",.{ ind, val });
-        if( self.MCastParams ) |val|  
+        if( self.MCastParams ) |val|  {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}MCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        if( self.BCastParams ) |val|  
+        } 
+        if( self.BCastParams ) |val|  {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}BCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        if( self.UDPStarParams ) |val|  
+        } 
+        if( self.UDPStarParams ) |val|  {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}UDPStarParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
+        } 
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *TransportDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *TransportDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, TransportDef, @as(*TransportDef,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, b_formato);
     }
 
@@ -405,11 +433,11 @@ pub const TransportDef = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !TransportDef {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !TransportDef {
         return try deseriigiTiponElBin(allocator, TransportDef, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !TransportDef {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !TransportDef {
         return try deseriigiTiponElDosiero(allocator, TransportDef, path, b_formato);
     }
 
@@ -470,26 +498,24 @@ pub const MCastDefConfig = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, MCastDefConfig, @as(*MCastDefConfig, self), t_formato);
+    pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, MCastDefConfig, @as(*MCastDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !MCastDefConfig {
-        return try encdec.legiTiponElTeksto(allocator, MCastDefConfig, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
+        return try legiTiponElTeksto(allocator, MCastDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !MCastDefConfig {
-        return try encdec.legiTiponElDosiero(allocator, MCastDefConfig, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
+        return try legiTiponElDosiero(allocator, MCastDefConfig, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const MCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const MCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
         try bufro.print(allocator,"{s}MCastAddress: \"{s}\"\n",.{ind, self.MCastAddress });
@@ -504,11 +530,18 @@ pub const MCastDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *MCastDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *MCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, MCastDefConfig, @as(*MCastDefConfig,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, b_formato);
     }
 
@@ -558,11 +591,11 @@ pub const MCastDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !MCastDefConfig {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !MCastDefConfig {
         return try deseriigiTiponElBin(allocator, MCastDefConfig, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !MCastDefConfig {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !MCastDefConfig {
         return try deseriigiTiponElDosiero(allocator, MCastDefConfig, path, b_formato);
     }
 
@@ -619,26 +652,24 @@ pub const BCastDefConfig = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, BCastDefConfig, @as(*BCastDefConfig, self), t_formato);
+    pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, BCastDefConfig, @as(*BCastDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !BCastDefConfig {
-        return try encdec.legiTiponElTeksto(allocator, BCastDefConfig, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
+        return try legiTiponElTeksto(allocator, BCastDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !BCastDefConfig {
-        return try encdec.legiTiponElDosiero(allocator, BCastDefConfig, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
+        return try legiTiponElDosiero(allocator, BCastDefConfig, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const BCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const BCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
         try bufro.print(allocator,"{s}BCastAddress: \"{s}\"\n",.{ind, self.BCastAddress });
@@ -651,11 +682,18 @@ pub const BCastDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *BCastDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *BCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, BCastDefConfig, @as(*BCastDefConfig,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, b_formato);
     }
 
@@ -698,11 +736,11 @@ pub const BCastDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !BCastDefConfig {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !BCastDefConfig {
         return try deseriigiTiponElBin(allocator, BCastDefConfig, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !BCastDefConfig {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !BCastDefConfig {
         return try deseriigiTiponElDosiero(allocator, BCastDefConfig, path, b_formato);
     }
 
@@ -757,31 +795,31 @@ pub const UDPStarDefConfig = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), t_formato);
+    pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !UDPStarDefConfig {
-        return try encdec.legiTiponElTeksto(allocator, UDPStarDefConfig, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
+        return try legiTiponElTeksto(allocator, UDPStarDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !UDPStarDefConfig {
-        return try encdec.legiTiponElDosiero(allocator, UDPStarDefConfig, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
+        return try legiTiponElDosiero(allocator, UDPStarDefConfig, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const UDPStarDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const UDPStarDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
-        for(self.EndPoint) |obj| 
+        for(self.EndPoint) |obj| {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try bufro.print(allocator, "{s}EndPoint {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
+        } 
         if( self.ReceiveBuffer ) |val|  
             try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
         if( self.SendBuffer ) |val|  
@@ -790,11 +828,18 @@ pub const UDPStarDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *UDPStarDefConfig, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *UDPStarDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, b_formato);
     }
 
@@ -837,11 +882,11 @@ pub const UDPStarDefConfig = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !UDPStarDefConfig {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !UDPStarDefConfig {
         return try deseriigiTiponElBin(allocator, UDPStarDefConfig, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !UDPStarDefConfig {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !UDPStarDefConfig {
         return try deseriigiTiponElDosiero(allocator, UDPStarDefConfig, path, b_formato);
     }
 
@@ -892,26 +937,24 @@ pub const EndPointDef = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, EndPointDef, @as(*EndPointDef, self), t_formato);
+    pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, EndPointDef, @as(*EndPointDef, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !EndPointDef {
-        return try encdec.legiTiponElTeksto(allocator, EndPointDef, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
+        return try legiTiponElTeksto(allocator, EndPointDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !EndPointDef {
-        return try encdec.legiTiponElDosiero(allocator, EndPointDef, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
+        return try legiTiponElDosiero(allocator, EndPointDef, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const EndPointDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const EndPointDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
         try bufro.print(allocator,"{s}Host: \"{s}\"\n",.{ind, self.Host });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
@@ -919,11 +962,18 @@ pub const EndPointDef = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *EndPointDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *EndPointDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, EndPointDef, @as(*EndPointDef,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, b_formato);
     }
 
@@ -944,11 +994,11 @@ pub const EndPointDef = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !EndPointDef {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !EndPointDef {
         return try deseriigiTiponElBin(allocator, EndPointDef, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !EndPointDef {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !EndPointDef {
         return try deseriigiTiponElDosiero(allocator, EndPointDef, path, b_formato);
     }
 
@@ -989,38 +1039,44 @@ pub const CrossConnectorDef = struct {
         return self.*;
     }
 
-    pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {
-        return try encdec.skribiTiponAlTeksto(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), t_formato);
+    pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {
-        try encdec.skribiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !CrossConnectorDef {
-        return try encdec.legiTiponElTeksto(allocator, CrossConnectorDef, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
+        return try legiTiponElTeksto(allocator, CrossConnectorDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !CrossConnectorDef {
-        return try encdec.legiTiponElDosiero(allocator, CrossConnectorDef, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
+        return try legiTiponElDosiero(allocator, CrossConnectorDef, path, t_formato);
     }
 
-    pub fn skribiAlProtobufTeksto(self: *const CrossConnectorDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-       var bufro:std.ArrayList(u8)= .empty;
-       if( equal(u8,indent,"") ) { {} } 
+    fn skribiAlProtobufTeksto(self: *const CrossConnectorDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
 
-        for(self.Transports) |obj| 
+        for(self.Transports) |obj| {
             try bufro.print(allocator,"{s}Transports: \"{s}\"\n",.{ind, obj });
+        } 
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    pub fn seriigiAlBin(self: *CrossConnectorDef, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {
+    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
+        _=allocator;
+        _=path;
+        _=t_formato;
+        return error.UnsupportedFormat;
+    }
+
+    pub fn seriigiAlBin(self: *CrossConnectorDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
         return try seriigiTiponAlBin(allocator, CrossConnectorDef, @as(*CrossConnectorDef,self), b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, b_formato);
     }
 
@@ -1037,11 +1093,11 @@ pub const CrossConnectorDef = struct {
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !CrossConnectorDef {
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !CrossConnectorDef {
         return try deseriigiTiponElBin(allocator, CrossConnectorDef, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !CrossConnectorDef {
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !CrossConnectorDef {
         return try deseriigiTiponElDosiero(allocator, CrossConnectorDef, path, b_formato);
     }
 
@@ -1083,6 +1139,15 @@ pub const CrossConnectorDef = struct {
 /// Seriigi Binaran Tipon
 /// //////////////////////////////////////////
 
+pub const BinaraFormato = enum(u32) {
+    BF_PROTOBUF,
+    BF_ASN1_DER,
+    BF_OMG_CDR,
+    BF_BASE64,
+    BF_BINPB2TEKSTO_HEX,
+    BF_BINPB2TEKSTO_DEC,
+};
+
 fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: *T) ![]const u8 {
     var mia_enc = try EncodeBuffer.init(allocator, 48 * 1024);
     defer mia_enc.deinit();
@@ -1093,7 +1158,7 @@ fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: *T) ![]const 
     return bytes;
 }
 
-fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato) ![]const u8 {
+fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato) ![]const u8 {
     var parsed: []const u8 = undefined;
     switch (b_formato) {
         .BF_PROTOBUF => {
@@ -1108,21 +1173,34 @@ fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_fo
             const base64_bitoj = try allocator.alloc(u8, base64_longo);
             parsed = enc.encode(base64_bitoj, binaraj_bitoj);
         },
-        .BF_BIN2TEKSTO => {
+        .BF_BINPB2TEKSTO_HEX => {
             const binaraj_bitoj = try seriigiTipon(allocator, T, value);
             defer allocator.free(binaraj_bitoj);
 
             var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
             const hex = "0123456789ABCDEF";
+            try bin2teksto_bitoj.print(allocator,"{{ ", .{});
             for (binaraj_bitoj, 0..) |val, i| {
                 const hi: u8 = @intCast((val >> 4) & 0xF);
                 const lo: u8 = @intCast(val & 0xF);
-                try bin2teksto_bitoj.print(allocator,"0x{c}{c} ", .{ hex[hi], hex[lo] });
+                try bin2teksto_bitoj.print(allocator,"0x{c}{c}{s} ", .{ hex[hi], hex[lo], if (i!=binaraj_bitoj.len-1) "," else ""});
 
                 if ((i + 1) % 20 == 0) try bin2teksto_bitoj.print(allocator,"\n", .{});
             }
+            try bin2teksto_bitoj.print(allocator,"}}", .{});
             parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
         },
+        .BF_BINPB2TEKSTO_DEC => {
+            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+            defer allocator.free(binaraj_bitoj);
+
+            var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
+            bin2teksto_bitoj.print(allocator,"{any}",.{binaraj_bitoj}) catch |err| {
+                std.debug.print("eraro dum bin2teksto: {}\n", .{err});
+                return err;
+            };
+            parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
+        },    
         else => {
             return error.UnsupportedFormat;
         },
@@ -1131,7 +1209,7 @@ fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_fo
     return parsed;
 }
 
-fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato, path: []const u8) !void {
+fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato, path: []const u8) !void {
     const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
 
     var dosiero = try std.fs.cwd().createFile(path, .{ .truncate = true });
@@ -1151,7 +1229,7 @@ fn deseriigiTipon(allocator: all.Allocator, comptime T: type, input: []const u8)
     return obj;
 }
 
-fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: encdec.BinaraFormato) !T {
+fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: BinaraFormato) !T {
     var parsed: []const u8 = undefined;
     switch (b_formato) {
         .BF_PROTOBUF => {
@@ -1168,8 +1246,20 @@ fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []cons
             };
             parsed = base64_decoded;
         },
-        .BF_BIN2TEKSTO => {
-            return error.UnsupportedFormat;
+        .BF_BINPB2TEKSTO_HEX, .BF_BINPB2TEKSTO_DEC => {
+            var it = std.mem.tokenizeAny(u8, input, "{}, \n\r\t");
+            var bytes: std.ArrayList(u8) = .empty;
+            while (it.next()) |tok| {
+                const val = std.fmt.parseUnsigned(u8, tok, 0) catch |err| {
+                    std.debug.print("eraro dum parseInt dec: {}\n", .{err});
+                    return err;
+                };
+                bytes.append(allocator, val) catch |err| {
+                    std.debug.print("eraro dum append dec: {}\n", .{err});
+                    return err;
+                };
+            }
+            parsed = try bytes.toOwnedSlice(allocator);
         },
         else => {
             return error.UnsupportedFormat;
@@ -1179,7 +1269,7 @@ fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []cons
     return deseriigiTipon(allocator, T, parsed);
 }
 
-fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: encdec.BinaraFormato) !T {
+fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: BinaraFormato) !T {
     var dosiero = try std.fs.cwd().openFile(path, .{});
     defer dosiero.close();
 
@@ -1193,3 +1283,105 @@ fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []c
     return deseriigiTiponElBin(allocator, T, enhavo[0..dosiera_long :0], b_formato);
 }
 
+//////////////////////////////////////////////
+/// //////////////////////////////////////////
+/// //////////////////////////////////////////
+//////////////////////////////////////////////
+
+const zon = std.zon;
+
+pub const TekstaFormato = enum(u32) {
+    TF_ZIG_ZON,
+    TF_PROTOBUF,
+    TF_JSON,
+    TF_ASN1,
+};
+
+//////////////////////////////////////////////
+//// Skribi Tipon Al Teksto
+//////////////////////////////////////////////
+
+pub fn skribiTiponAlTeksto(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato) ![]const u8 {
+    var skribila_asignilo = std.Io.Writer.Allocating.init(allocator);
+
+    const self = @as(T, value.*);
+    var bytes: []const u8 = undefined;
+    switch (t_formato) {
+        .TF_ZIG_ZON => {
+            zon.stringify.serialize(self, .{}, &skribila_asignilo.writer) catch |err| {
+                std.debug.print("eraro dum seriigo: {}\n", .{err});
+                return err;
+            };
+            bytes = skribila_asignilo.writer.buffered();
+        },
+        .TF_JSON => {
+            std.json.fmt(self, .{ .whitespace = .indent_3 }).format(&skribila_asignilo.writer) catch |err| {
+                std.debug.print("eraro dum seriigo: {}\n", .{err});
+                return err;
+            };
+            bytes = skribila_asignilo.writer.buffered();
+        },
+        .TF_PROTOBUF => {
+            bytes = self.skribiAlProtobufTeksto(allocator, "") catch |err| {
+                std.debug.print("eraro dum seriigo: {}\n", .{err});
+                return err;
+            };
+        },
+        else => {
+            return error.UnsupportedFormat;
+        },
+    }
+
+    return bytes;
+}
+
+fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato, path: []const u8) !void {
+    const teksto = try skribiTiponAlTeksto(allocator, T, value, t_formato);
+
+    var dosiero = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    defer dosiero.close();
+    try dosiero.writeAll(teksto);
+}
+
+//////////////////////////////////////////////
+//// Legi Tipon El Teksto
+//////////////////////////////////////////////
+
+pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]const u8, t_formato: TekstaFormato) !T {
+    var parsed: T = undefined;
+    switch (t_formato) {
+        .TF_ZIG_ZON => {
+            parsed = zon.parse.fromSlice(T, allocator, input, null, .{}) catch |err| {
+                std.debug.print("eraro dun deseriigo: {}\n", .{err});
+                return err;
+            };
+        },
+        .TF_JSON => {
+            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{ .ignore_unknown_fields = true }) catch |err| {
+                std.debug.print("eraro dun deseriigo: {}\n", .{err});
+                return err;
+            };
+        },
+        .TF_PROTOBUF => {
+            return error.UnsupportedFormat;
+        },
+        else => {
+            return error.UnsupportedFormat;
+        },
+    }
+
+    return parsed;
+}
+
+pub fn legiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, t_formato: TekstaFormato) !T {
+    var dosiero = try std.fs.cwd().openFile(path, .{});
+    defer dosiero.close();
+
+    const dosiera_long = try dosiero.getEndPos();
+    var enhavo = allocator.alloc(u8, dosiera_long + 1) catch return error.OutOfMemory;
+
+    _ = try dosiero.readAll(enhavo[0..dosiera_long]);
+    enhavo[dosiera_long] = 0;
+
+    return legiTiponElTeksto(allocator, T, enhavo[0..dosiera_long :0], t_formato);
+}

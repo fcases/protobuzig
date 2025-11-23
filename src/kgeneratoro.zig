@@ -14,7 +14,7 @@ pub fn generiZigKodon(dosiera_nomo: []const u8, proto: *pf) !void {
     const nuda = std.fs.path.basename(dosiera_nomo);
     const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse dosiera_nomo.len;
     const basa_nomo = nuda[0..punkta_indekso];
-    const zig_nomo = try std.fmt.bufPrint(&buffer, "src_test/generated/{s}.zig", .{basa_nomo});
+    const zig_nomo = try std.fmt.bufPrint(&buffer, "example/generated/{s}.zig", .{basa_nomo});
 
     var zig_dosiero = try std.fs.cwd().createFile(zig_nomo, .{ .truncate = true });
     defer zig_dosiero.close();
@@ -24,7 +24,7 @@ pub fn generiZigKodon(dosiera_nomo: []const u8, proto: *pf) !void {
     var zig_verkisto = zig_dosiero.writer(&zig_buffero);
     verkisto = &zig_verkisto.interface;
 
-    // La tuta kodoj por generiĝas ĉi tie:
+    // La tuta kodoj por generiĝas ĉiuij:
     try skribiKaplinion(proto);
     const tabs = try skribiIniPakaghon(proto.package_name);
     try skribiEnums(proto.enums, "");
@@ -50,7 +50,8 @@ fn skribiKaplinion(proto: *pf) !void {
         \\const all = std.mem;
         \\const equal = std.mem.eql;
         \\const  io = std.Io;
-        \\const encdec = @import("../encdec.zig");
+        \\
+        \\const encdec = @import("encdec.zig");
         \\const EncodeBuffer = encdec.EncodeBuffer;
         \\const DecodeBuffer = encdec.DecodeBuffer;
         \\
@@ -130,19 +131,20 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
 
         try skribiInitDefault(msg, ind);
 
+        // /////////////
+        // Skribi kaj Legi funkcion al/el .TF_XXX teksto
         try skribiAlTeksto(msg, ind);
         try legiElTeksto(msg, ind);
 
         // /////////////
-        // Skribi funkcion por deseriigi al protobuf kaj Json teksto
-        try skribiAlPBTeksto(msg, ind);
+        // Skribi kaj Legi funkcion al/el PB teksto
+        try skribiSkribiAlPBTeksto(msg, ind);
+        try skribiLegiElPBTeksto(msg, ind);
 
         // /////////////
         // Skribi funkcion por seriigi al binara formato
-        try skribiSeriigi(msg, ind);
-
-        // /////////////
         // Skribi funkcion por deseriigi al binara formato
+        try skribiSeriigi(msg, ind);
         try skribiDeseriigi(msg, ind);
 
         try verkisto.print("\n{s}}};\n\n", .{ind});
@@ -163,6 +165,7 @@ fn skribiFiniPakaghon(pnamo: ?[]const u8, tabs: u8) !void {
         }
         try verkisto.print("\n", .{});
     }
+    try verkisto.flush();
 }
 
 fn skribiGeneralajnFunkciojn() !void {
@@ -185,6 +188,15 @@ fn skribiGeneralajnFunkciojn() !void {
         \\/// Seriigi Binaran Tipon
         \\/// //////////////////////////////////////////
         \\
+        \\pub const BinaraFormato = enum(u32) {{
+        \\    BF_PROTOBUF,
+        \\    BF_ASN1_DER,
+        \\    BF_OMG_CDR,
+        \\    BF_BASE64,
+        \\    BF_BINPB2TEKSTO_HEX,
+        \\    BF_BINPB2TEKSTO_DEC,
+        \\}};
+        \\
         \\
     , .{});
     try verkisto.flush();
@@ -205,7 +217,7 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.flush();
 
     try verkisto.print(
-        \\fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato) ![]const u8 {{
+        \\fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato) ![]const u8 {{
         \\    var parsed: []const u8 = undefined;
         \\    switch (b_formato) {{
         \\        .BF_PROTOBUF => {{
@@ -220,21 +232,34 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            const base64_bitoj = try allocator.alloc(u8, base64_longo);
         \\            parsed = enc.encode(base64_bitoj, binaraj_bitoj);
         \\        }},
-        \\        .BF_BIN2TEKSTO => {{
+        \\        .BF_BINPB2TEKSTO_HEX => {{
         \\            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
         \\            defer allocator.free(binaraj_bitoj);
         \\
         \\            var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
         \\            const hex = "0123456789ABCDEF";
+        \\            try bin2teksto_bitoj.print(allocator,"{{{{ ", .{{}});
         \\            for (binaraj_bitoj, 0..) |val, i| {{
         \\                const hi: u8 = @intCast((val >> 4) & 0xF);
         \\                const lo: u8 = @intCast(val & 0xF);
-        \\                try bin2teksto_bitoj.print(allocator,"0x{{c}}{{c}} ", .{{ hex[hi], hex[lo] }});
+        \\                try bin2teksto_bitoj.print(allocator,"0x{{c}}{{c}}{{s}} ", .{{ hex[hi], hex[lo], if (i!=binaraj_bitoj.len-1) "," else ""}});
         \\
         \\                if ((i + 1) % 20 == 0) try bin2teksto_bitoj.print(allocator,"\n", .{{}});
         \\            }}
+        \\            try bin2teksto_bitoj.print(allocator,"}}}}", .{{}});
         \\            parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
         \\        }},
+        \\        .BF_BINPB2TEKSTO_DEC => {{
+        \\            const binaraj_bitoj = try seriigiTipon(allocator, T, value);
+        \\            defer allocator.free(binaraj_bitoj);
+        \\
+        \\            var bin2teksto_bitoj:std.ArrayList(u8)= .empty;
+        \\            bin2teksto_bitoj.print(allocator,"{{any}}",.{{binaraj_bitoj}}) catch |err| {{
+        \\                std.debug.print("eraro dum bin2teksto: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\            parsed = try bin2teksto_bitoj.toOwnedSlice(allocator);
+        \\        }},    
         \\        else => {{
         \\            return error.UnsupportedFormat;
         \\        }},
@@ -248,7 +273,7 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.flush();
 
     try verkisto.print(
-        \\fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: encdec.BinaraFormato, path: []const u8) !void {{
+        \\fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato, path: []const u8) !void {{
         \\    const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
         \\
         \\    var dosiero = try std.fs.cwd().createFile(path, .{{ .truncate = true }});
@@ -287,7 +312,7 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.flush();
 
     try verkisto.print(
-        \\fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: encdec.BinaraFormato) !T {{
+        \\fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: BinaraFormato) !T {{
         \\    var parsed: []const u8 = undefined;
         \\    switch (b_formato) {{
         \\        .BF_PROTOBUF => {{
@@ -304,8 +329,20 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            }};
         \\            parsed = base64_decoded;
         \\        }},
-        \\        .BF_BIN2TEKSTO => {{
-        \\            return error.UnsupportedFormat;
+        \\        .BF_BINPB2TEKSTO_HEX, .BF_BINPB2TEKSTO_DEC => {{
+        \\            var it = std.mem.tokenizeAny(u8, input, "{{}}, \n\r\t");
+        \\            var bytes: std.ArrayList(u8) = .empty;
+        \\            while (it.next()) |tok| {{
+        \\                const val = std.fmt.parseUnsigned(u8, tok, 0) catch |err| {{
+        \\                    std.debug.print("eraro dum parseInt dec: {{}}\n", .{{err}});
+        \\                    return err;
+        \\                }};
+        \\                bytes.append(allocator, val) catch |err| {{
+        \\                    std.debug.print("eraro dum append dec: {{}}\n", .{{err}});
+        \\                    return err;
+        \\                }};
+        \\            }}
+        \\            parsed = try bytes.toOwnedSlice(allocator);
         \\        }},
         \\        else => {{
         \\            return error.UnsupportedFormat;
@@ -320,7 +357,7 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.flush();
 
     try verkisto.print(
-        \\fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: encdec.BinaraFormato) !T {{
+        \\fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, b_formato: BinaraFormato) !T {{
         \\    var dosiero = try std.fs.cwd().openFile(path, .{{}});
         \\    defer dosiero.close();
         \\
@@ -337,6 +374,127 @@ fn skribiGeneralajnFunkciojn() !void {
         \\
     , .{});
     try verkisto.flush();
+
+    try verkisto.print(
+        \\//////////////////////////////////////////////
+        \\/// //////////////////////////////////////////
+        \\/// //////////////////////////////////////////
+        \\//////////////////////////////////////////////
+        \\
+        \\
+    , .{});
+    try verkisto.flush();
+
+    //////////////////////////////////////////////
+    //// Seriigi Binaran Tipon
+    //////////////////////////////////////////////
+
+    try verkisto.print(
+        \\const zon = std.zon;
+        \\
+        \\pub const TekstaFormato = enum(u32) {{
+        \\    TF_ZIG_ZON,
+        \\    TF_PROTOBUF,
+        \\    TF_JSON,
+        \\    TF_ASN1,
+        \\}};
+        \\
+        \\//////////////////////////////////////////////
+        \\//// Skribi Tipon Al Teksto
+        \\//////////////////////////////////////////////
+        \\
+        \\pub fn skribiTiponAlTeksto(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato) ![]const u8 {{
+        \\    var skribila_asignilo = std.Io.Writer.Allocating.init(allocator);
+        \\
+        \\    const self = @as(T, value.*);
+        \\    var bytes: []const u8 = undefined;
+        \\    switch (t_formato) {{
+        \\        .TF_ZIG_ZON => {{
+        \\            zon.stringify.serialize(self, .{{}}, &skribila_asignilo.writer) catch |err| {{
+        \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\            bytes = skribila_asignilo.writer.buffered();
+        \\        }},
+        \\        .TF_JSON => {{
+        \\            std.json.fmt(self, .{{ .whitespace = .indent_3 }}).format(&skribila_asignilo.writer) catch |err| {{
+        \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\            bytes = skribila_asignilo.writer.buffered();
+        \\        }},
+        \\        .TF_PROTOBUF => {{
+        \\            bytes = self.skribiAlProtobufTeksto(allocator, "") catch |err| {{
+        \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\        }},
+        \\        else => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\    }}
+        \\
+        \\    return bytes;
+        \\}}
+        \\
+        \\fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato, path: []const u8) !void {{
+        \\    const teksto = try skribiTiponAlTeksto(allocator, T, value, t_formato);
+        \\
+        \\    var dosiero = try std.fs.cwd().createFile(path, .{{ .truncate = true }});
+        \\    defer dosiero.close();
+        \\    try dosiero.writeAll(teksto);
+        \\}}
+        \\
+    , .{});
+    try verkisto.flush();
+
+    try verkisto.print(
+        \\
+        \\//////////////////////////////////////////////
+        \\//// Legi Tipon El Teksto
+        \\//////////////////////////////////////////////
+        \\
+        \\pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]const u8, t_formato: TekstaFormato) !T {{
+        \\    var parsed: T = undefined;
+        \\    switch (t_formato) {{
+        \\        .TF_ZIG_ZON => {{
+        \\            parsed = zon.parse.fromSlice(T, allocator, input, null, .{{}}) catch |err| {{
+        \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\        }},
+        \\        .TF_JSON => {{
+        \\            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{{ .ignore_unknown_fields = true }}) catch |err| {{
+        \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\        }},
+        \\        .TF_PROTOBUF => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\        else => {{
+        \\            return error.UnsupportedFormat;
+        \\        }},
+        \\    }}
+        \\
+        \\    return parsed;
+        \\}}
+        \\
+        \\pub fn legiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []const u8, t_formato: TekstaFormato) !T {{
+        \\    var dosiero = try std.fs.cwd().openFile(path, .{{}});
+        \\    defer dosiero.close();
+        \\
+        \\    const dosiera_long = try dosiero.getEndPos();
+        \\    var enhavo = allocator.alloc(u8, dosiera_long + 1) catch return error.OutOfMemory;
+        \\
+        \\    _ = try dosiero.readAll(enhavo[0..dosiera_long]);
+        \\    enhavo[dosiera_long] = 0;
+        \\
+        \\    return legiTiponElTeksto(allocator, T, enhavo[0..dosiera_long :0], t_formato);
+        \\}}
+        \\
+    , .{});
+    try verkisto.flush();
 }
 
 /////////////////////////////////////
@@ -344,7 +502,7 @@ fn skribiGeneralajnFunkciojn() !void {
 /// -Teksta formato: ZON, Protobuf, JSON
 // /     - skribiAlTeksto: generica por ZON, Protobuf, JSON
 // /     - legiElTeksto:  generica por ZON, Protobuf, JSON
-// /     - skribiAlPBTeksto
+// /     - skribiSkribiAlPBTeksto
 /// -Binara formato: Protobuf
 ///     - skribiSeriigi
 ///     - skribiDeseriigi
@@ -354,8 +512,8 @@ fn skribiAlTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por seriigi al teksta bufro
     try verkisto.print(
-        \\{s}    pub fn skribiAlTeksto(self: *{s}, allocator: all.Allocator, t_formato: encdec.TekstaFormato) ![]const u8 {{
-        \\{s}        return try encdec.skribiTiponAlTeksto(allocator, {s}, @as(*{s}, self), t_formato);
+        \\{s}    pub fn skribiAlTeksto(self: *{s}, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {{
+        \\{s}        return try skribiTiponAlTeksto(allocator, {s}, @as(*{s}, self), t_formato);
         \\{s}    }}
         \\
     , .{ ind, msg.name, ind, msg.name, msg.name, ind });
@@ -364,8 +522,8 @@ fn skribiAlTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por seriigi al dosiero
     try verkisto.print(
-        \\{s}    pub fn skribiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, t_formato: encdec.TekstaFormato) !void {{
-        \\{s}        try encdec.skribiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, t_formato);
+        \\{s}    pub fn skribiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {{
+        \\{s}        try skribiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, t_formato);
         \\{s}    }}
         \\
     , .{ ind, msg.name, ind, msg.name, msg.name, ind });
@@ -376,8 +534,8 @@ fn legiElTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por deseriigi el teksta bufro
     try verkisto.print(
-        \\{s}    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: encdec.TekstaFormato) !{s} {{
-        \\{s}        return try encdec.legiTiponElTeksto(allocator, {s}, input, t_formato);
+        \\{s}    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !{s} {{
+        \\{s}        return try legiTiponElTeksto(allocator, {s}, input, t_formato);
         \\{s}    }}
         \\
     , .{ ind, msg.name, ind, msg.name, ind });
@@ -386,40 +544,44 @@ fn legiElTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por deseriigi el dosiero
     try verkisto.print(
-        \\{s}    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: encdec.TekstaFormato) !{s} {{
-        \\{s}        return try encdec.legiTiponElDosiero(allocator, {s}, path, t_formato);
+        \\{s}    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !{s} {{
+        \\{s}        return try legiTiponElDosiero(allocator, {s}, path, t_formato);
         \\{s}    }}
         \\
     , .{ ind, msg.name, ind, msg.name, ind });
     try verkisto.print("\n", .{});
 }
 
-fn skribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
+fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print(
-        \\{s}    pub fn skribiAlProtobufTeksto(self: *const {s}, allocator: all.Allocator,ind: []const u8) ![]const u8 {{
-        \\{s}       const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
-        \\{s}       var bufro:std.ArrayList(u8)= .empty;
-        \\{s}       if( equal(u8,indent,"") ) {{ {{}} }} 
+        \\{s}    fn skribiAlProtobufTeksto(self: *const {s}, allocator: all.Allocator,ind: []const u8) ![]const u8 {{
+        \\{s}        var bufro:std.ArrayList(u8)= .empty;
         \\
         \\
-    , .{ ind, msg.name, ind, ind, ind });
+    , .{ ind, msg.name, ind });
 
     for (msg.fields) |f| {
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
-                \\{s}        for(self.{s}) |obj| 
-                \\    
+                \\{s}        for(self.{s}) |obj| {{
+                \\{s}
             , .{
-                ind, f.name,
+                ind, f.name, "    ",
             });
         } else if (f.label_enum == .LABEL_OPTIONAL) {
             try verkisto.print(
-                \\{s}        if( self.{s} ) |val|  
-                \\    
-            , .{ ind, f.name });
+                \\{s}        if( self.{s} ) |val|  {s}
+                \\{s}
+            , .{ ind, f.name, if (f.field_type_enum == .TYPE_MESSAGE) "{" else "", "    " });
         }
 
         if (f.field_type_enum == .TYPE_MESSAGE) {
+            try verkisto.print(
+                \\{s}        const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
+                \\    
+            , .{
+                ind,
+            });
             if (f.label_enum == .LABEL_OPTIONAL) {
                 try verkisto.print(
                     \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind }});
@@ -466,6 +628,15 @@ fn skribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                 });
             }
         }
+        // if (f.label_enum == .LABEL_REPEATED or f.label_enum == .LABEL_OPTIONAL) {
+        if (f.label_enum == .LABEL_REPEATED or (f.label_enum == .LABEL_OPTIONAL and f.field_type_enum == .TYPE_MESSAGE)) {
+            try verkisto.print(
+                \\{s}        }} 
+                \\
+            , .{
+                ind,
+            });
+        }
     }
     try verkisto.print(
         \\
@@ -476,11 +647,24 @@ fn skribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print("\n", .{});
 }
 
+fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
+    try verkisto.print(
+        \\{s}    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !{s} {{
+        \\{s}        _=allocator;
+        \\{s}        _=path;
+        \\{s}        _=t_formato;
+        \\{s}        return error.UnsupportedFormat;
+        \\{s}    }}
+        \\
+    , .{ ind, msg.name, ind, ind, ind, ind, ind });
+    try verkisto.print("\n", .{});
+}
+
 fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
 
     try verkisto.print(
-        \\{s}pub fn seriigiAlBin(self: *{s}, allocator: all.Allocator, b_formato: encdec.BinaraFormato) ![]const u8 {{
+        \\{s}pub fn seriigiAlBin(self: *{s}, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {{
         \\{s}    return try seriigiTiponAlBin(allocator, {s}, @as(*{s},self), b_formato);
         \\{s}}}
         \\
@@ -492,7 +676,7 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     });
 
     try verkisto.print(
-        \\{s}pub fn seriigiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, b_formato: encdec.BinaraFormato) !void {{
+        \\{s}pub fn seriigiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {{
         \\{s}    return try seriigiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, b_formato);
         \\{s}}}
         \\
@@ -590,7 +774,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
     const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
 
     try verkisto.print(
-        \\{s}pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: encdec.BinaraFormato) !{s} {{
+        \\{s}pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !{s} {{
         \\{s}    return try deseriigiTiponElBin(allocator, {s}, input, b_formato);
         \\{s}}}
         \\
@@ -602,7 +786,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
     });
 
     try verkisto.print(
-        \\{s}    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: encdec.BinaraFormato) !{s} {{
+        \\{s}    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !{s} {{
         \\{s}        return try deseriigiTiponElDosiero(allocator, {s}, path, b_formato);
         \\{s}    }}
         \\
