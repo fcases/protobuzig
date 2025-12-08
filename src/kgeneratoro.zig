@@ -55,6 +55,7 @@ fn skribiKaplinion(proto: *pf) !void {
         \\const EncodeBuffer = encdec.EncodeBuffer;
         \\const DecodeBuffer = encdec.DecodeBuffer;
         \\
+        \\const TokenIterType = std.mem.TokenIterator(u8, .any);
         \\
     , .{});
 
@@ -454,11 +455,11 @@ fn skribiGeneralajnFunkciojn() !void {
         \\//// Legi Tipon El Teksto
         \\//////////////////////////////////////////////
         \\
-        \\pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]const u8, t_formato: TekstaFormato) !T {{
+        \\pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []const u8, t_formato: TekstaFormato) !T {{
         \\    var parsed: T = undefined;
         \\    switch (t_formato) {{
         \\        .TF_ZIG_ZON => {{
-        \\            parsed = zon.parse.fromSlice(T, allocator, input, null, .{{}}) catch |err| {{
+        \\            parsed = zon.parse.fromSlice(T, allocator, @ptrCast(input), null, .{{}}) catch |err| {{
         \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
         \\                return err;
         \\            }};
@@ -470,7 +471,12 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            }};
         \\        }},
         \\        .TF_PROTOBUF => {{
-        \\            return error.UnsupportedFormat;
+        \\            var it: TokenIterType = std.mem.tokenizeAny(u8, input, ":\", \n\r\t");
+        \\            parsed = T.legiElProtobufTeksto(allocator, &it) catch |err| {{
+        \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
+        \\                return err;
+        \\            }};
+        \\            _=it.peek();
         \\        }},
         \\        else => {{
         \\            return error.UnsupportedFormat;
@@ -534,7 +540,7 @@ fn legiElTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por deseriigi el teksta bufro
     try verkisto.print(
-        \\{s}    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !{s} {{
+        \\{s}    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !{s} {{
         \\{s}        return try legiTiponElTeksto(allocator, {s}, input, t_formato);
         \\{s}    }}
         \\
@@ -544,7 +550,7 @@ fn legiElTeksto(msg: prs.Message, ind: []const u8) !void {
     // /////////////
     // Skribi funkcion por deseriigi el dosiero
     try verkisto.print(
-        \\{s}    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !{s} {{
+        \\{s}    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !{s} {{
         \\{s}        return try legiTiponElDosiero(allocator, {s}, path, t_formato);
         \\{s}    }}
         \\
@@ -648,15 +654,103 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
 }
 
 fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
+    // const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+
     try verkisto.print(
-        \\{s}    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !{s} {{
-        \\{s}        _=allocator;
-        \\{s}        _=path;
-        \\{s}        _=t_formato;
-        \\{s}        return error.UnsupportedFormat;
+        \\{s}    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !{s} {{
+        \\{s}        var mia_Mesagho= try {s}.initDefault(allocator); 
+        \\
+        \\
+    , .{ ind, msg.name, ind, msg.name });
+
+    for (msg.fields) |field| {
+        if (field.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}        var {s}_list: std.ArrayList({s}) = .empty; 
+            , .{
+                ind, field.name, auks.mapiProtoTiponAlZig(field.field_type),
+            });
+        }
+    }
+
+    try verkisto.print(
+        \\
+        \\{s}        while (it.next()) |tok| {{
+        \\{s}            if( equal(u8, tok, "}}" ) ) break;
+        \\{s}            const val = it.next() orelse return error.InvalidFormat;
+        \\
+        \\
+    , .{ ind, ind, ind });
+
+    for (msg.fields) |field| {
+        try verkisto.print(
+            \\{s}            if( equal(u8, tok, "{s}" ) ) {{ 
+            \\
+        , .{ ind, field.name });
+
+        if (field.field_type_enum == .TYPE_MESSAGE) {
+            try verkisto.print(
+                \\{s}                const sub_msg = try {s}.legiElProtobufTeksto(allocator, it); 
+                \\
+            , .{
+                ind,
+                field.field_type,
+            });
+            if (field.label_enum == .LABEL_REPEATED) {
+                try verkisto.print(
+                    \\{s}                try {s}_list.append(allocator, sub_msg); 
+                    \\
+                , .{ ind, field.name });
+            } else {
+                try verkisto.print(
+                    \\{s}                mia_Mesagho.{s} = sub_msg; 
+                    \\
+                , .{ ind, field.name });
+            }
+        } else {
+            if (field.label_enum == .LABEL_REPEATED) {
+                try verkisto.print(
+                    \\{s}                try {s}_list.append(allocator, val); 
+                    \\
+                , .{ ind, field.name });
+            } else {
+                try verkisto.print(
+                    \\{s}                
+                , .{ind});
+                auks.printParseType(verkisto, field.field_type_enum, field.name);
+            }
+        }
+
+        try verkisto.print( // Fino de la if(tok
+            \\{s}                continue;
+            \\{s}            }}
+            \\
+        , .{ ind, ind });
+    }
+
+    try verkisto.print( // Fino de la while(it.next())
+        \\{s}        }}
+        \\
+    , .{ind});
+
+    for (msg.fields) |field| {
+        if (field.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}        mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
+                \\
+            , .{
+                ind, field.name, field.name,
+            });
+        }
+    }
+
+    try verkisto.print(
+        \\
+        \\{s}        return mia_Mesagho;
         \\{s}    }}
         \\
-    , .{ ind, msg.name, ind, ind, ind, ind, ind });
+    , .{ ind, ind });
+
     try verkisto.print("\n", .{});
 }
 

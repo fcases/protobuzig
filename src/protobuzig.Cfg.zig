@@ -10,14 +10,16 @@ const DecodeBuffer = encdec.DecodeBuffer;
 
 
 pub const protobuzigCfg = struct {
-    ProtoDir: []const u8 = "./proto" ,
-    ObjectsGeneratedDir: []const u8 = "." ,
+    proto_dir: []const u8 = "./proto" ,
+    objects_generated_dir: []const u8 = "." ,
+    verbose: bool = false ,
 
     pub fn initDefault(allocator: all.Allocator) !protobuzigCfg {
         const self = try allocator.create(protobuzigCfg);
         self.* = protobuzigCfg{
-            .ProtoDir = "./proto",
-            .ObjectsGeneratedDir = ".",
+            .proto_dir = "./proto",
+            .objects_generated_dir = ".",
+            .verbose = false,
         };
         return self.*;
     }
@@ -41,8 +43,9 @@ pub const protobuzigCfg = struct {
     fn skribiAlProtobufTeksto(self: *const protobuzigCfg, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}ProtoDir: \"{s}\"\n",.{ind, self.ProtoDir });
-        try bufro.print(allocator,"{s}ObjectsGeneratedDir: \"{s}\"\n",.{ind, self.ObjectsGeneratedDir });
+        try bufro.print(allocator,"{s}proto_dir: \"{s}\"\n",.{ind, self.proto_dir });
+        try bufro.print(allocator,"{s}objects_generated_dir: \"{s}\"\n",.{ind, self.objects_generated_dir });
+        try bufro.print(allocator,"{s}verbose: {any}\n",.{ind, self.verbose });
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -65,15 +68,20 @@ pub const protobuzigCfg = struct {
     fn seriigi(self: *const protobuzigCfg, buffer: *EncodeBuffer) !usize {
         var tuta_longo: usize = 0;
  
-        if ( ! equal(u8, self.ObjectsGeneratedDir, ".") ) {
-            const st_longa = try buffer.encodeString( self.ObjectsGeneratedDir );
+        if( self.verbose != false )  {
+            tuta_longo += try buffer.encodeBool( self.verbose );
+            tuta_longo += try buffer.encodeVarint(24);
+        }  //6  req - def - no varlong
+
+        if ( ! equal(u8, self.objects_generated_dir, ".") ) {
+            const st_longa = try buffer.encodeString( self.objects_generated_dir );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(18);
         }  //8 req - def - varlong
 
-        if ( ! equal(u8, self.ProtoDir, "./proto") ) {
-            const st_longa = try buffer.encodeString( self.ProtoDir );
+        if ( ! equal(u8, self.proto_dir, "./proto") ) {
+            const st_longa = try buffer.encodeString( self.proto_dir );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
             tuta_longo += try buffer.encodeVarint(10);
@@ -106,9 +114,11 @@ pub const protobuzigCfg = struct {
             const field_number = key >> 3;
 
             if ( field_number == 1 and wire_type == 2 ) 
-                mia_Mesagho.ProtoDir = try buffer.decodeString(  try buffer.decodeVarint() )
+                mia_Mesagho.proto_dir = try buffer.decodeString(  try buffer.decodeVarint() )
             else if ( field_number == 2 and wire_type == 2 ) 
-                mia_Mesagho.ObjectsGeneratedDir = try buffer.decodeString(  try buffer.decodeVarint() );
+                mia_Mesagho.objects_generated_dir = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 3 and wire_type == 0 ) 
+                mia_Mesagho.verbose = try buffer.decodeBool();
         }
 
 

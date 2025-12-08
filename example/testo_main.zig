@@ -154,25 +154,35 @@ fn fariTeston3() !void {
     /////////////////
     // Tria testo
     /////////////////
+    {
+        var app_config: pbz.AppConfig = undefined;
+        var skribilo: []const u8 = undefined;
 
-    var app_config: pbz.AppConfig = undefined;
-    var skribilo: []const u8 = undefined;
+        const teksto =
+            \\.{
+            \\  .Domains = .{.{
+            \\          .Id = 0,
+            \\          .ActivateDefaultTransport = true,
+            \\          .Transports = .{},
+            \\  }},
+            \\}
+        ;
 
-    const teksto =
-        \\.{
-        \\  .Domains = .{.{
-        \\          .Id = 0,
-        \\          .ActivateDefaultTransport = true,
-        \\          .Transports = .{},
-        \\  }},
-        \\}
-    ;
+        app_config = pbz.AppConfig.legiElTeksto(mia_asignilo, teksto, .TF_ZIG_ZON) catch unreachable;
+        skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
 
-    app_config = pbz.AppConfig.legiElTeksto(mia_asignilo, teksto, .TF_ZIG_ZON) catch unreachable;
-    skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
+        presiMesagho("Testo 3.1:");
+        dbgPresi("{s}\n", .{skribilo});
+    }
+    {
+        var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App7.pb.cfg", .TF_PROTOBUF) catch unreachable;
+        var skribilo: []const u8 = undefined;
 
-    presiMesagho("Testo 3.1:");
-    dbgPresi("{s}\n", .{skribilo});
+        skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
+
+        presiMesagho("Testo 3.2:");
+        dbgPresi("{s}\n", .{skribilo});
+    }
 
     presiMesagho("Fino de Testo 3");
 }
@@ -258,6 +268,12 @@ fn fariTeston5() !void {
     dbgPresi("\n{s}\n{d}\n\n", .{ skribilo, skribilo.len });
     const la_biteoj = try app_config.seriigiAlBin(mia_asignilo, .BF_PROTOBUF);
     dbgPresi("{any}\n", .{la_biteoj});
+
+    /////////////////
+
+    var app_config1 = pbz.AppConfig.legiElTeksto(mia_asignilo, skribilo, .TF_PROTOBUF) catch unreachable;
+    const skribilo1 = try app_config1.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
+    dbgPresi("\n{s}\n{d}\n\n", .{ skribilo1, skribilo1.len });
 
     /////////////////
 

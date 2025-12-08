@@ -173,3 +173,18 @@ pub fn estasLongaVar(field_type: tpj) bool {
 
     return false;
 }
+
+pub fn printParseType(verkisto: *std.Io.Writer, field_type: tpj, name: []const u8) void {
+    return switch (field_type) {
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i32,val,10) catch 0;\n", .{name}) catch {},
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i64,val,10) catch 0;\n", .{name}) catch {},
+        .TYPE_UINT32, .TYPE_FIXED32 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u32,val,10) catch 0;\n", .{name}) catch {},
+        .TYPE_UINT64, .TYPE_FIXED64 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u64,val,10) catch 0;\n", .{name}) catch {},
+        .TYPE_FLOAT => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f32,val) catch 0.0;\n", .{name}) catch {},
+        .TYPE_DOUBLE => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0.0;\n", .{name}) catch {},
+        .TYPE_ENUM => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0;\n", .{name}) catch {},
+        .TYPE_BOOL => verkisto.print("mia_Mesagho.{s} =  if( equal(u8, val,\"true\") ) true else false;\n", .{name}) catch {},
+        .TYPE_STRING, .TYPE_BYTES => verkisto.print("mia_Mesagho.{s} =  allocator.dupe(u8, val) catch \"\";\n", .{name}) catch {},
+        else => {},
+    };
+}

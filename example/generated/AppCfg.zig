@@ -8,6 +8,7 @@ const encdec = @import("encdec.zig");
 const EncodeBuffer = encdec.EncodeBuffer;
 const DecodeBuffer = encdec.DecodeBuffer;
 
+const TokenIterType = std.mem.TokenIterator(u8, .any);
 
 pub const ProtocolBus = struct {
 
@@ -37,11 +38,11 @@ pub const AppConfig = struct {
         try skribiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !AppConfig {
         return try legiTiponElTeksto(allocator, AppConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !AppConfig {
         return try legiTiponElDosiero(allocator, AppConfig, path, t_formato);
     }
 
@@ -60,11 +61,31 @@ pub const AppConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !AppConfig {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !AppConfig {
+        var mia_Mesagho= try AppConfig.initDefault(allocator); 
+
+        var Domains_list: std.ArrayList(DomainCfg) = .empty; 
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "ActivateTrace" ) ) { 
+                mia_Mesagho.ActivateTrace =  if( equal(u8, val,"true") ) true else false;
+                continue;
+            }
+            if( equal(u8, tok, "TraceLevel" ) ) { 
+                mia_Mesagho.TraceLevel =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "Domains" ) ) { 
+                const sub_msg = try DomainCfg.legiElProtobufTeksto(allocator, it); 
+                try Domains_list.append(allocator, sub_msg); 
+                continue;
+            }
+        }
+        mia_Mesagho.Domains = try Domains_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *AppConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -169,11 +190,11 @@ pub const DomainCfg = struct {
         try skribiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !DomainCfg {
         return try legiTiponElTeksto(allocator, DomainCfg, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !DomainCfg {
         return try legiTiponElDosiero(allocator, DomainCfg, path, t_formato);
     }
 
@@ -198,11 +219,44 @@ pub const DomainCfg = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !DomainCfg {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !DomainCfg {
+        var mia_Mesagho= try DomainCfg.initDefault(allocator); 
+
+        var Transports_list: std.ArrayList(TransportDef) = .empty; 
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "Id" ) ) { 
+                mia_Mesagho.Id =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "ActivateDefaultTransport" ) ) { 
+                mia_Mesagho.ActivateDefaultTransport =  if( equal(u8, val,"true") ) true else false;
+                continue;
+            }
+            if( equal(u8, tok, "DirectDispacthToSubs" ) ) { 
+                mia_Mesagho.DirectDispacthToSubs =  if( equal(u8, val,"true") ) true else false;
+                continue;
+            }
+            if( equal(u8, tok, "KeyFile" ) ) { 
+                mia_Mesagho.KeyFile =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Transports" ) ) { 
+                const sub_msg = try TransportDef.legiElProtobufTeksto(allocator, it); 
+                try Transports_list.append(allocator, sub_msg); 
+                continue;
+            }
+            if( equal(u8, tok, "CrossConnector" ) ) { 
+                const sub_msg = try CrossConnectorDef.legiElProtobufTeksto(allocator, it); 
+                mia_Mesagho.CrossConnector = sub_msg; 
+                continue;
+            }
+        }
+        mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *DomainCfg, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -331,11 +385,11 @@ pub const TransportDef = struct {
         try skribiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !TransportDef {
         return try legiTiponElTeksto(allocator, TransportDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !TransportDef {
         return try legiTiponElDosiero(allocator, TransportDef, path, t_formato);
     }
 
@@ -363,11 +417,48 @@ pub const TransportDef = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !TransportDef {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !TransportDef {
+        var mia_Mesagho= try TransportDef.initDefault(allocator); 
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "TransportName" ) ) { 
+                mia_Mesagho.TransportName =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "DllImport" ) ) { 
+                mia_Mesagho.DllImport =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "TransportClass" ) ) { 
+                mia_Mesagho.TransportClass =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "ReceiveOwnMsgs" ) ) { 
+                mia_Mesagho.ReceiveOwnMsgs =  if( equal(u8, val,"true") ) true else false;
+                continue;
+            }
+            if( equal(u8, tok, "MCastParams" ) ) { 
+                const sub_msg = try MCastDefConfig.legiElProtobufTeksto(allocator, it); 
+                mia_Mesagho.MCastParams = sub_msg; 
+                continue;
+            }
+            if( equal(u8, tok, "BCastParams" ) ) { 
+                const sub_msg = try BCastDefConfig.legiElProtobufTeksto(allocator, it); 
+                mia_Mesagho.BCastParams = sub_msg; 
+                continue;
+            }
+            if( equal(u8, tok, "UDPStarParams" ) ) { 
+                const sub_msg = try UDPStarDefConfig.legiElProtobufTeksto(allocator, it); 
+                mia_Mesagho.UDPStarParams = sub_msg; 
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *TransportDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -506,11 +597,11 @@ pub const MCastDefConfig = struct {
         try skribiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !MCastDefConfig {
         return try legiTiponElTeksto(allocator, MCastDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !MCastDefConfig {
         return try legiTiponElDosiero(allocator, MCastDefConfig, path, t_formato);
     }
 
@@ -530,11 +621,41 @@ pub const MCastDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !MCastDefConfig {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !MCastDefConfig {
+        var mia_Mesagho= try MCastDefConfig.initDefault(allocator); 
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "LocalAddress" ) ) { 
+                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "MCastAddress" ) ) { 
+                mia_Mesagho.MCastAddress =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Port" ) ) { 
+                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "TTL" ) ) { 
+                mia_Mesagho.TTL =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "ReceiveBuffer" ) ) { 
+                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "SendBuffer" ) ) { 
+                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *MCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -660,11 +781,11 @@ pub const BCastDefConfig = struct {
         try skribiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !BCastDefConfig {
         return try legiTiponElTeksto(allocator, BCastDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !BCastDefConfig {
         return try legiTiponElDosiero(allocator, BCastDefConfig, path, t_formato);
     }
 
@@ -682,11 +803,37 @@ pub const BCastDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !BCastDefConfig {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !BCastDefConfig {
+        var mia_Mesagho= try BCastDefConfig.initDefault(allocator); 
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "LocalAddress" ) ) { 
+                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "BCastAddress" ) ) { 
+                mia_Mesagho.BCastAddress =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Port" ) ) { 
+                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "ReceiveBuffer" ) ) { 
+                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "SendBuffer" ) ) { 
+                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *BCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -803,11 +950,11 @@ pub const UDPStarDefConfig = struct {
         try skribiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
         return try legiTiponElTeksto(allocator, UDPStarDefConfig, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
         return try legiTiponElDosiero(allocator, UDPStarDefConfig, path, t_formato);
     }
 
@@ -828,11 +975,39 @@ pub const UDPStarDefConfig = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !UDPStarDefConfig {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !UDPStarDefConfig {
+        var mia_Mesagho= try UDPStarDefConfig.initDefault(allocator); 
+
+        var EndPoint_list: std.ArrayList(EndPointDef) = .empty; 
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "LocalAddress" ) ) { 
+                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Port" ) ) { 
+                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "EndPoint" ) ) { 
+                const sub_msg = try EndPointDef.legiElProtobufTeksto(allocator, it); 
+                try EndPoint_list.append(allocator, sub_msg); 
+                continue;
+            }
+            if( equal(u8, tok, "ReceiveBuffer" ) ) { 
+                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "SendBuffer" ) ) { 
+                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+        }
+        mia_Mesagho.EndPoint = try EndPoint_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *UDPStarDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -945,11 +1120,11 @@ pub const EndPointDef = struct {
         try skribiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !EndPointDef {
         return try legiTiponElTeksto(allocator, EndPointDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !EndPointDef {
         return try legiTiponElDosiero(allocator, EndPointDef, path, t_formato);
     }
 
@@ -962,11 +1137,25 @@ pub const EndPointDef = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !EndPointDef {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !EndPointDef {
+        var mia_Mesagho= try EndPointDef.initDefault(allocator); 
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "Host" ) ) { 
+                mia_Mesagho.Host =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Port" ) ) { 
+                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *EndPointDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -1047,11 +1236,11 @@ pub const CrossConnectorDef = struct {
         try skribiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !CrossConnectorDef {
         return try legiTiponElTeksto(allocator, CrossConnectorDef, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !CrossConnectorDef {
         return try legiTiponElDosiero(allocator, CrossConnectorDef, path, t_formato);
     }
 
@@ -1065,11 +1254,22 @@ pub const CrossConnectorDef = struct {
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, path: [:0]const u8, t_formato: TekstaFormato) !CrossConnectorDef {
-        _=allocator;
-        _=path;
-        _=t_formato;
-        return error.UnsupportedFormat;
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !CrossConnectorDef {
+        var mia_Mesagho= try CrossConnectorDef.initDefault(allocator); 
+
+        var Transports_list: std.ArrayList([]const u8) = .empty; 
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "Transports" ) ) { 
+                try Transports_list.append(allocator, val); 
+                continue;
+            }
+        }
+        mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
+
+        return mia_Mesagho;
     }
 
     pub fn seriigiAlBin(self: *CrossConnectorDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
@@ -1347,11 +1547,11 @@ fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, t
 //// Legi Tipon El Teksto
 //////////////////////////////////////////////
 
-pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]const u8, t_formato: TekstaFormato) !T {
+pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []const u8, t_formato: TekstaFormato) !T {
     var parsed: T = undefined;
     switch (t_formato) {
         .TF_ZIG_ZON => {
-            parsed = zon.parse.fromSlice(T, allocator, input, null, .{}) catch |err| {
+            parsed = zon.parse.fromSlice(T, allocator, @ptrCast(input), null, .{}) catch |err| {
                 std.debug.print("eraro dun deseriigo: {}\n", .{err});
                 return err;
             };
@@ -1363,7 +1563,12 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: [:0]
             };
         },
         .TF_PROTOBUF => {
-            return error.UnsupportedFormat;
+            var it: TokenIterType = std.mem.tokenizeAny(u8, input, ":\", \n\r\t");
+            parsed = T.legiElProtobufTeksto(allocator, &it) catch |err| {
+                std.debug.print("eraro dun deseriigo: {}\n", .{err});
+                return err;
+            };
+            _=it.peek();
         },
         else => {
             return error.UnsupportedFormat;
