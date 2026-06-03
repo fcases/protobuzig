@@ -120,6 +120,26 @@ pub fn getWireType(field_type: tpj) u3 {
     };
 }
 
+pub fn estasPackable(field_type: tpj) bool {
+    return switch (field_type) {
+        .TYPE_INT32,
+        .TYPE_INT64,
+        .TYPE_UINT32,
+        .TYPE_UINT64,
+        .TYPE_SINT32,
+        .TYPE_SINT64,
+        .TYPE_FIXED32,
+        .TYPE_FIXED64,
+        .TYPE_SFIXED32,
+        .TYPE_SFIXED64,
+        .TYPE_FLOAT,
+        .TYPE_DOUBLE,
+        .TYPE_BOOL,
+        .TYPE_ENUM => true,
+        else => false,
+    };
+}
+
 pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8) void {
     return switch (field_type) {
         .TYPE_MESSAGE => verkisto.print("{s}{s}.seriigi( buffer );\n", .{ prefix, field_name }) catch {},
@@ -153,7 +173,7 @@ pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []co
         .TYPE_INT64 => verkisto.print("buffer.decodeInt64(){s}", .{field_name}) catch {},
         .TYPE_SINT32 => verkisto.print("buffer.decodeSint32(){s}", .{field_name}) catch {},
         .TYPE_SINT64 => verkisto.print("buffer.decodeSint64(){s}", .{field_name}) catch {},
-        .TYPE_SFIXED32 => verkisto.print("buffer.edecodeSfixed32(){s}", .{field_name}) catch {},
+        .TYPE_SFIXED32 => verkisto.print("buffer.decodeSfixed32(){s}", .{field_name}) catch {},
         .TYPE_SFIXED64 => verkisto.print("buffer.decodeSfixed64(){s}", .{field_name}) catch {},
         .TYPE_UINT32 => verkisto.print("buffer.decodeUint32(){s}", .{field_name}) catch {},
         .TYPE_UINT64 => verkisto.print("buffer.decodeUint64(){s}", .{field_name}) catch {},
@@ -186,5 +206,35 @@ pub fn printParseType(verkisto: *std.Io.Writer, field_type: tpj, name: []const u
         .TYPE_BOOL => verkisto.print("mia_Mesagho.{s} =  if( equal(u8, val,\"true\") ) true else false;\n", .{name}) catch {},
         .TYPE_STRING, .TYPE_BYTES => verkisto.print("mia_Mesagho.{s} =  allocator.dupe(u8, val) catch \"\";\n", .{name}) catch {},
         else => {},
+    };
+}
+
+pub fn printParseValueExpr(
+    verkisto: *std.Io.Writer,
+    field_type: tpj,
+    field_zig_type: []const u8,
+    val_expr: []const u8,
+) void {
+    return switch (field_type) {
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 =>
+            verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 =>
+            verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_UINT32, .TYPE_FIXED32 =>
+            verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_UINT64, .TYPE_FIXED64 =>
+            verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_FLOAT =>
+            verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}) catch {},
+        .TYPE_DOUBLE =>
+            verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}) catch {},
+        .TYPE_BOOL =>
+            verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}) catch {},
+        .TYPE_ENUM =>
+            verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }) catch {},
+        .TYPE_STRING, .TYPE_BYTES =>
+            verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}) catch {},
+        else =>
+            verkisto.print("{s}", .{val_expr}) catch {},
     };
 }

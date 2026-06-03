@@ -6,7 +6,10 @@ const prs = @import("mecha_prs.zig");
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-pub fn analiziDosieron(dosieroaNomo: [:0]const u8, presi: bool) !prs.ProtoFile {
+pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
+    // Conecta tambien las trazas internas de mecha_prs.zig al flag presi/verbose.
+    prs.setVerbose(presi);
+
     const dosiero = try std.fs.cwd().openFile(dosieroaNomo, .{});
     defer dosiero.close();
 

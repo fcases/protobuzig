@@ -8,13 +8,24 @@ const auks = @import("kgen_auks.zig");
 
 var verkisto: *std.Io.Writer = undefined;
 
-pub fn generiZigKodon(dosiera_nomo: []const u8, proto: *pf) !void {
-    var buffer: [256]u8 = .{0} ** 256;
+pub fn generiZigKodon(
+    dosiera_nomo: []const u8,
+    output_dir: []const u8,
+    proto: *pf,
+) !void {
+    var buffer: [512]u8 = .{0} ** 512;
 
     const nuda = std.fs.path.basename(dosiera_nomo);
-    const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse dosiera_nomo.len;
+    const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse nuda.len;
     const basa_nomo = nuda[0..punkta_indekso];
-    const zig_nomo = try std.fmt.bufPrint(&buffer, "example/generated/{s}.zig", .{basa_nomo});
+
+    try std.fs.cwd().makePath(output_dir);
+
+    const zig_nomo = try std.fmt.bufPrint(
+        &buffer,
+        "{s}/{s}.zig",
+        .{ output_dir, basa_nomo },
+    );
 
     var zig_dosiero = try std.fs.cwd().createFile(zig_nomo, .{ .truncate = true });
     defer zig_dosiero.close();
@@ -60,8 +71,16 @@ fn skribiKaplinion(proto: *pf) !void {
     , .{});
 
     for (proto.imports) |imp| {
-        const punkta_indekso = std.mem.lastIndexOfScalar(u8, imp, '.') orelse imp.len;
-        const basa_nomo = imp[1 .. punkta_indekso - 1]; // elimini gvidliniojn
+        // imp puede venir con comillas desde el parser: "Msg.proto".
+        // Normalizamos aqui para no romper defaults string que tambien usan quoted_string.
+        var import_name = imp;
+        if (import_name.len >= 2 and import_name[0] == '"' and import_name[import_name.len - 1] == '"') {
+            import_name = import_name[1 .. import_name.len - 1];
+        }
+
+        const base = std.fs.path.basename(import_name);
+        const punkta_indekso = std.mem.lastIndexOfScalar(u8, base, '.') orelse base.len;
+        const basa_nomo = base[0..punkta_indekso];
 
         try verkisto.print(
             \\const {s} = @import("{s}.zig");
@@ -393,6 +412,12 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.print(
         \\const zon = std.zon;
         \\
+        \\fn parseEnumValue(comptime E: type, tok: []const u8) !E {{
+        \\    if (std.meta.stringToEnum(E, tok)) |v| return v;
+        \\    const n = try std.fmt.parseInt(u64, tok, 10);
+        \\    return try std.meta.intToEnum(E, n);
+        \\}}
+        \\
         \\pub const TekstaFormato = enum(u32) {{
         \\    TF_ZIG_ZON,
         \\    TF_PROTOBUF,
@@ -709,15 +734,26 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
             }
         } else {
             if (field.label_enum == .LABEL_REPEATED) {
-                try verkisto.print(
-                    \\{s}                try {s}_list.append(allocator, val); 
-                    \\
-                , .{ ind, field.name });
+                    try verkisto.print("{s}                try {s}_list.append(allocator, ", .{ ind, field.name });
+                    auks.printParseValueExpr(
+                        verkisto,
+                        field.field_type_enum,
+                        field.field_type,
+                        "val",
+                    );
+                    try verkisto.print(");\n", .{});
             } else {
                 try verkisto.print(
                     \\{s}                
                 , .{ind});
-                auks.printParseType(verkisto, field.field_type_enum, field.name);
+                if (field.field_type_enum == .TYPE_ENUM) {
+                    try verkisto.print(
+                        "mia_Mesagho.{s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);\\n",
+                        .{ field.name, field.field_type, field.field_type },
+                    );
+                } else {
+                    auks.printParseType(verkisto, field.field_type_enum, field.name);
+                }
             }
         }
 
@@ -796,7 +832,11 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         const field = msg.fields[nf - 1 - i];
         const field_name = field.name;
         const field_type_enum = field.field_type_enum;
-        const wire_type = if (field.label_enum == .LABEL_REPEATED) 2 else auks.getWireType(field_type_enum);
+        const base_wire_type = auks.getWireType(field_type_enum);
+        const is_packed = field.label_enum == .LABEL_REPEATED and
+            field.packed_value and
+            auks.estasPackable(field_type_enum);
+        const wire_type = if (is_packed) 2 else base_wire_type;
         const default_value: []const u8 = field.default_value orelse "null";
         const packed_value = field.packed_value;
 
@@ -940,7 +980,11 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
         const field_type_enum = field.field_type_enum;
         const field_label = field.label_enum;
         const field_number = field.number;
-        const wire_type = if (field.label_enum == .LABEL_REPEATED) 2 else auks.getWireType(field_type_enum);
+        const base_wire_type = auks.getWireType(field_type_enum);
+        const is_packed = field.label_enum == .LABEL_REPEATED and
+            field.packed_value and
+            auks.estasPackable(field_type_enum);
+        const wire_type = if (is_packed) 2 else base_wire_type;
 
         try verkisto.print(
             \\{s}        {s} ( field_number == {d} and wire_type == {d} ) 
@@ -951,7 +995,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 
         switch (field_label) {
             .LABEL_REPEATED => {
-                if (field.packed_value == true and field_type_enum != .TYPE_STRING and field_type_enum != .TYPE_MESSAGE and field_type_enum != .TYPE_BYTES) {
+                if (field.packed_value and auks.estasPackable(field_type_enum)) {
                     const typename_len = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ field_name, "_len" }, 0) catch unreachable;
                     try verkisto.print(
                         \\{s}        {{
@@ -1336,11 +1380,9 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
     try verkisto.print(
         \\{s}pub fn initDefault(allocator: all.Allocator) !{s} {{
-        \\{s}    const self = try allocator.create({s});
-        \\{s}    self.* = {s}{{
+        \\{s}    return {s}{{
         \\
     , .{
-        indent, msg.name,
         indent, msg.name,
         indent, msg.name,
     });
@@ -1356,12 +1398,11 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
 
     try verkisto.print(
         \\{s}    }};
-        \\{s}    return self.*;
         \\{s}}}
         \\
         \\
     , .{
-        indent, indent, indent,
+        indent, indent,
     });
 
     return;

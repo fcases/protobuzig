@@ -1,8 +1,18 @@
 const std = @import("std");
 const equal = std.mem.eql;
-const dbgPrint = std.debug.print;
 const shpa = std.heap.page_allocator;
 const mecha = @import("mecha");
+
+var verbose: bool = false;
+
+
+pub fn setVerbose(value: bool) void {
+    verbose = value;
+}
+
+fn dbgPrint(comptime fmt: []const u8, args: anytype) void {
+    if (verbose) std.debug.print(fmt, args);
+}
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -147,6 +157,30 @@ const anu_parser = mecha.combine(.{
         } else {
             return shpa.dupe(u8, items[0]) catch &[_]u8{};
         }
+    }
+}.mapFn);
+
+// Nombre de tipo posiblemente cualificado: Msg, k6bus.msg.Msg, foo.bar.Baz.
+// Se usa para tipos de campo; no sustituye a anu_parser para nombres simples
+// como field.name, enum.name, package parts, etc.
+const qualified_name_parser = mecha.combine(.{
+    anu_parser,
+    mecha.combine(.{
+        mecha.string("."),
+        anu_parser,
+    }).many(.{ .collect = true }).opt(),
+}).map(struct {
+    pub fn mapFn(items: anytype) []const u8 {
+        if (items[1]) |more| {
+            var full_name = std.ArrayList(u8).empty;
+            full_name.appendSlice(shpa, items[0]) catch {};
+            for (more) |part| {
+                full_name.appendSlice(shpa, part[0]) catch {}; // "."
+                full_name.appendSlice(shpa, part[1]) catch {}; // siguiente parte
+            }
+            return full_name.toOwnedSlice(shpa) catch &[_]u8{};
+        }
+        return shpa.dupe(u8, items[0]) catch &[_]u8{};
     }
 }.mapFn);
 
@@ -338,7 +372,7 @@ const field_parser = mecha.combine(.{
         mecha.string("repeated"),
     }),
     ws, // 0,1
-    anu_parser, ws, // 2,3
+    qualified_name_parser, ws, // 2,3
     anu_parser, ws, // 4,5
     mecha.string("="), ws, // 6,7
     mecha.intToken(.{}), ws, // 8,9
@@ -526,6 +560,13 @@ pub const protofile_parser = mecha.oneOf(.{
                             dbgPrint("enum definition found: {s}\n\n", .{me.name});
                             break;
                         }
+                    }
+
+                    // Temporal: si no se ha podido resolver localmente,
+                    // asumimos mensaje externo/importado.
+                    if (msg.fields[i].field_type_enum == .TYPE_UNRESOLVED) {
+                        msg.fields[i].field_type_enum = .TYPE_MESSAGE;
+                        dbgPrint("external message assumed: {s}\n\n", .{field.field_type});
                     }
                 }
             }
