@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package k6bus.msg;
+
+option optimize_for = SPEED;
+
+///////////////////////////////////////////////////////////
+// Mensaje base del bus
+///////////////////////////////////////////////////////////
+
+message Msg {
+    repeated fixed32 channels = 1;   // definidos en código (compile-time)
+    required fixed64 msgType  = 2;
+    required bytes payLoad    = 3;
+}

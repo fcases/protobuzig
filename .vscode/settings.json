@@ -1,9 +1,9 @@
 {
     "zig.zigPath": "/opt/Zig/zig/zig",
     "zig.path": "/opt/Zig/zig/zig",
-    "zig.zls.path": "/opt/Zig/zls/zig-out/bin/zls",
-    "zig.zls.zigLibPath": "/opt/Zig/zig/lib",
+    "zig.zls.path": "/opt/Zig/zls/zls",
     "lldb.launch.terminal": "integrated",
+    "zig.libPath": "/opt/Zig/zig/lib",
     // "github-enterprise.uri": "https://github.com/fcases/fcases",
    // "zig.zls.zigLibPath": "/opt/Zig/zig/lib"
 //    "lldb.verboseLogging": true,
