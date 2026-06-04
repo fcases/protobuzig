@@ -99,6 +99,23 @@ pub fn mapiProtoTiponAlZig(protoType: []const u8) []const u8 {
         baseType = "[]const u8";
     }
 
+    // Tipo cualificado/importado, por ejemplo:
+    //     k6bus.msg.Msg
+    // Si Packet.zig importa Msg.zig como:
+    //     const Msg = @import("Msg.zig");
+    // el tipo usable es:
+    //     Msg.k6bus.msg.Msg
+    // Heuristica temporal: si el tipo contiene puntos, el ultimo segmento
+    // se usa como alias del modulo importado.
+    if (std.mem.lastIndexOfScalar(u8, baseType, '.')) |last_dot| {
+        const alias = baseType[last_dot + 1 ..];
+        baseType = std.fmt.allocPrint(
+            std.heap.page_allocator,
+            "{s}.{s}",
+            .{ alias, baseType },
+        ) catch unreachable;
+    }
+
     const finalBaseTypo: []u8 = std.fmt.allocPrint(std.heap.page_allocator, "{s}", .{baseType}) catch unreachable;
 
     return finalBaseTypo;
@@ -142,7 +159,7 @@ pub fn estasPackable(field_type: tpj) bool {
 
 pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8) void {
     return switch (field_type) {
-        .TYPE_MESSAGE => verkisto.print("{s}{s}.seriigi( buffer );\n", .{ prefix, field_name }) catch {},
+        .TYPE_MESSAGE => verkisto.print("{s}{s}.seriigi( allocator, buffer );\n", .{ prefix, field_name }) catch {},
         .TYPE_ENUM => verkisto.print("buffer.encodeVarint( @intFromEnum({s}{s}) );\n", .{ prefix, field_name }) catch {},
         .TYPE_BOOL => verkisto.print("buffer.encodeBool( {s}{s} );\n", .{ prefix, field_name }) catch {},
         .TYPE_STRING => verkisto.print("buffer.encodeString( {s}{s} );\n", .{ prefix, field_name }) catch {},
@@ -165,7 +182,20 @@ pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []co
 
 pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8, extra: []const u8) void {
     return switch (field_type) {
-        .TYPE_MESSAGE => verkisto.print("{s}.deseriigi(allocator, buffer, {s} ){s}", .{ prefix, extra, field_name }) catch {},
+        .TYPE_MESSAGE => {
+            if (std.mem.indexOfScalar(u8, prefix, '.')) |_| {
+                const zig_type = mapiProtoTiponAlZig(prefix);
+                verkisto.print(
+                    "{s}.deseriigiElBin(allocator, try buffer.decodeBytes( {s} ), .BF_PROTOBUF ){s}",
+                    .{ zig_type, extra, field_name },
+                ) catch {};
+            } else {
+                verkisto.print(
+                    "{s}.deseriigi(allocator, buffer, {s} ){s}",
+                    .{ prefix, extra, field_name },
+                ) catch {};
+            }
+        },
         .TYPE_ENUM => verkisto.print("std.meta.intToEnum({s}, try buffer.decodeVarint() ) {s}", .{ prefix, field_name }) catch {},
         .TYPE_BOOL => verkisto.print("buffer.decodeBool(){s}", .{field_name}) catch {},
         .TYPE_STRING => verkisto.print("buffer.decodeString( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }) catch {},
