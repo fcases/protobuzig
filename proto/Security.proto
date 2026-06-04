@@ -1,0 +1,16 @@
+syntax = "proto2";
+package k6bus.security;
+option optimize_for = SPEED;
+enum CryptoMode { CRYPTO_NONE = 0; CRYPTO_AES_256_CBC = 1; CRYPTO_AES_256_GCM = 2; CRYPTO_CHACHA20_POLY1305 = 3; }
+message KeyRegistry {
+    optional uint32 Version = 1 [default = 1];
+    required string Date = 2;
+    required string Time = 3;
+    required string Sender = 4;
+    optional string Phrase = 5;
+    optional string Salt = 6;
+    optional CryptoMode Mode = 7 [default = CRYPTO_AES_256_GCM];
+    optional uint32 KeyId = 8 [default = 0];
+    required bytes Key = 9;
+    optional bytes LegacyIV = 10;
+}

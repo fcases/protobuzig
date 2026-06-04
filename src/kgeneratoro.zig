@@ -748,7 +748,7 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
                 , .{ind});
                 if (field.field_type_enum == .TYPE_ENUM) {
                     try verkisto.print(
-                        "mia_Mesagho.{s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);\\n",
+                        "mia_Mesagho.{s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);\n",
                         .{ field.name, field.field_type, field.field_type },
                     );
                 } else {
