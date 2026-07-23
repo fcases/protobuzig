@@ -123,11 +123,14 @@ pub const DecodeBuffer = struct {
     }
 
     // `decode_fixed64`
+
     pub fn decodeFixed64(self: *DecodeBuffer) ProtobufError!u64 {
         const data = try self.readBytes(8);
 
-        // Uso de `std.mem.readInt` para manejo correcto de endianness (pequeño-endian en Protobuf)
-        return mem.readInt(u64, data, .little);
+        if (data.len < 8) return ProtobufError.EndOfBuffer;
+
+        const ptr: *const [8]u8 = @ptrCast(data.ptr);
+        return mem.readInt(u64, ptr, .little);
     }
 
     // `decode_fixed32`
@@ -201,7 +204,7 @@ pub const DecodeBuffer = struct {
         const data = try self.readBytes(length);
 
         // Crea y retorna una copia de los bytes leídos, con memoria gestionada por el allocator
-        return self.allocator.dupe(u8, data);
+        return self.allocator.dupe(u8, data) catch return ProtobufError.AllocationFailed;
     }
 
     // `decode_sfixed32`
@@ -315,34 +318,34 @@ pub const EncodeBuffer = struct {
 
     // `allocate` (private void allocate)
     fn allocate(self: *EncodeBuffer, size: usize) ProtobufError!void {
-        const old_len = self.buffer.len;
-        const old_write_index = self.write_index;
-        const written_len = old_len - old_write_index;
+        const written_len = self.buffer.len - self.write_index;
         const required = size + written_len;
 
-        if (required <= old_len) {
+        if (required <= self.buffer.len) {
             return;
         }
 
-        // Doblar el buffer hasta que haya espacio suficiente.
-        var new_length = old_len;
+        // Doblar el buffer hasta que haya espacio suficiente (crecimiento exponencial)
+        var new_length = self.buffer.len;
         while (required > new_length) {
             new_length *= 2;
         }
 
+        // Reallocar y copiar los datos (Zig usa `realloc` o `realloc_exact` si el allocator lo soporta)
+        // Usaremos `realloc` que es más seguro y común en `std.mem.Allocator`
         self.buffer = self.allocator.realloc(self.buffer, new_length) catch return ProtobufError.AllocationFailed;
 
-        // El EncodeBuffer escribe hacia atras. Tras crecer, los bytes ya escritos
-        // deben quedar al final del nuevo buffer, igual que en la version Vala.
-        const new_write_index = new_length - written_len;
+        // Mover los datos existentes al final del nuevo buffer para liberar espacio al principio
+        const write_offset = new_length - self.buffer.len;
 
-        std.mem.copyBackwards(
-            u8,
-            self.buffer[new_write_index..new_length],
-            self.buffer[old_write_index..old_len],
-        );
+        // Mover el slice escrito hacia atrás
+        // Los datos a mover son `self.buffer[self.write_index..self.buffer.len]`, es decir, el slice `data()` actual
+        // Lo movemos a `self.buffer[self.write_index + write_offset ..]`
+        // mem.copy(u8, self.buffer[self.write_index + write_offset .. new_length], self.buffer[self.write_index..self.buffer.len]);
+        @memcpy(self.buffer[self.write_index + write_offset .. new_length], self.buffer[self.write_index..self.buffer.len]);
 
-        self.write_index = new_write_index;
+        // Ajustar el índice de escritura
+        self.write_index += write_offset;
     }
 
     // `encode_varint` - Retorna el número de bytes escritos.

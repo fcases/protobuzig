@@ -110,7 +110,7 @@ fn skribiIniPakaghon(pnamo: ?[]const u8) !u8 {
     return i;
 }
 
-fn skribiEnums(enums: []prs.Enum, ind: []u8) !void {
+fn skribiEnums(enums: []prs.Enum, ind: []const u8) !void {
     for (enums) |enm| {
         try verkisto.print(
             \\{s}pub const {s} = enum(u64) {{
@@ -620,6 +620,7 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
         \\
     , .{ ind, msg.name, ind });
 
+
     for (msg.fields) |f| {
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
@@ -635,13 +636,21 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
             , .{ ind, f.name, if (f.field_type_enum == .TYPE_MESSAGE) "{" else "", "    " });
         }
 
+        var needs_indent = false;
+        if (f.field_type_enum == .TYPE_MESSAGE and
+            !estasImportitaTipo(f.field_type))
+        {
+            needs_indent = true;
+        }
+
         if (f.field_type_enum == .TYPE_MESSAGE) {
-            try verkisto.print(
-                \\{s}        const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
-                \\    
-            , .{
-                ind,
-            });
+
+            if (needs_indent) {
+                try verkisto.print(
+                    \\{s}        const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
+                    \\
+                , .{ ind });
+            }
 
             if (estasImportitaTipo(f.field_type)) {
                 if (f.label_enum == .LABEL_OPTIONAL) {
@@ -868,8 +877,6 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 }
 
 fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
-    const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-
     try verkisto.print(
         \\{s}pub fn seriigiAlBin(self: *{s}, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {{
         \\{s}    return try seriigiTiponAlBin(allocator, {s}, @as(*{s},self), b_formato);
@@ -877,9 +884,9 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         \\
         \\
     , .{
-        indent, msg.name, // fn
-        indent, msg.name, msg.name, // return
-        indent, // }
+        ind, msg.name, // fn
+        ind, msg.name, msg.name, // return
+        ind, // }
     });
 
     try verkisto.print(
@@ -889,19 +896,41 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         \\
         \\
     , .{
-        indent, msg.name, // fn
-        indent, msg.name, msg.name, // return
-        indent, // }
+        ind, msg.name, // fn
+        ind, msg.name, msg.name, // return
+        ind, // }
     });
+
+    var uses_allocator = false;
+    for (msg.fields) |f| {
+        if (f.field_type_enum == .TYPE_MESSAGE) {
+            uses_allocator = true;
+            break;
+        }
+    }
 
     try verkisto.print(
         \\{s}fn seriigi(self: *const {s}, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {{
+        \\ 
+        \\
+    , .{
+        ind, msg.name,
+    });
+
+
+    if (!uses_allocator) {
+        try verkisto.print(
+            \\{s}    _ = allocator;
+            \\
+        ,.{ind});
+    }
+
+    try verkisto.print(
         \\{s}    var tuta_longo: usize = 0;
         \\ 
         \\
     , .{
-        indent, msg.name,
-        indent,
+        ind,
     });
 
     const nf = msg.fields.len;
@@ -923,60 +952,60 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         switch (field.label_enum) {
             .LABEL_OPTIONAL => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiOptionalNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    skribiOptionalNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
                     continue;
                 }
 
                 if (havas_default and !estas_variabla_longo) {
-                    skribiOptionalDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    skribiOptionalDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiOptionalNoDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    skribiOptionalNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
                     continue;
                 }
 
                 if (havas_default and estas_variabla_longo) {
-                    skribiOptionalDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    skribiOptionalDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
                     continue;
                 }
             },
             .LABEL_REQUIRED => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiRequiredNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    skribiRequiredNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
                     continue;
                 }
 
                 if (havas_default and !estas_variabla_longo) {
-                    skribiRequiredDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    skribiRequiredDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiRequiredNoDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type) catch {};
+                    skribiRequiredNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
                     continue;
                 }
 
                 if (havas_default and estas_variabla_longo) {
-                    skribiRequiredDefaultVarLong(indent, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    skribiRequiredDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
                     continue;
                 }
             },
             .LABEL_REPEATED => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiRepeatedNoDefaultNoVarLong(indent, field_name, field_type_enum, field.number, wire_type, packed_value) catch {};
+                    skribiRepeatedNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, packed_value) catch {};
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiRepeatedNoDefaultVarLong(indent, field_name, field_type_enum, field.field_type, field.number, wire_type) catch {};
+                    skribiRepeatedNoDefaultVarLong(ind, field_name, field_type_enum, field.field_type, field.number, wire_type) catch {};
                     continue;
                 }
             },
         }
     }
-    try verkisto.print("{s}    return tuta_longo;\n{s}}}\n\n", .{ indent, indent });
+    try verkisto.print("{s}    return tuta_longo;\n{s}}}\n\n", .{ ind, ind });
 
     try verkisto.flush();
 }
@@ -1160,7 +1189,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 /// skribiSeriigi: Optional Funkcioj
 /////////////////////////////////////
 ///
-fn skribiOptionalNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+fn skribiOptionalNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
         \\{s}    if( self.{s} ) |val| {{
         \\{s}        tuta_longo += try 
@@ -1180,7 +1209,7 @@ fn skribiOptionalNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_
     });
 }
 
-fn skribiOptionalDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+fn skribiOptionalDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
     var default_value_string = default;
 
     if (field_type == .TYPE_ENUM) {
@@ -1212,7 +1241,7 @@ fn skribiOptionalDefaultNoVarLong(indent: []u8, field_name: []const u8, field_ty
     });
 }
 
-fn skribiOptionalNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+fn skribiOptionalNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
         \\{s}    if ( self.{s} ) |val| {{
         \\{s}        const st_longa = try 
@@ -1237,7 +1266,7 @@ fn skribiOptionalNoDefaultVarLong(indent: []u8, field_name: []const u8, field_ty
     });
 }
 
-fn skribiOptionalDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+fn skribiOptionalDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
     if (field_type != .TYPE_STRING) {
         skribiOptionalNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
         return;
@@ -1275,7 +1304,7 @@ fn skribiOptionalDefaultVarLong(indent: []u8, field_name: []const u8, field_type
 /// skribiSeriigi: Required Funkcioj
 /////////////////////////////////////
 ///
-fn skribiRequiredNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+fn skribiRequiredNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
         \\{s}    tuta_longo += try 
     , .{
@@ -1293,7 +1322,7 @@ fn skribiRequiredNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_
     });
 }
 
-fn skribiRequiredDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+fn skribiRequiredDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
     var default_value_string = default;
 
     if (field_type == .TYPE_ENUM) {
@@ -1322,7 +1351,7 @@ fn skribiRequiredDefaultNoVarLong(indent: []u8, field_name: []const u8, field_ty
     });
 }
 
-fn skribiRequiredNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
+fn skribiRequiredNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
         \\{s}    const {s}_longa = try 
     , .{
@@ -1344,7 +1373,7 @@ fn skribiRequiredNoDefaultVarLong(indent: []u8, field_name: []const u8, field_ty
     });
 }
 
-fn skribiRequiredDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+fn skribiRequiredDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
     if (field_type != .TYPE_STRING) {
         skribiRequiredNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
         return;
@@ -1378,7 +1407,7 @@ fn skribiRequiredDefaultVarLong(indent: []u8, field_name: []const u8, field_type
 /// skribiSeriigi: Repeted Funkcioj
 /////////////////////////////////////
 ///
-fn skribiRepeatedNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, pck: bool) !void {
+fn skribiRepeatedNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, pck: bool) !void {
     if (pck) {
         try verkisto.print(
             \\{s}    var {s}_longa: usize = 0; 
@@ -1425,7 +1454,7 @@ fn skribiRepeatedNoDefaultNoVarLong(indent: []u8, field_name: []const u8, field_
     });
 }
 
-fn skribiRepeatedNoDefaultVarLong(indent: []u8, field_name: []const u8, field_type: tpj, field_type_name: []const u8, field_number: u32, wire_type: u3) !void {
+fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_type_name: []const u8, field_number: u32, wire_type: u3) !void {
     if (field_type == .TYPE_MESSAGE and estasImportitaTipo(field_type_name)) {
         try verkisto.print(
             \\{s}    for (self.{s}) |item| {{
@@ -1482,32 +1511,91 @@ fn skribiRepeatedNoDefaultVarLong(indent: []u8, field_name: []const u8, field_ty
 ///
 fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-    try verkisto.print(
-        \\{s}pub fn initDefault(allocator: all.Allocator) !{s} {{
-        \\{s}    return {s}{{
-        \\
-    , .{
-        indent, msg.name,
-        indent, msg.name,
-    });
 
-    for (msg.fields) |field| {
-        try verkisto.print(
-            \\{s}        .{s} = 
-        , .{
-            indent, field.name,
-        });
-        try auks.skribiFieldInit(verkisto, field);
+    // -----------------------------------------
+    // Detectar si se usa allocator
+    // -----------------------------------------
+    var uses_allocator = false;
+
+    for (msg.fields) |f| {
+        if (f.label_enum == .LABEL_REPEATED )
+        {
+            uses_allocator = true;
+            break;
+        }
     }
 
+    // -----------------------------------------
+    // Generar cabecera
+    // -----------------------------------------
     try verkisto.print(
-        \\{s}    }};
-        \\{s}}}
+        \\{s}    pub fn initDefault(allocator: all.Allocator) !{s} {{
         \\
-        \\
-    , .{
-        indent, indent,
-    });
+    , .{ indent, msg.name });
 
+    // -----------------------------------------
+    // SOLO si NO se usa allocator → marcarlo como usado
+    // -----------------------------------------
+    if (!uses_allocator) {
+        try verkisto.print(
+            \\{s}        _ = allocator;
+            \\
+        , .{ indent });
+    }
+
+    // -----------------------------------------
+    // Generar return
+    // -----------------------------------------
+    try verkisto.print(
+        \\{s}        return {s} {{
+        \\
+    , .{ indent, msg.name });
+
+    // -----------------------------------------
+    // Campos
+    // -----------------------------------------
+    for (msg.fields) |f| {
+        if (f.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}            .{s} = try allocator.alloc({s}, 0),
+                \\
+            , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+
+        } else if (f.label_enum == .LABEL_OPTIONAL) {
+            try verkisto.print(
+                \\{s}            .{s} = null,
+                \\
+            , .{ indent, f.name });
+
+        } else {
+            // required → valor por defecto simple
+
+            if (f.field_type_enum == .TYPE_STRING or
+                f.field_type_enum == .TYPE_BYTES)
+            {
+                try verkisto.print(
+                    \\{s}            .{s} = "",
+                    \\
+                , .{ indent, f.name });
+
+            } else {
+                try verkisto.print(
+                    \\{s}            .{s} = 0,
+                    \\
+                , .{ indent, f.name });
+            }
+        }
+    }
+
+    // -----------------------------------------
+    // Cierre
+    // -----------------------------------------
+    try verkisto.print(
+        \\{s}        }};
+        \\{s}    }}
+        \\
+    , .{ indent, indent });
+
+    try verkisto.print("\n", .{});
     return;
 }

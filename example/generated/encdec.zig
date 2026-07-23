@@ -123,11 +123,14 @@ pub const DecodeBuffer = struct {
     }
 
     // `decode_fixed64`
+
     pub fn decodeFixed64(self: *DecodeBuffer) ProtobufError!u64 {
         const data = try self.readBytes(8);
 
-        // Uso de `std.mem.readInt` para manejo correcto de endianness (pequeño-endian en Protobuf)
-        return mem.readInt(u64, data, .little);
+        if (data.len < 8) return ProtobufError.EndOfBuffer;
+
+        const ptr: *const [8]u8 = @ptrCast(data.ptr);
+        return mem.readInt(u64, ptr, .little);
     }
 
     // `decode_fixed32`
@@ -201,7 +204,7 @@ pub const DecodeBuffer = struct {
         const data = try self.readBytes(length);
 
         // Crea y retorna una copia de los bytes leídos, con memoria gestionada por el allocator
-        return self.allocator.dupe(u8, data);
+        return self.allocator.dupe(u8, data) catch return ProtobufError.AllocationFailed;
     }
 
     // `decode_sfixed32`

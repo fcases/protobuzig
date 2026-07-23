@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+package geo;
+
+// -------------------------
+// Estacion
+// -------------------------
+message Estacion {
+    optional string nombre = 1;
+    optional uint32 id     = 2;
+}
+
+// -------------------------
+// Ciudad
+// -------------------------
+message Ciudad {
+    optional string nombre = 1;
+    repeated Estacion estaciones = 2;
+}
