@@ -171,7 +171,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
         try skribiSeriigi(msg, ind);
         try skribiDeseriigi(msg, ind);
 
-        try verkisto.print("\n{s}}};\n\n", .{ind});
+        try verkisto.print("\n{s}}};    // {s}\n\n", .{ ind, msg.name });
         try verkisto.flush();
     }
 }
@@ -620,7 +620,6 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
         \\
     , .{ ind, msg.name, ind });
 
-
     for (msg.fields) |f| {
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
@@ -644,12 +643,11 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
         }
 
         if (f.field_type_enum == .TYPE_MESSAGE) {
-
             if (needs_indent) {
                 try verkisto.print(
                     \\{s}        const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
                     \\
-                , .{ ind });
+                , .{ind});
             }
 
             if (estasImportitaTipo(f.field_type)) {
@@ -660,9 +658,10 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                         \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                         \\
                     , .{
-                        ind, f.name,
-                        ind, f.name, f.name,
-                        ind, f.name, f.name,
+                        ind,    f.name,
+                        ind,    f.name,
+                        f.name, ind,
+                        f.name, f.name,
                     });
                 } else if (f.label_enum == .LABEL_REPEATED) {
                     try verkisto.print(
@@ -671,9 +670,10 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                         \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                         \\
                     , .{
-                        ind, f.name,
-                        ind, f.name, f.name,
-                        ind, f.name, f.name,
+                        ind,    f.name,
+                        ind,    f.name,
+                        f.name, ind,
+                        f.name, f.name,
                     });
                 } else {
                     try verkisto.print(
@@ -820,14 +820,14 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
             }
         } else {
             if (field.label_enum == .LABEL_REPEATED) {
-                    try verkisto.print("{s}                try {s}_list.append(allocator, ", .{ ind, field.name });
-                    auks.printParseValueExpr(
-                        verkisto,
-                        field.field_type_enum,
-                        field.field_type,
-                        "val",
-                    );
-                    try verkisto.print(");\n", .{});
+                try verkisto.print("{s}                try {s}_list.append(allocator, ", .{ ind, field.name });
+                auks.printParseValueExpr(
+                    verkisto,
+                    field.field_type_enum,
+                    field.field_type,
+                    "val",
+                );
+                try verkisto.print(");\n", .{});
             } else {
                 try verkisto.print(
                     \\{s}                
@@ -878,9 +878,9 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 
 fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print(
-        \\{s}pub fn seriigiAlBin(self: *{s}, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {{
-        \\{s}    return try seriigiTiponAlBin(allocator, {s}, @as(*{s},self), b_formato);
-        \\{s}}}
+        \\    {s}pub fn seriigiAlBin(self: *const {s}, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {{
+        \\    {s}    return try seriigiTiponAlBin(allocator, {s}, @as(*{s},self), b_formato);
+        \\    {s}}}
         \\
         \\
     , .{
@@ -890,9 +890,9 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     });
 
     try verkisto.print(
-        \\{s}pub fn seriigiAlDosiero(self: *{s}, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {{
-        \\{s}    return try seriigiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, b_formato);
-        \\{s}}}
+        \\    {s}pub fn seriigiAlDosiero(self: *const {s}, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {{
+        \\    {s}    return try seriigiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, b_formato);
+        \\    {s}}}
         \\
         \\
     , .{
@@ -910,23 +910,22 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     }
 
     try verkisto.print(
-        \\{s}fn seriigi(self: *const {s}, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {{
+        \\    {s}fn seriigi(self: *const {s}, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {{
         \\ 
         \\
     , .{
         ind, msg.name,
     });
 
-
     if (!uses_allocator) {
         try verkisto.print(
-            \\{s}    _ = allocator;
+            \\    {s}    _ = allocator;
             \\
-        ,.{ind});
+        , .{ind});
     }
 
     try verkisto.print(
-        \\{s}    var tuta_longo: usize = 0;
+        \\    {s}    var tuta_longo: usize = 0;
         \\ 
         \\
     , .{
@@ -1005,7 +1004,7 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
             },
         }
     }
-    try verkisto.print("{s}    return tuta_longo;\n{s}}}\n\n", .{ ind, ind });
+    try verkisto.print("    {s}    return tuta_longo;\n    {s}}}\n\n", .{ ind, ind });
 
     try verkisto.flush();
 }
@@ -1191,16 +1190,16 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 ///
 fn skribiOptionalNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
-        \\{s}    if( self.{s} ) |val| {{
-        \\{s}        tuta_longo += try 
+        \\    {s}    if( self.{s} ) |val| {{
+        \\    {s}        tuta_longo += try 
     , .{
         indent, field_name, // if (non-null )
         indent,
     });
     auks.printEncodeMethod(verkisto, field_type, "val", "");
     try verkisto.print(
-        \\{s}        tuta_longo += try buffer.encodeVarint({d});
-        \\{s}    }}   //1 opt - no def - no varlong
+        \\    {s}        tuta_longo += try buffer.encodeVarint({d});
+        \\    {s}    }}   //1 opt - no def - no varlong
         \\
         \\
     , .{
@@ -1306,14 +1305,14 @@ fn skribiOptionalDefaultVarLong(indent: []const u8, field_name: []const u8, fiel
 ///
 fn skribiRequiredNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
-        \\{s}    tuta_longo += try 
+        \\    {s}    tuta_longo += try 
     , .{
         indent,
     });
     auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
-        \\{s}    tuta_longo += try buffer.encodeVarint({d});
-        \\{s}    //5 req - no def - no varlong
+        \\    {s}    tuta_longo += try buffer.encodeVarint({d});
+        \\    {s}    //5 req - no def - no varlong
         \\
         \\
     , .{
@@ -1333,15 +1332,15 @@ fn skribiRequiredDefaultNoVarLong(indent: []const u8, field_name: []const u8, fi
     }
 
     try verkisto.print(
-        \\{s}    if( self.{s} != {s} )  {{
-        \\{s}        tuta_longo += try 
+        \\    {s}    if( self.{s} != {s} )  {{
+        \\    {s}        tuta_longo += try 
     , .{
         indent, field_name, default_value_string, // if !default )
         indent,
     });
     auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
-        \\{s}        tuta_longo += try buffer.encodeVarint({d});
+        \\    {s}        tuta_longo += try buffer.encodeVarint({d});
         \\{s}    }}  //6  req - def - no varlong
         \\
         \\
@@ -1353,16 +1352,16 @@ fn skribiRequiredDefaultNoVarLong(indent: []const u8, field_name: []const u8, fi
 
 fn skribiRequiredNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
-        \\{s}    const {s}_longa = try 
+        \\    {s}    const {s}_longa = try 
     , .{
         indent, field_name,
     });
     auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
-        \\{s}    tuta_longo += {s}_longa;
-        \\{s}    tuta_longo += try buffer.encodeVarint({s}_longa);
-        \\{s}    tuta_longo += try buffer.encodeVarint({d});
-        \\{s}    //7  req - no def - varlong
+        \\    {s}    tuta_longo += {s}_longa;
+        \\    {s}    tuta_longo += try buffer.encodeVarint({s}_longa);
+        \\    {s}    tuta_longo += try buffer.encodeVarint({d});
+        \\    {s}    //7  req - no def - varlong
         \\
         \\
     , .{
@@ -1410,9 +1409,9 @@ fn skribiRequiredDefaultVarLong(indent: []const u8, field_name: []const u8, fiel
 fn skribiRepeatedNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, pck: bool) !void {
     if (pck) {
         try verkisto.print(
-            \\{s}    var {s}_longa: usize = 0; 
-            \\{s}    for (self.{s}) |item| 
-            \\{s}        {s}_longa += try 
+            \\    {s}    var {s}_longa: usize = 0; 
+            \\    {s}    for (self.{s}) |item| 
+            \\    {s}        {s}_longa += try 
         , .{
             indent, field_name, // s_longa
             indent, field_name, // for
@@ -1420,32 +1419,31 @@ fn skribiRepeatedNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, 
         });
         auks.printEncodeMethod(verkisto, field_type, "", "item");
         try verkisto.print(
-            \\{s}    tuta_longo += {s}_longa;
-            \\{s}    tuta_longo += try buffer.encodeVarint({s}_longa);
-            \\{s}    tuta_longo += try buffer.encodeVarint({d});
-            \\{s}    // 9 rept - no def - no varlong  PACKED
+            \\    {s}    tuta_longo += {s}_longa;
+            \\    {s}    tuta_longo += try buffer.encodeVarint({s}_longa);
+            \\    {s}    tuta_longo += try buffer.encodeVarint({d});
+            \\    // 9 rept - no def - no varlong  PACKED
             \\
             \\
         , .{
             indent, field_name, // tuta = {s}_long
             indent, field_name, // tuta = encode {s}_long
             indent, (@as(u32, field_number) << 3) | wire_type, // encode key
-            indent,
         });
         return;
     }
 
     try verkisto.print(
-        \\{s}    for (self.{s}) |item| {{
-        \\{s}        tuta_longo += try 
+        \\    {s}    for (self.{s}) |item| {{
+        \\    {s}        tuta_longo += try 
     , .{
         indent, field_name, // for
         indent, // try
     });
     auks.printEncodeMethod(verkisto, field_type, "", "item");
     try verkisto.print(
-        \\{s}        tuta_longo += try buffer.encodeVarint({d});
-        \\{s}    }}  // 9 rept - no def - no varlong 
+        \\    {s}        tuta_longo += try buffer.encodeVarint({d});
+        \\    {s}    }}  // 9 rept - no def - no varlong 
         \\
         \\
     , .{
@@ -1469,14 +1467,15 @@ fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
             \\
             \\
         , .{
-            indent, field_name,
-            indent, field_name,
-            indent, field_name, field_name,
-            indent, field_name,
-            indent, field_name, field_name,
-            indent, field_name,
-            indent, field_name,
-            indent, (@as(u32, field_number) << 3) | wire_type,
+            indent,     field_name,
+            indent,     field_name,
+            indent,     field_name,
+            field_name, indent,
+            field_name, indent,
+            field_name, field_name,
+            indent,     field_name,
+            indent,     field_name,
+            indent,     (@as(u32, field_number) << 3) | wire_type,
             indent,
         });
         return;
@@ -1518,8 +1517,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     var uses_allocator = false;
 
     for (msg.fields) |f| {
-        if (f.label_enum == .LABEL_REPEATED )
-        {
+        if (f.label_enum == .LABEL_REPEATED) {
             uses_allocator = true;
             break;
         }
@@ -1540,7 +1538,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         try verkisto.print(
             \\{s}        _ = allocator;
             \\
-        , .{ indent });
+        , .{indent});
     }
 
     // -----------------------------------------
@@ -1560,13 +1558,11 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                 \\{s}            .{s} = try allocator.alloc({s}, 0),
                 \\
             , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
-
         } else if (f.label_enum == .LABEL_OPTIONAL) {
             try verkisto.print(
                 \\{s}            .{s} = null,
                 \\
             , .{ indent, f.name });
-
         } else {
             // required → valor por defecto simple
 
@@ -1577,7 +1573,6 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                     \\{s}            .{s} = "",
                     \\
                 , .{ indent, f.name });
-
             } else {
                 try verkisto.print(
                     \\{s}            .{s} = 0,
