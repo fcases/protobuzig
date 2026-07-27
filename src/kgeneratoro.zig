@@ -154,6 +154,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
         try verkisto.print("\n", .{});
 
         try skribiInitDefault(msg, ind);
+        try skribiDeInit(msg, ind);
 
         // /////////////
         // Skribi kaj Legi funkcion al/el .TF_XXX teksto
@@ -1509,12 +1510,12 @@ fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
 /////////////////////////////////////
 ///
 fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
-    const indent = std.mem.concatWithSentinel(
-        std.heap.page_allocator,
-        u8,
-        &[_][]const u8{ ind, "    " },
-        0,
-    ) catch unreachable;
+    // const indent = std.mem.concatWithSentinel(
+    //     std.heap.page_allocator,
+    //     u8,
+    //     &[_][]const u8{ ind, "    " },
+    //     0,
+    // ) catch unreachable;
 
     // -----------------------------------------
     // Generar cabecera
@@ -1522,7 +1523,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print(
         \\{s}    pub fn initDefault(allocator: all.Allocator) !{s} {{
         \\
-    , .{ indent, msg.name });
+        // , .{ indent, msg.name });
+    , .{ ind, msg.name });
 
     // -----------------------------------------
     // Detectar si se usa allocator
@@ -1538,7 +1540,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         try verkisto.print(
             \\{s}        _ = allocator;
             \\
-        , .{indent});
+            // , .{indent});
+        , .{ind});
     }
 
     // -----------------------------------------
@@ -1547,7 +1550,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print(
         \\{s}        return {s} {{
         \\
-    , .{ indent, msg.name });
+        // , .{ indent, msg.name });
+    , .{ ind, msg.name });
 
     // -----------------------------------------
     // Campos
@@ -1560,7 +1564,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             try verkisto.print(
                 \\{s}            .{s} = try allocator.alloc({s}, 0),
                 \\
-            , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+            , .{ ind, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+            // , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
             continue;
         }
 
@@ -1572,12 +1577,14 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                 try verkisto.print(
                     \\{s}            .{s} = .{s},
                     \\
-                , .{ indent, f.name, def });
+                    // , .{ indent, f.name, def });
+                , .{ ind, f.name, def });
             } else {
                 try verkisto.print(
                     \\{s}            .{s} = {s},
                     \\
-                , .{ indent, f.name, def });
+                    // , .{ indent, f.name, def });
+                , .{ ind, f.name, def });
             }
             continue;
         }
@@ -1589,7 +1596,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             try verkisto.print(
                 \\{s}            .{s} = null,
                 \\
-            , .{ indent, f.name });
+                // , .{ indent, f.name });
+            , .{ ind, f.name });
             continue;
         }
 
@@ -1602,12 +1610,14 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             try verkisto.print(
                 \\{s}            .{s} = "",
                 \\
-            , .{ indent, f.name });
+                // , .{ indent, f.name });
+            , .{ ind, f.name });
         } else {
             try verkisto.print(
                 \\{s}            .{s} = 0,
                 \\
-            , .{ indent, f.name });
+                // , .{ indent, f.name });
+            , .{ ind, f.name });
         }
     }
 
@@ -1618,9 +1628,121 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         \\{s}        }};
         \\{s}    }}
         \\
+        // , .{ indent, indent });
+    , .{ ind, ind });
+
+    try verkisto.print("\n", .{});
+}
+
+/////////////////////////////////////
+/// Destruktoriloj
+/////////////////////////////////////
+///
+fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
+    // const indent = std.mem.concatWithSentinel(
+    //     std.heap.page_allocator,
+    //     u8,
+    //     &[_][]const u8{ ind, "    " },
+    //     0,
+    // ) catch unreachable;
+
+    // -----------------------------------------
+    // Generar cabecera
+    // -----------------------------------------
+    try verkisto.print(
+        \\{s}    pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
+        \\{s}        _ =self;
+        \\{s}        _ =allocator;
+        \\
+    , .{ ind, msg.name, ind, ind });
+
+    // -----------------------------------------
+    // Detectar si se usa allocator
+    // -----------------------------------------
+    // var uses_allocator = false;
+    // for (msg.fields) |f| {
+    //     if (f.label_enum == .LABEL_REPEATED) {
+    //         uses_allocator = true;
+    //         break;
+    //     }
+    // }
+    // if (!uses_allocator) {
+    //     try verkisto.print(
+    //         \\{s}        _ = allocator;
+    //         \\
+    //     , .{indent});
+    // }
+
+    // -----------------------------------------
+    // Campos
+    // -----------------------------------------
+    // for (msg.fields) |f| {
+    // -------------------------
+    // repeated
+    // -------------------------
+    // if (f.label_enum == .LABEL_REPEATED) {
+    //     try verkisto.print(
+    //         \\{s}            .{s} = try allocator.alloc({s}, 0),
+    //         \\
+    //     , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+    //     continue;
+    // }
+
+    // -------------------------
+    // tiene default explícito
+    // -------------------------
+    // if (f.default_value) |def| {
+    //     if (f.field_type_enum == .TYPE_ENUM) {
+    //         try verkisto.print(
+    //             \\{s}            .{s} = .{s},
+    //             \\
+    //         , .{ indent, f.name, def });
+    //     } else {
+    //         try verkisto.print(
+    //             \\{s}            .{s} = {s},
+    //             \\
+    //         , .{ indent, f.name, def });
+    //     }
+    //     continue;
+    // }
+
+    // -------------------------
+    // optional sin default
+    // -------------------------
+    // if (f.label_enum == .LABEL_OPTIONAL) {
+    //     try verkisto.print(
+    //         \\{s}            .{s} = null,
+    //         \\
+    //     , .{ indent, f.name });
+    //     continue;
+    // }
+
+    // -------------------------
+    // required sin default
+    // -------------------------
+    // if (f.field_type_enum == .TYPE_STRING or
+    //     f.field_type_enum == .TYPE_BYTES)
+    // {
+    //     try verkisto.print(
+    //         \\{s}            .{s} = "",
+    //         \\
+    //     , .{ indent, f.name });
+    // } else {
+    //     try verkisto.print(
+    //         \\{s}            .{s} = 0,
+    //         \\
+    //     , .{ indent, f.name });
+    // }
+    // }
+
+    // -----------------------------------------
+    // Cierre
+    // -----------------------------------------
+    try verkisto.print(
+        \\{s}    }}
+        \\
     , .{
-        indent,
-        indent,
+        ind,
     });
 
     try verkisto.print("\n", .{});
