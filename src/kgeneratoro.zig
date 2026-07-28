@@ -1649,12 +1649,17 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     // Generar cabecera
     // -----------------------------------------
+    // try verkisto.print(
+    //     \\{s}    pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
+    //     \\{s}        _ =self;
+    //     \\{s}        _ =allocator;
+    //     \\
+    // , .{ ind, msg.name, ind, ind });
+
     try verkisto.print(
         \\{s}    pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
-        \\{s}        _ =self;
-        \\{s}        _ =allocator;
         \\
-    , .{ ind, msg.name, ind, ind });
+    , .{ ind, msg.name });
 
     // -----------------------------------------
     // Detectar si se usa allocator
@@ -1676,64 +1681,92 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     // Campos
     // -----------------------------------------
-    // for (msg.fields) |f| {
-    // -------------------------
-    // repeated
-    // -------------------------
-    // if (f.label_enum == .LABEL_REPEATED) {
-    //     try verkisto.print(
-    //         \\{s}            .{s} = try allocator.alloc({s}, 0),
-    //         \\
-    //     , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
-    //     continue;
-    // }
+    for (msg.fields) |f| {
+        // -------------------------
+        // repeated
+        // -------------------------
+        if (f.label_enum == .LABEL_REPEATED) {
+            switch (f.field_type_enum) {
+                .TYPE_MESSAGE => {
+                    try verkisto.print(
+                        \\{s}        for (self.{s}) |item| {{
+                        \\{s}            item.deinit(allocator);
+                        \\{s}        }}
+                        \\{s}        allocator.free(self.{s});
+                        \\
+                    , .{ ind, f.name, ind, ind, ind, f.name });
+                },
+                .TYPE_STRING, .TYPE_BYTES => {
+                    try verkisto.print(
+                        \\{s}        for (self.{s}) |item| {{
+                        \\{s}            allocator.free(item);
+                        \\{s}        }}
+                        \\{s}        allocator.free(self.{s});
+                        \\
+                    , .{ ind, f.name, ind, ind, ind, f.name });
+                },
+                else => {
+                    try verkisto.print(
+                        \\{s}        allocator.free(self.{s});
+                        \\
+                    , .{ ind, f.name });
+                },
+            }
+        }
+        // if (f.label_enum == .LABEL_REPEATED) {
+        //     try verkisto.print(
+        //         \\{s}            .{s} = try allocator.alloc({s}, 0),
+        //         \\
+        //     , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+        //     continue;
+        // }
 
-    // -------------------------
-    // tiene default explícito
-    // -------------------------
-    // if (f.default_value) |def| {
-    //     if (f.field_type_enum == .TYPE_ENUM) {
-    //         try verkisto.print(
-    //             \\{s}            .{s} = .{s},
-    //             \\
-    //         , .{ indent, f.name, def });
-    //     } else {
-    //         try verkisto.print(
-    //             \\{s}            .{s} = {s},
-    //             \\
-    //         , .{ indent, f.name, def });
-    //     }
-    //     continue;
-    // }
+        // -------------------------
+        // tiene default explícito
+        // -------------------------
+        // if (f.default_value) |def| {
+        //     if (f.field_type_enum == .TYPE_ENUM) {
+        //         try verkisto.print(
+        //             \\{s}            .{s} = .{s},
+        //             \\
+        //         , .{ indent, f.name, def });
+        //     } else {
+        //         try verkisto.print(
+        //             \\{s}            .{s} = {s},
+        //             \\
+        //         , .{ indent, f.name, def });
+        //     }
+        //     continue;
+        // }
 
-    // -------------------------
-    // optional sin default
-    // -------------------------
-    // if (f.label_enum == .LABEL_OPTIONAL) {
-    //     try verkisto.print(
-    //         \\{s}            .{s} = null,
-    //         \\
-    //     , .{ indent, f.name });
-    //     continue;
-    // }
+        // -------------------------
+        // optional sin default
+        // -------------------------
+        // if (f.label_enum == .LABEL_OPTIONAL) {
+        //     try verkisto.print(
+        //         \\{s}            .{s} = null,
+        //         \\
+        //     , .{ indent, f.name });
+        //     continue;
+        // }
 
-    // -------------------------
-    // required sin default
-    // -------------------------
-    // if (f.field_type_enum == .TYPE_STRING or
-    //     f.field_type_enum == .TYPE_BYTES)
-    // {
-    //     try verkisto.print(
-    //         \\{s}            .{s} = "",
-    //         \\
-    //     , .{ indent, f.name });
-    // } else {
-    //     try verkisto.print(
-    //         \\{s}            .{s} = 0,
-    //         \\
-    //     , .{ indent, f.name });
-    // }
-    // }
+        // -------------------------
+        // CAMBIAR: required sin default
+        // -------------------------
+        if (f.field_type_enum == .TYPE_STRING or
+            f.field_type_enum == .TYPE_BYTES)
+        {
+            try verkisto.print(
+                \\{s}        allocator.free(self.{s});
+                \\
+            , .{ ind, f.name });
+        } else {
+            // try verkisto.print(
+            //     \\{s}            .{s} = 0,
+            //     \\
+            // , .{ ind, f.name });
+        }
+    }
 
     // -----------------------------------------
     // Cierre

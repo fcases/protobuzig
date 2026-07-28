@@ -187,6 +187,7 @@ pub const DomainCfg = struct {
     pub fn deinit(self: *DomainCfg, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(KeyFile);
     }
 
     pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -387,6 +388,9 @@ pub const TransportDef = struct {
     pub fn deinit(self: *TransportDef, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(TransportName);
+                allocator.free(DllImport);
+                allocator.free(TransportClass);
     }
 
     pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -604,6 +608,8 @@ pub const MCastDefConfig = struct {
     pub fn deinit(self: *MCastDefConfig, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(LocalAddress);
+                allocator.free(MCastAddress);
     }
 
     pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -794,6 +800,8 @@ pub const BCastDefConfig = struct {
     pub fn deinit(self: *BCastDefConfig, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(LocalAddress);
+                allocator.free(BCastAddress);
     }
 
     pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -968,6 +976,7 @@ pub const UDPStarDefConfig = struct {
     pub fn deinit(self: *UDPStarDefConfig, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(LocalAddress);
     }
 
     pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1143,6 +1152,7 @@ pub const EndPointDef = struct {
     pub fn deinit(self: *EndPointDef, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(Host);
     }
 
     pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1264,6 +1274,7 @@ pub const CrossConnectorDef = struct {
     pub fn deinit(self: *CrossConnectorDef, allocator: all.Allocator) void {
         _ =self;
         _ =allocator;
+                allocator.free(Transports);
     }
 
     pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
