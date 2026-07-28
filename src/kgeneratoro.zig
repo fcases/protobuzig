@@ -153,8 +153,9 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
         }
         try verkisto.print("\n", .{});
 
-        try skribiInitDefault(msg, ind);
-        try skribiDeInit(msg, ind);
+        const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+        try skribiInitDefault(msg, indent);
+        try skribiDeInit(msg, indent);
 
         // /////////////
         // Skribi kaj Legi funkcion al/el .TF_XXX teksto
@@ -470,14 +471,20 @@ fn skribiGeneralajnFunkciojn() !void {
         \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
         \\                return err;
         \\            }};
-        \\            bytes = skribila_asignilo.writer.buffered();
+        \\            bytes = skribila_asignilo.toOwnedSlice() catch |err| {{
+        \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
+        \\               return err;
+        \\            }};
         \\        }},
         \\        .TF_JSON => {{
         \\            std.json.fmt(self, .{{ .whitespace = .indent_3 }}).format(&skribila_asignilo.writer) catch |err| {{
         \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
         \\                return err;
         \\            }};
-        \\            bytes = skribila_asignilo.writer.buffered();
+        \\            bytes = skribila_asignilo.toOwnedSlice() catch |err| {{
+        \\                std.debug.print("eraro dum seriigo: {{}}\n", .{{err}});
+        \\               return err;
+        \\            }};
         \\        }},
         \\        .TF_PROTOBUF => {{
         \\            bytes = self.skribiAlProtobufTeksto(allocator, "") catch |err| {{
@@ -1521,7 +1528,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // Generar cabecera
     // -----------------------------------------
     try verkisto.print(
-        \\{s}    pub fn initDefault(allocator: all.Allocator) !{s} {{
+        \\{s}pub fn initDefault(allocator: all.Allocator) !{s} {{
         \\
         // , .{ indent, msg.name });
     , .{ ind, msg.name });
@@ -1538,7 +1545,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
     if (!uses_allocator) {
         try verkisto.print(
-            \\{s}        _ = allocator;
+            \\{s}    _ = allocator;
             \\
             // , .{indent});
         , .{ind});
@@ -1548,7 +1555,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // Generar return
     // -----------------------------------------
     try verkisto.print(
-        \\{s}        return {s} {{
+        \\{s}    return {s} {{
         \\
         // , .{ indent, msg.name });
     , .{ ind, msg.name });
@@ -1562,7 +1569,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         // -------------------------
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
-                \\{s}            .{s} = try allocator.alloc({s}, 0),
+                \\{s}        .{s} = try allocator.alloc({s}, 0),
                 \\
             , .{ ind, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
             // , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
@@ -1575,13 +1582,13 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         if (f.default_value) |def| {
             if (f.field_type_enum == .TYPE_ENUM) {
                 try verkisto.print(
-                    \\{s}            .{s} = .{s},
+                    \\{s}        .{s} = .{s},
                     \\
                     // , .{ indent, f.name, def });
                 , .{ ind, f.name, def });
             } else {
                 try verkisto.print(
-                    \\{s}            .{s} = {s},
+                    \\{s}        .{s} = {s},
                     \\
                     // , .{ indent, f.name, def });
                 , .{ ind, f.name, def });
@@ -1594,7 +1601,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         // -------------------------
         if (f.label_enum == .LABEL_OPTIONAL) {
             try verkisto.print(
-                \\{s}            .{s} = null,
+                \\{s}        .{s} = null,
                 \\
                 // , .{ indent, f.name });
             , .{ ind, f.name });
@@ -1608,13 +1615,13 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             f.field_type_enum == .TYPE_BYTES)
         {
             try verkisto.print(
-                \\{s}            .{s} = "",
+                \\{s}        .{s} = "",
                 \\
                 // , .{ indent, f.name });
             , .{ ind, f.name });
         } else {
             try verkisto.print(
-                \\{s}            .{s} = 0,
+                \\{s}        .{s} = 0,
                 \\
                 // , .{ indent, f.name });
             , .{ ind, f.name });
@@ -1625,8 +1632,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // Cierre
     // -----------------------------------------
     try verkisto.print(
-        \\{s}        }};
-        \\{s}    }}
+        \\{s}    }};
+        \\{s}}}
         \\
         // , .{ indent, indent });
     , .{ ind, ind });
@@ -1657,7 +1664,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // , .{ ind, msg.name, ind, ind });
 
     try verkisto.print(
-        \\{s}    pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
+        \\{s}pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
         \\
     , .{ ind, msg.name });
 
@@ -1689,25 +1696,27 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
             switch (f.field_type_enum) {
                 .TYPE_MESSAGE => {
                     try verkisto.print(
-                        \\{s}        for (self.{s}) |item| {{
-                        \\{s}            item.deinit(allocator);
-                        \\{s}        }}
-                        \\{s}        allocator.free(self.{s});
+                        \\{s}    for (self.{s}) |item| {{
+                        \\{s}        item.deinit(allocator);
+                        \\{s}    }}
+                        \\{s}    allocator.free(self.{s});
+                        \\
                         \\
                     , .{ ind, f.name, ind, ind, ind, f.name });
                 },
                 .TYPE_STRING, .TYPE_BYTES => {
                     try verkisto.print(
-                        \\{s}        for (self.{s}) |item| {{
-                        \\{s}            allocator.free(item);
-                        \\{s}        }}
-                        \\{s}        allocator.free(self.{s});
+                        \\{s}    for (self.{s}) |item| {{
+                        \\{s}        allocator.free(item);
+                        \\{s}    }}
+                        \\{s}    allocator.free(self.{s});
+                        \\
                         \\
                     , .{ ind, f.name, ind, ind, ind, f.name });
                 },
                 else => {
                     try verkisto.print(
-                        \\{s}        allocator.free(self.{s});
+                        \\{s}    allocator.free(self.{s});
                         \\
                     , .{ ind, f.name });
                 },
@@ -1756,10 +1765,19 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
         if (f.field_type_enum == .TYPE_STRING or
             f.field_type_enum == .TYPE_BYTES)
         {
-            try verkisto.print(
-                \\{s}        allocator.free(self.{s});
-                \\
-            , .{ ind, f.name });
+            if (f.label_enum == .LABEL_OPTIONAL) {
+                try verkisto.print(
+                    \\{s}    if( self.{s} ) |f| {{
+                    \\{s}        allocator.free(f);
+                    \\{s}    }}
+                    \\
+                , .{ ind, f.name, ind, ind });
+            } else {
+                try verkisto.print(
+                    \\{s}    allocator.free(self.{s});
+                    \\
+                , .{ ind, f.name });
+            }
         } else {
             // try verkisto.print(
             //     \\{s}            .{s} = 0,
@@ -1772,7 +1790,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // Cierre
     // -----------------------------------------
     try verkisto.print(
-        \\{s}    }}
+        \\{s}}}
         \\
     , .{
         ind,
