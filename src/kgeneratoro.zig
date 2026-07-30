@@ -1664,7 +1664,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // , .{ ind, msg.name, ind, ind });
 
     try verkisto.print(
-        \\{s}pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
+        \\{s}pub fn deinit(self: *const {s}, allocator: all.Allocator) void {{
         \\
     , .{ ind, msg.name });
 
@@ -1701,7 +1701,6 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
                         \\{s}    }}
                         \\{s}    allocator.free(self.{s});
                         \\
-                        \\
                     , .{ ind, f.name, ind, ind, ind, f.name });
                 },
                 .TYPE_STRING, .TYPE_BYTES => {
@@ -1710,7 +1709,6 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
                         \\{s}        allocator.free(item);
                         \\{s}    }}
                         \\{s}    allocator.free(self.{s});
-                        \\
                         \\
                     , .{ ind, f.name, ind, ind, ind, f.name });
                 },
