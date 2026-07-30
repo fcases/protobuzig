@@ -1106,24 +1106,95 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
             indent, if (unua) "if" else "else if", field_number, wire_type,
         });
 
+        // ====================================
+
+        // switch (field_label) {
+        //     .LABEL_REPEATED => {
+        //         if (field.packed_value and auks.estasPackable(field_type_enum)) {
+        //             const typename_len = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ field_name, "_len" }, 0) catch unreachable;
+        //             try verkisto.print(
+        //                 \\{s}        {{
+        //                 \\{s}            const {s}_len = try buffer.decodeVarint();
+        //                 \\{s}            const {s}_end = buffer.read_index + {s}_len;
+        //                 \\{s}            while (buffer.read_index < {s}_end)
+        //                 \\{s}                try {s}_list.append( allocator, try
+        //             , .{
+        //                 indent,
+        //                 indent, field_name, // const _len
+        //                 indent, field_name, field_name, // const _end
+        //                 indent, field_name, // while
+        //                 indent, field_name, // append
+        //             });
+        //             auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
+        //             try verkisto.print(
+        //                 \\ );
+        //                 \\{s}            if (buffer.read_index != {s}_end) return error.AllocationFailed;
+        //                 \\{s}        }}
+        //                 \\
+        //             , .{
+        //                 indent, field_name,
+        //                 indent,
+        //             });
+        //         } else {
+        //             try verkisto.print(
+        //                 \\{s}            {{ try {s}_list.append( allocator, try
+        //             , .{
+        //                 indent, field_name,
+        //             });
+        //             auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "", "try buffer.decodeVarint()");
+        //             try verkisto.print(" ); }}\n", .{});
+        //         }
+        //     },
+        //     .LABEL_REQUIRED => {
+        //         try verkisto.print(
+        //             \\{s}            mia_Mesagho.{s} = try
+        //         , .{
+        //             indent, field.name,
+        //         });
+        //         auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
+        //     },
+        //     else => {
+        //         try verkisto.print(
+        //             \\{s}            mia_Mesagho.{s} = try
+        //         , .{
+        //             indent, field.name,
+        //         });
+        //         auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
+        //     },
+        // }
+        // ====================================
         switch (field_label) {
             .LABEL_REPEATED => {
+                // packed repeated
                 if (field.packed_value and auks.estasPackable(field_type_enum)) {
-                    const typename_len = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ field_name, "_len" }, 0) catch unreachable;
+                    const typename_len = std.mem.concatWithSentinel(
+                        std.heap.page_allocator,
+                        u8,
+                        &[_][]const u8{ field_name, "_len" },
+                        0,
+                    ) catch unreachable;
+
                     try verkisto.print(
                         \\{s}        {{
                         \\{s}            const {s}_len = try buffer.decodeVarint();
                         \\{s}            const {s}_end = buffer.read_index + {s}_len;
                         \\{s}            while (buffer.read_index < {s}_end)
-                        \\{s}                try {s}_list.append( allocator, try  
+                        \\{s}                try {s}_list.append( allocator, try 
                     , .{
                         indent,
-                        indent, field_name, // const _len
-                        indent, field_name, field_name, // const _end
-                        indent, field_name, // while
-                        indent, field_name, // append
+                        indent,
+                        field_name,
+                        indent,
+                        field_name,
+                        field_name,
+                        indent,
+                        field_name,
+                        indent,
+                        field_name,
                     });
+
                     auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
+
                     try verkisto.print(
                         \\ );
                         \\{s}            if (buffer.read_index != {s}_end) return error.AllocationFailed;
@@ -1134,32 +1205,167 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         indent,
                     });
                 } else {
-                    try verkisto.print(
-                        \\{s}            {{ try {s}_list.append( allocator, try 
-                    , .{
-                        indent, field_name,
-                    });
-                    auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "", "try buffer.decodeVarint()");
-                    try verkisto.print(" ); }}\n", .{});
+                    // imported message
+                    if (field_type_enum == .TYPE_MESSAGE and estasImportitaTipo(field_type)) {
+                        try verkisto.print(
+                            \\{s}        {{
+                            \\{s}            const raw = try buffer.decodeBytes(try buffer.decodeVarint());
+                            \\{s}            defer allocator.free(raw);
+                            \\{s}
+                            \\{s}            try {s}_list.append(
+                            \\{s}                allocator,
+                            \\{s}                try {s}.deseriigiElBin(
+                            \\{s}                    allocator,
+                            \\{s}                    raw,
+                            \\{s}                    .BF_PROTOBUF,
+                            \\{s}                )
+                            \\{s}            );
+                            \\{s}        }}
+                            \\
+                        , .{
+                            indent,
+                            indent,
+                            indent,
+                            indent,
+                            indent,
+                            field_name,
+                            indent,
+                            indent,
+                            auks.mapiProtoTiponAlZig(field_type),
+                            indent,
+                            indent,
+                            indent,
+                            indent,
+                            indent,
+                            indent,
+                        });
+                    } else {
+                        try verkisto.print(
+                            \\{s}            {{ try {s}_list.append( allocator, try 
+                        , .{
+                            indent,
+                            field_name,
+                        });
+
+                        auks.printDecodeMethod(
+                            verkisto,
+                            field_type_enum,
+                            if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
+                                field_type
+                            else
+                                "",
+                            "",
+                            "try buffer.decodeVarint()",
+                        );
+
+                        try verkisto.print(" ); }}\n", .{});
+                    }
                 }
             },
             .LABEL_REQUIRED => {
-                try verkisto.print(
-                    \\{s}            mia_Mesagho.{s} = try 
-                , .{
-                    indent, field.name,
-                });
-                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
+                // imported message
+                if (field_type_enum == .TYPE_MESSAGE and estasImportitaTipo(field_type)) {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const raw = try buffer.decodeBytes(try buffer.decodeVarint());
+                        \\{s}            defer allocator.free(raw);
+                        \\{s}
+                        \\{s}            mia_Mesagho.{s} =
+                        \\{s}                try {s}.deseriigiElBin(
+                        \\{s}                    allocator,
+                        \\{s}                    raw,
+                        \\{s}                    .BF_PROTOBUF,
+                        \\{s}                );
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        field.name,
+                        indent,
+                        auks.mapiProtoTiponAlZig(field_type),
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}            mia_Mesagho.{s} = try 
+                    , .{
+                        indent,
+                        field.name,
+                    });
+
+                    auks.printDecodeMethod(
+                        verkisto,
+                        field_type_enum,
+                        if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
+                            field_type
+                        else
+                            "",
+                        if (i == field_nums - 1) ";\n" else "\n",
+                        "try buffer.decodeVarint()",
+                    );
+                }
             },
             else => {
-                try verkisto.print(
-                    \\{s}            mia_Mesagho.{s} = try 
-                , .{
-                    indent, field.name,
-                });
-                auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
+                // optional message
+                if (field_type_enum == .TYPE_MESSAGE and estasImportitaTipo(field_type)) {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const raw = try buffer.decodeBytes(try buffer.decodeVarint());
+                        \\{s}            defer allocator.free(raw);
+                        \\{s}
+                        \\{s}            mia_Mesagho.{s} =
+                        \\{s}                try {s}.deseriigiElBin(
+                        \\{s}                    allocator,
+                        \\{s}                    raw,
+                        \\{s}                    .BF_PROTOBUF,
+                        \\{s}                );
+                        \\{s}       }}
+                        \\
+                    , .{
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        field.name,
+                        indent,
+                        auks.mapiProtoTiponAlZig(field_type),
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}            mia_Mesagho.{s} = try 
+                    , .{
+                        indent,
+                        field.name,
+                    });
+
+                    auks.printDecodeMethod(
+                        verkisto,
+                        field_type_enum,
+                        if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
+                            field_type
+                        else
+                            "",
+                        if (i == field_nums - 1) ";\n" else "\n",
+                        "try buffer.decodeVarint()",
+                    );
+                }
             },
         }
+        // ====================================
 
         unua = false;
     }
@@ -1517,12 +1723,6 @@ fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
 /////////////////////////////////////
 ///
 fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
-    // const indent = std.mem.concatWithSentinel(
-    //     std.heap.page_allocator,
-    //     u8,
-    //     &[_][]const u8{ ind, "    " },
-    //     0,
-    // ) catch unreachable;
 
     // -----------------------------------------
     // Generar cabecera
@@ -1538,7 +1738,11 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     var uses_allocator = false;
     for (msg.fields) |f| {
-        if (f.label_enum == .LABEL_REPEATED) {
+        if (f.label_enum == .LABEL_REPEATED or
+            f.field_type_enum == .TYPE_STRING or
+            f.field_type_enum == .TYPE_BYTES or
+            f.field_type_enum == .TYPE_MESSAGE)
+        {
             uses_allocator = true;
             break;
         }
@@ -1580,17 +1784,25 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         // tiene default explícito
         // -------------------------
         if (f.default_value) |def| {
+            // enum
             if (f.field_type_enum == .TYPE_ENUM) {
                 try verkisto.print(
                     \\{s}        .{s} = .{s},
                     \\
-                    // , .{ indent, f.name, def });
                 , .{ ind, f.name, def });
+                // string y bytes
+            } else if (f.field_type_enum == .TYPE_STRING or
+                f.field_type_enum == .TYPE_BYTES)
+            {
+                try verkisto.print(
+                    \\{s}        .{s} = try allocator.dupe(u8, {s}),
+                    \\
+                , .{ ind, f.name, def });
+                // resto de tipos
             } else {
                 try verkisto.print(
                     \\{s}        .{s} = {s},
                     \\
-                    // , .{ indent, f.name, def });
                 , .{ ind, f.name, def });
             }
             continue;
@@ -1608,6 +1820,19 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             continue;
         }
 
+        if (f.field_type_enum == .TYPE_MESSAGE) {
+            try verkisto.print(
+                \\{s}        .{s} = try {s}.initDefault(allocator),
+                \\
+            , .{
+                ind,
+                f.name,
+                auks.mapiProtoTiponAlZig(f.field_type),
+            });
+
+            continue;
+        }
+
         // -------------------------
         // required sin default
         // -------------------------
@@ -1615,9 +1840,8 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             f.field_type_enum == .TYPE_BYTES)
         {
             try verkisto.print(
-                \\{s}        .{s} = "",
+                \\{s}        .{s} = try allocator.dupe(u8, ""),
                 \\
-                // , .{ indent, f.name });
             , .{ ind, f.name });
         } else {
             try verkisto.print(
@@ -1646,23 +1870,6 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
 /////////////////////////////////////
 ///
 fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
-    // const indent = std.mem.concatWithSentinel(
-    //     std.heap.page_allocator,
-    //     u8,
-    //     &[_][]const u8{ ind, "    " },
-    //     0,
-    // ) catch unreachable;
-
-    // -----------------------------------------
-    // Generar cabecera
-    // -----------------------------------------
-    // try verkisto.print(
-    //     \\{s}    pub fn deinit(self: *{s}, allocator: all.Allocator) void {{
-    //     \\{s}        _ =self;
-    //     \\{s}        _ =allocator;
-    //     \\
-    // , .{ ind, msg.name, ind, ind });
-
     try verkisto.print(
         \\{s}pub fn deinit(self: *const {s}, allocator: all.Allocator) void {{
         \\
@@ -1671,19 +1878,23 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     // Detectar si se usa allocator
     // -----------------------------------------
-    // var uses_allocator = false;
-    // for (msg.fields) |f| {
-    //     if (f.label_enum == .LABEL_REPEATED) {
-    //         uses_allocator = true;
-    //         break;
-    //     }
-    // }
-    // if (!uses_allocator) {
-    //     try verkisto.print(
-    //         \\{s}        _ = allocator;
-    //         \\
-    //     , .{indent});
-    // }
+    var uses_allocator = false;
+    for (msg.fields) |f| {
+        if (f.label_enum == .LABEL_REPEATED or
+            f.field_type_enum == .TYPE_STRING or
+            f.field_type_enum == .TYPE_BYTES or
+            f.field_type_enum == .TYPE_MESSAGE)
+        {
+            uses_allocator = true;
+            break;
+        }
+    }
+    if (!uses_allocator) {
+        try verkisto.print(
+            \\{s}    _ = allocator;
+            \\
+        , .{ind});
+    }
 
     // -----------------------------------------
     // Campos
@@ -1719,47 +1930,41 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
                     , .{ ind, f.name });
                 },
             }
+            continue;
         }
-        // if (f.label_enum == .LABEL_REPEATED) {
-        //     try verkisto.print(
-        //         \\{s}            .{s} = try allocator.alloc({s}, 0),
-        //         \\
-        //     , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
-        //     continue;
-        // }
 
-        // -------------------------
-        // tiene default explícito
-        // -------------------------
-        // if (f.default_value) |def| {
-        //     if (f.field_type_enum == .TYPE_ENUM) {
-        //         try verkisto.print(
-        //             \\{s}            .{s} = .{s},
-        //             \\
-        //         , .{ indent, f.name, def });
-        //     } else {
-        //         try verkisto.print(
-        //             \\{s}            .{s} = {s},
-        //             \\
-        //         , .{ indent, f.name, def });
-        //     }
-        //     continue;
-        // }
+        if (f.label_enum == .LABEL_OPTIONAL and
+            f.field_type_enum == .TYPE_MESSAGE)
+        {
+            try verkisto.print(
+                \\{s}    if (self.{s}) |item| {{
+                \\{s}        item.deinit(allocator);
+                \\{s}    }}
+                \\
+            , .{
+                ind,
+                f.name,
+                ind,
+                ind,
+            });
 
-        // -------------------------
-        // optional sin default
-        // -------------------------
-        // if (f.label_enum == .LABEL_OPTIONAL) {
-        //     try verkisto.print(
-        //         \\{s}            .{s} = null,
-        //         \\
-        //     , .{ indent, f.name });
-        //     continue;
-        // }
+            continue;
+        }
 
-        // -------------------------
-        // CAMBIAR: required sin default
-        // -------------------------
+        if (f.label_enum == .LABEL_REQUIRED and
+            f.field_type_enum == .TYPE_MESSAGE)
+        {
+            try verkisto.print(
+                \\{s}    self.{s}.deinit(allocator);
+                \\
+            , .{
+                ind,
+                f.name,
+            });
+
+            continue;
+        }
+
         if (f.field_type_enum == .TYPE_STRING or
             f.field_type_enum == .TYPE_BYTES)
         {
@@ -1778,7 +1983,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
             }
         } else {
             // try verkisto.print(
-            //     \\{s}            .{s} = 0,
+            //     \\{s}    self.{s} = 0;
             //     \\
             // , .{ ind, f.name });
         }
