@@ -28,12 +28,11 @@ pub const AppConfig = struct {
         };
     }
 
-    pub fn deinit(self: *AppConfig, allocator: all.Allocator) void {
+    pub fn deinit(self: *const AppConfig, allocator: all.Allocator) void {
         for (self.Domains) |item| {
             item.deinit(allocator);
         }
         allocator.free(self.Domains);
-
     }
 
     pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -187,7 +186,7 @@ pub const DomainCfg = struct {
         };
     }
 
-    pub fn deinit(self: *DomainCfg, allocator: all.Allocator) void {
+    pub fn deinit(self: *const DomainCfg, allocator: all.Allocator) void {
         if( self.KeyFile ) |f| {
             allocator.free(f);
         }
@@ -195,7 +194,9 @@ pub const DomainCfg = struct {
             item.deinit(allocator);
         }
         allocator.free(self.Transports);
-
+        if (self.CrossConnector) |item| {
+            item.deinit(allocator);
+        }
     }
 
     pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -381,11 +382,10 @@ pub const TransportDef = struct {
     UDPStarParams: ?UDPStarDefConfig = null,
 
     pub fn initDefault(allocator: all.Allocator) !TransportDef {
-        _ = allocator;
         return TransportDef {
-            .TransportName = "MCastDefault0",
-            .DllImport = "Default",
-            .TransportClass = "Default",
+            .TransportName = try allocator.dupe(u8, "MCastDefault0"),
+            .DllImport = try allocator.dupe(u8, "Default"),
+            .TransportClass = try allocator.dupe(u8, "Default"),
             .ReceiveOwnMsgs = false,
             .MCastParams = null,
             .BCastParams = null,
@@ -393,10 +393,19 @@ pub const TransportDef = struct {
         };
     }
 
-    pub fn deinit(self: *TransportDef, allocator: all.Allocator) void {
+    pub fn deinit(self: *const TransportDef, allocator: all.Allocator) void {
         allocator.free(self.TransportName);
         allocator.free(self.DllImport);
         allocator.free(self.TransportClass);
+        if (self.MCastParams) |item| {
+            item.deinit(allocator);
+        }
+        if (self.BCastParams) |item| {
+            item.deinit(allocator);
+        }
+        if (self.UDPStarParams) |item| {
+            item.deinit(allocator);
+        }
     }
 
     pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -600,10 +609,9 @@ pub const MCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !MCastDefConfig {
-        _ = allocator;
         return MCastDefConfig {
-            .LocalAddress = "Any",
-            .MCastAddress = "239.255.0.1",
+            .LocalAddress = try allocator.dupe(u8, "Any"),
+            .MCastAddress = try allocator.dupe(u8, "239.255.0.1"),
             .Port = 40069,
             .TTL = 1,
             .ReceiveBuffer = 134217727,
@@ -611,7 +619,7 @@ pub const MCastDefConfig = struct {
         };
     }
 
-    pub fn deinit(self: *MCastDefConfig, allocator: all.Allocator) void {
+    pub fn deinit(self: *const MCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.MCastAddress);
     }
@@ -791,17 +799,16 @@ pub const BCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !BCastDefConfig {
-        _ = allocator;
         return BCastDefConfig {
-            .LocalAddress = "Any",
-            .BCastAddress = "192.168.2.255",
+            .LocalAddress = try allocator.dupe(u8, "Any"),
+            .BCastAddress = try allocator.dupe(u8, "192.168.2.255"),
             .Port = 40069,
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
         };
     }
 
-    pub fn deinit(self: *BCastDefConfig, allocator: all.Allocator) void {
+    pub fn deinit(self: *const BCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.BCastAddress);
     }
@@ -967,7 +974,7 @@ pub const UDPStarDefConfig = struct {
 
     pub fn initDefault(allocator: all.Allocator) !UDPStarDefConfig {
         return UDPStarDefConfig {
-            .LocalAddress = "Any",
+            .LocalAddress = try allocator.dupe(u8, "Any"),
             .Port = 40069,
             .EndPoint = try allocator.alloc(EndPointDef, 0),
             .ReceiveBuffer = 134217727,
@@ -975,13 +982,12 @@ pub const UDPStarDefConfig = struct {
         };
     }
 
-    pub fn deinit(self: *UDPStarDefConfig, allocator: all.Allocator) void {
+    pub fn deinit(self: *const UDPStarDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         for (self.EndPoint) |item| {
             item.deinit(allocator);
         }
         allocator.free(self.EndPoint);
-
     }
 
     pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1147,14 +1153,13 @@ pub const EndPointDef = struct {
     Port: i32 = 40069 ,
 
     pub fn initDefault(allocator: all.Allocator) !EndPointDef {
-        _ = allocator;
         return EndPointDef {
-            .Host = "",
+            .Host = try allocator.dupe(u8, ""),
             .Port = 40069,
         };
     }
 
-    pub fn deinit(self: *EndPointDef, allocator: all.Allocator) void {
+    pub fn deinit(self: *const EndPointDef, allocator: all.Allocator) void {
         allocator.free(self.Host);
     }
 
@@ -1274,12 +1279,10 @@ pub const CrossConnectorDef = struct {
         };
     }
 
-    pub fn deinit(self: *CrossConnectorDef, allocator: all.Allocator) void {
+    pub fn deinit(self: *const CrossConnectorDef, allocator: all.Allocator) void {
         for (self.Transports) |item| {
             allocator.free(item);
         }
-        allocator.free(self.Transports);
-
         allocator.free(self.Transports);
     }
 
