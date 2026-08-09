@@ -47,6 +47,18 @@ pub fn liberiProtoDosieron(pf: *prs.ProtoFile) void {
             if (field.default_value) |d| shpa.free(d);
         }
         shpa.free(msg.fields);
+
+        for (msg.oneofs) |oneof_decl| {
+            shpa.free(oneof_decl.name);
+            for (oneof_decl.fields) |field| {
+                shpa.free(field.field_type);
+                shpa.free(field.name);
+                if (field.default_value) |d| shpa.free(d);
+            }
+            shpa.free(oneof_decl.fields);
+        }
+        shpa.free(msg.oneofs);
+
         shpa.free(msg.name);
     }
     shpa.free(pf.messages);
@@ -108,6 +120,18 @@ fn presiProtoDosieron(ast: prs.ProtoFile) void {
             const def_value: []const u8 = field.default_value orelse "void";
             const pck_value: []const u8 = if (field.label_enum == .LABEL_REPEATED and field.packed_value) ", packed" else "";
             dbgPrint("    {d}: {s} := {s} ( {s} , [{s}{s}] )\n", .{ field.number, field.name, field.field_type, field.label, def_value, pck_value });
+        }
+
+        for (msg.oneofs) |oneof_decl| {
+            dbgPrint("    - OneOf: {s}\n", .{oneof_decl.name});
+            for (oneof_decl.fields) |field| {
+                const def_value: []const u8 = field.default_value orelse "void";
+                const pck_value: []const u8 = if (field.packed_value) ", packed" else "";
+                dbgPrint(
+                    "        {d}: {s} := {s} ( [ {s}{s} ] )\n",
+                    .{ field.number, field.name, field.field_type, def_value, pck_value },
+                );
+            }
         }
 
         // Enums dentro de mensaje

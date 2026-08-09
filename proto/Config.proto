@@ -1,0 +1,87 @@
+syntax = "proto2";
+package k6bus.config;
+option optimize_for = SPEED;
+
+message AppConfig {
+    optional uint32 version = 1 [default = 1];
+    optional bool activate_trace = 2 [default = false];
+    optional int32 trace_level = 3 [default = 0];
+    repeated DomainConfig domains = 4;
+}
+
+enum BinaryFormat { BF_PROTOBUF = 0; BF_ASN1_DER = 1; BF_OMG_CDR = 2; BF_ASN1_BER = 3; }
+enum DispatchMode { IMMEDIATE = 0; BATCH = 1; }
+message DomainConfig {
+    required uint32 id = 1;
+    optional bool activate_default_transport = 2  [default = true];
+    optional bool direct_dispatch_to_subs = 3      [default = false];
+    optional string key_file = 4;
+    optional BinaryFormat binary_format = 5   [default = BF_PROTOBUF];
+    optional bool start_at_init  = 6              [default=true];    
+    optional DispatchMode dispatch_mode = 7   [default=IMMEDIATE];
+    optional uint32 dispatch_batch_time_ms = 8	[default=0]; 
+    repeated TransportConfig transports = 9;
+    repeated CrossConnectorConfig cross_connectors = 10;
+}
+
+enum TransportKind { LOOP = 0; MCAST = 1; BCAST = 2; UDPSTAR = 3; USOXSTAR = 4; CUSTOM = 100; }
+enum Encoding { RAW = 0; BASE64 = 1; }
+message TransportConfig {
+    required string name = 1;
+    required TransportKind kind = 2 [default = MCAST];
+    optional Encoding encoding = 3 [default = RAW];
+    oneof params {
+            MCastConfig mcast = 10;
+            BCastConfig bcast = 11;
+            UDPStarConfig udpstar = 12;
+            UnixSocketStarConfig usoxstar = 13;
+            CustomTransportConfig custom = 100;
+    }
+}
+
+message MCastConfig {
+    optional string local_address = 1 [default = "Any"];
+    required string mcast_address = 2 [default = "239.255.0.1"];
+    required int32 port = 3 [default = 40069];
+    optional int32 ttl = 4 [default = 1];
+    optional int32 receive_buffer = 5 [default = 134217727];
+    optional int32 send_buffer = 6 [default = 134217727];
+}
+
+message BCastConfig {
+    optional string local_address = 1 [default = "Any"];
+    required string bcast_address = 2;
+    required int32 port = 3 [default = 40069];
+    optional int32 receive_buffer = 4 [default = 134217727];
+    optional int32 send_buffer = 5 [default = 134217727];
+}
+
+message UDPStarConfig {
+    optional string local_address = 1 [default = "Any"];
+    required int32 port = 2;
+    repeated EndPointConfig end_point = 3;
+    optional int32 receive_buffer = 4 [default = 134217727];
+    optional int32 send_buffer = 5 [default = 134217727];
+}
+
+message EndPointConfig { 
+	required string host = 1; 
+	required int32 port = 2 [default = 40069]; 
+}
+
+message UnixSocketStarConfig {
+    required string local_socket_path = 1;
+    repeated string remote_socket_paths = 2;
+    optional int32 receive_buffer = 3      [default = 134217727];
+    optional int32 send_buffer = 4         [default = 134217727];
+}
+
+message CustomTransportConfig { 
+	required string sub_type = 1; 
+	required bytes config = 2;
+	required string plug_in_lib = 30; 
+}
+
+message CrossConnectorConfig { 
+	repeated string transports = 1; 
+}

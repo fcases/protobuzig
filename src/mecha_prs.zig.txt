@@ -5,6 +5,7 @@ const mecha = @import("mecha");
 
 var verbose: bool = false;
 
+
 pub fn setVerbose(value: bool) void {
     verbose = value;
 }
@@ -78,7 +79,7 @@ pub fn getFieldTypeEnum(field_type: []const u8) !Tipoj {
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
-pub const EnumTipo = enum(u8) { LINIO, SYNTAX, IMPORT, PACKAGE, ENUM, OPTION, MESSAGE, FIELD, ONEOF, ALIA };
+pub const EnumTipo = enum(u8) { LINIO, SYNTAX, IMPORT, PACKAGE, ENUM, OPTION, MESSAGE, FIELD, ALIA };
 
 pub const RespondUnio = union {
     l: []u8,
@@ -89,21 +90,6 @@ pub const RespondUnio = union {
     o: Option,
     m: Message,
     f: Field,
-    oo: OneOfDecl,
-};
-
-pub const OneOfField = struct {
-    name: []const u8,
-    field_type: []const u8,
-    field_type_enum: Tipoj = undefined,
-    number: u32,
-    default_value: ?[]const u8 = null,
-    packed_value: bool = false,
-};
-
-pub const OneOfDecl = struct {
-    name: []const u8,
-    fields: []OneOfField,
 };
 
 pub const Respondo = struct { Type: EnumTipo, Data: RespondUnio = undefined };
@@ -128,7 +114,6 @@ pub const Field = struct { name: []const u8, field_type: []const u8, field_type_
 pub const Message = struct {
     name: []const u8,
     fields: []Field,
-    oneofs: []OneOfDecl,
     internal_enums: []Enum, // enums dentro de mensajes
     internal_msgs: []Message, // Messages dentro de mensajes
 };
@@ -417,72 +402,6 @@ const field_parser = mecha.combine(.{
     }
 }.mapFn);
 
-const oneof_field_parser = mecha.combine(.{
-    ws.discard(),
-    qualified_name_parser, ws, // 0,1
-    anu_parser, ws, // 2,3
-    mecha.string("="), ws, // 4,5
-    mecha.intToken(.{}), ws, // 6,7
-    mecha.opt(default_parser), ws, // 8,9
-    mecha.opt(packed_parser), ws, // 10,11
-    mecha.string(";"), ws, // 12,13
-}).map(struct {
-    pub fn mapFn(items: anytype) OneOfField {
-        const field_type = shpa.dupe(u8, items[0]) catch &[_]u8{};
-        const name = shpa.dupe(u8, items[2]) catch &[_]u8{};
-        const number = std.fmt.parseInt(u32, items[6], 10) catch 0;
-        const default_value = if (items[8]) |def| shpa.dupe(u8, def) catch &[_]u8{} else null;
-        const packed_value = if (items[10]) |pck| equal(u8, pck, "true") else false;
-
-        return OneOfField{
-            .field_type = field_type,
-            .field_type_enum = getFieldTypeEnum(field_type) catch @panic("Invalid oneof field type"),
-            .name = name,
-            .number = number,
-            .default_value = default_value,
-            .packed_value = packed_value,
-        };
-    }
-}.mapFn);
-
-const oneof_parser = mecha.combine(.{
-    ws, // 0
-    mecha.string("oneof"), ws, // 1,2
-    anu_parser, ws, // 3,4
-    mecha.string("{"), ws, // 5,6
-    mecha.many(oneof_field_parser, .{}), ws, // 7,8
-    mecha.string("}"), ws, // 9,10
-    mecha.string(";").opt(), ws, // 11,12
-}).map(struct {
-    pub fn mapFn(items: anytype) Respondo {
-        const name = shpa.dupe(u8, items[3]) catch &[_]u8{};
-        const oneof_field_results = items[7];
-
-        dbgPrint("found OneOf: {s}\n", .{name});
-
-        var fields = std.ArrayList(OneOfField).empty;
-        for (oneof_field_results) |field| {
-            fields.append(shpa, field) catch {};
-            dbgPrint(
-                "    {d}: {s} := {s}\n",
-                .{ field.number, field.name, field.field_type },
-            );
-        }
-
-        dbgPrint("\n", .{});
-
-        return Respondo{
-            .Type = .ONEOF,
-            .Data = .{
-                .oo = OneOfDecl{
-                    .name = name,
-                    .fields = fields.toOwnedSlice(shpa) catch &[_]OneOfField{},
-                },
-            },
-        };
-    }
-}.mapFn);
-
 const message_internal_parser = mecha.combine(.{
     ws, // 0
     mecha.string("message"), ws, // 1,2
@@ -512,7 +431,7 @@ const message_internal_parser = mecha.combine(.{
                 .m = Message{
                     .name = name,
                     .fields = fields.toOwnedSlice(shpa) catch &[_]Field{},
-                    .oneofs = &[_]OneOfDecl{},
+                    // Para Enums internos a Message
                     .internal_enums = &[_]Enum{},
                     .internal_msgs = &[_]Message{},
                 },
@@ -528,7 +447,6 @@ const message_parser = mecha.combine(.{
     mecha.string("{"), ws, // 5,6
     mecha.oneOf(.{
         field_parser,
-        oneof_parser,
         enum_parser,
         message_internal_parser,
     }).many(.{ .collect = true }),
@@ -541,12 +459,9 @@ const message_parser = mecha.combine(.{
         const oneof_results = items[7];
 
         dbgPrint("found Message: {s}\n", .{name});
-
         var fields = std.ArrayList(Field).empty;
-        var oneofs = std.ArrayList(OneOfDecl).empty;
         var enums = std.ArrayList(Enum).empty;
         var msgs = std.ArrayList(Message).empty;
-
         for (oneof_results) |one| {
             switch (one.Type) {
                 .ENUM => {
@@ -554,9 +469,6 @@ const message_parser = mecha.combine(.{
                 },
                 .FIELD => {
                     fields.append(shpa, one.Data.f) catch {};
-                },
-                .ONEOF => {
-                    oneofs.append(shpa, one.Data.oo) catch {};
                 },
                 .MESSAGE => {
                     msgs.append(shpa, one.Data.m) catch {};
@@ -569,7 +481,6 @@ const message_parser = mecha.combine(.{
         return Respondo{ .Type = .MESSAGE, .Data = .{ .m = Message{
             .name = name,
             .fields = fields.toOwnedSlice(shpa) catch &[_]Field{},
-            .oneofs = oneofs.toOwnedSlice(shpa) catch &[_]OneOfDecl{},
             .internal_enums = enums.toOwnedSlice(shpa) catch &[_]Enum{},
             .internal_msgs = msgs.toOwnedSlice(shpa) catch &[_]Message{},
         } } };
@@ -631,20 +542,31 @@ pub const protofile_parser = mecha.oneOf(.{
         }
 
         // Por ciuj tipojn .TYPE_UNRESOLVED
-
-        for (mia_messages.items) |*msg| {
+        for (mia_messages.items) |msg| {
             dbgPrint("msg {s}\n", .{msg.name});
-
             for (msg.fields, 0..) |field, i| {
                 if (field.field_type_enum == .TYPE_UNRESOLVED) {
-                    resolveFieldType(&msg.fields[i], field.field_type, mia_messages.items, mia_enums.items);
-                }
-            }
+                    dbgPrint("Searching for unresolved: {s}\n", .{field.field_type});
+                    for (mia_messages.items) |mm| {
+                        if (equal(u8, mm.name, field.field_type)) {
+                            msg.fields[i].field_type_enum = .TYPE_MESSAGE;
+                            dbgPrint("message definition found: {s}\n\n", .{mm.name});
+                            break;
+                        }
+                    }
+                    for (mia_enums.items) |me| {
+                        if (equal(u8, me.name, field.field_type)) {
+                            msg.fields[i].field_type_enum = .TYPE_ENUM;
+                            dbgPrint("enum definition found: {s}\n\n", .{me.name});
+                            break;
+                        }
+                    }
 
-            for (msg.oneofs) |*oneof_decl| {
-                for (oneof_decl.fields, 0..) |field, i| {
-                    if (field.field_type_enum == .TYPE_UNRESOLVED) {
-                        resolveOneOfFieldType(&oneof_decl.fields[i], field.field_type, mia_messages.items, mia_enums.items);
+                    // Temporal: si no se ha podido resolver localmente,
+                    // asumimos mensaje externo/importado.
+                    if (msg.fields[i].field_type_enum == .TYPE_UNRESOLVED) {
+                        msg.fields[i].field_type_enum = .TYPE_MESSAGE;
+                        dbgPrint("external message assumed: {s}\n\n", .{field.field_type});
                     }
                 }
             }
@@ -660,59 +582,3 @@ pub const protofile_parser = mecha.oneOf(.{
         };
     }
 }.mapFn);
-
-fn resolveFieldType(
-    field: *Field,
-    field_type: []const u8,
-    messages: []Message,
-    enums: []Enum,
-) void {
-    dbgPrint("Searching for unresolved: {s}\n", .{field_type});
-
-    for (messages) |mm| {
-        if (equal(u8, mm.name, field_type)) {
-            field.field_type_enum = .TYPE_MESSAGE;
-            dbgPrint("message definition found: {s}\n\n", .{mm.name});
-            return;
-        }
-    }
-
-    for (enums) |me| {
-        if (equal(u8, me.name, field_type)) {
-            field.field_type_enum = .TYPE_ENUM;
-            dbgPrint("enum definition found: {s}\n\n", .{me.name});
-            return;
-        }
-    }
-
-    field.field_type_enum = .TYPE_MESSAGE;
-    dbgPrint("external message assumed: {s}\n\n", .{field_type});
-}
-
-fn resolveOneOfFieldType(
-    field: *OneOfField,
-    field_type: []const u8,
-    messages: []Message,
-    enums: []Enum,
-) void {
-    dbgPrint("Searching for unresolved oneof: {s}\n", .{field_type});
-
-    for (messages) |mm| {
-        if (equal(u8, mm.name, field_type)) {
-            field.field_type_enum = .TYPE_MESSAGE;
-            dbgPrint("message definition found: {s}\n\n", .{mm.name});
-            return;
-        }
-    }
-
-    for (enums) |me| {
-        if (equal(u8, me.name, field_type)) {
-            field.field_type_enum = .TYPE_ENUM;
-            dbgPrint("enum definition found: {s}\n\n", .{me.name});
-            return;
-        }
-    }
-
-    field.field_type_enum = .TYPE_MESSAGE;
-    dbgPrint("external message assumed: {s}\n\n", .{field_type});
-}

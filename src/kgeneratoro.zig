@@ -1,3 +1,5 @@
+/// kgeneratoro.zig
+///
 const std = @import("std");
 const equal = std.mem.eql;
 const prs = @import("mecha_prs.zig");
@@ -124,37 +126,589 @@ fn skribiEnums(enums: []prs.Enum, ind: []const u8) !void {
     }
 }
 
+/////////////////////////////////////
+/// OneOf - Generado de union(enum)
+/////////////////////////////////////
+/// Genera los tipos Zig asociados a los oneof de un mensaje.
+///
+/// Ejemplo protobuf:
+///
+///     oneof params {
+///         MCastConfig mcast = 10;
+///         BCastConfig bcast = 11;
+///     }
+/// Salida Zig:
+///
+///     pub const Params = union(enum) {
+///         none: void,
+///         mcast: MCastConfig,
+///         bcast: BCastConfig,
+///     };
+/// Nota importante:
+/// - El nombre del oneof se transforma a PascalCase.
+/// - La alternativa "none" no existe en protobuf.
+/// - "none" es una convencion interna para que initDefault() tenga un estado
+///   explicito y seguro.
+fn skribiOneOfUnion(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
+    const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+    try verkisto.print(
+        \\{s}pub const {s} = union(enum) {{
+        \\{s}    none: void,
+        \\
+    , .{
+        ind,
+        union_name,
+        ind,
+    });
+
+    for (oneof_decl.fields) |field| {
+        try verkisto.print(
+            \\{s}    {s}: {s},
+            \\
+        , .{
+            ind,
+            field.name,
+            auks.mapiOneOfFieldTiponAlZig(field),
+        });
+    }
+
+    try verkisto.print(
+        \\{s}}};
+        \\
+        \\
+    , .{ind});
+}
+
+/// Genera todos los union(enum) oneof definidos dentro de un mensaje.
+fn skribiOneOfUnions(msg: prs.Message, ind: []const u8) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiOneOfUnion(oneof_decl, ind);
+    }
+}
+
+/////////////////////////////////////
+/// OneOf - Generado de deinit helpers
+/////////////////////*///////////////
+/// Genera una funcion auxiliar por cada oneof del mensaje.
+/// Ejemplo:
+///     fn deinitParams(self: *const T*ansportConfig, allocator: all.Allo*ator) void {
+///         switch (s*lf.params) {
+///             .none => {},
+///             .mcast => |*v| v.deinit(allocator),
+///         }
+///     }
+/// Esta funcion se usa en dos sitios:
+/// - deinit() general del mensaje.
+/// - deseriigi(), antes de sobrescribir una alternativa oneof ya activa.
+///
+/// Razon protobuf:
+/// Si aparecen varias alternativas del mismo oneof en el wire, gana la ultima.
+/// Por tanto, al leer una nueva alternativa hay que liberar la anterior.
+fn skribiOneOfDeinitHelper(msg: prs.Message, oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
+    const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+    try verkisto.print(
+        \\{s}fn deinit{s}(self: *const {s}, allocator: all.Allocator) void {{
+        \\{s}    switch (self.{s}) {{
+        \\{s}        .none => {{}},
+        \\
+    , .{
+        ind,
+        union_name,
+        msg.name,
+        ind,
+        oneof_decl.name,
+        ind,
+    });
+
+    for (oneof_decl.fields) |field| {
+        switch (field.field_type_enum) {
+            .TYPE_MESSAGE => {
+                try verkisto.print(
+                    \\{s}        .{s} => |*v| v.deinit(allocator),
+                    \\
+                , .{
+                    ind,
+                    field.name,
+                });
+            },
+
+            .TYPE_STRING,
+            .TYPE_BYTES,
+            => {
+                try verkisto.print(
+                    \\{s}        .{s} => |v| allocator.free(v),
+                    \\
+                , .{
+                    ind,
+                    field.name,
+                });
+            },
+
+            else => {
+                try verkisto.print(
+                    \\{s}        .{s} => {{}},
+                    \\
+                , .{
+                    ind,
+                    field.name,
+                });
+            },
+        }
+    }
+
+    try verkisto.print(
+        \\{s}    }}
+        \\{s}}}
+        \\
+        \\
+    , .{
+        ind,
+        ind,
+    });
+}
+
+/// Genera todos los helpers *e deinit asociados a oneof dentro *e un mensaje.
+fn skribiOneOfDeinitHelpers(msg: prs.Message, ind: []const u8) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiOneOfDeinitHelper(msg, oneof_decl, ind);
+    }
+}
+
+/////////////////////////////////////
+/// OneOf - Generado de seriigi()
+/////////////////////////////////////
+/// Genera el codigo de serializacion binaria de un oneof.
+/// Importante:
+/// - En protobuf, oneof no tiene wire-format propio.
+/// - Cada alternativa se codifica como si fuese un campo normal.
+/// - Solo se serializa la alternativa activa.
+/// - La alternativa .none no se serializa.
+/// Como EncodeBuffer escribe hacia atras, este bloque debe emitirse antes que
+/// los campos normales cuando los field numbers del oneof sean mayores.
+fn skribiSeriigiOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
+    try verkisto.print(
+        \\    {s}    switch (self.{s}) {{
+        \\    {s}        .none => {{}},
+        \\
+    , .{
+        ind,
+        oneof_decl.name,
+        ind,
+    });
+
+    for (oneof_decl.fields) |field| {
+        const wire_type = auks.getOneOfWireType(field);
+        const temp_name = try std.fmt.allocPrint(
+            std.heap.page_allocator,
+            "{s}_{s}_longa",
+            .{ oneof_decl.name, field.name },
+        );
+
+        switch (field.field_type_enum) {
+            .TYPE_MESSAGE => {
+                if (estasImportitaTipo(field.field_type)) {
+                    try verkisto.print(
+                        \\    {s}        .{s} => |val| {{
+                        \\    {s}            var item = val;
+                        \\    {s}            const {s}_bytes = try item.seriigiAlBin(allocator, .BF_PROTOBUF);
+                        \\    {s}            defer allocator.free({s}_bytes);
+                        \\    {s}            const {s} = try buffer.encodeBytes({s}_bytes);
+                        \\    {s}            tuta_longo += {s};
+                        \\    {s}            tuta_longo += try buffer.encodeVarint({s});
+                        \\    {s}            tuta_longo += try buffer.encodeVarint((@as(u32, {d}) << 3) | {d});
+                        \\    {s}        }},
+                        \\
+                    , .{
+                        ind,       field.name,
+                        ind,       ind,
+                        temp_name, ind,
+                        temp_name, ind,
+                        temp_name, temp_name,
+                        ind,       temp_name,
+                        ind,       temp_name,
+                        ind,       field.number,
+                        wire_type, ind,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\    {s}        .{s} => |val| {{
+                        \\    {s}            const {s} = try val.seriigi(allocator, buffer);
+                        \\    {s}            tuta_longo += {s};
+                        \\    {s}            tuta_longo += try buffer.encodeVarint({s});
+                        \\    {s}            tuta_longo += try buffer.encodeVarint((@as(u32, {d}) << 3) | {d});
+                        \\    {s}        }},
+                        \\
+                    , .{
+                        ind,       field.name,
+                        ind,       temp_name,
+                        ind,       temp_name,
+                        ind,       temp_name,
+                        ind,       field.number,
+                        wire_type, ind,
+                    });
+                }
+            },
+
+            else => {
+                try verkisto.print(
+                    \\    {s}        .{s} => |val| {{
+                    \\    {s}            tuta_longo += try 
+                , .{
+                    ind,
+                    field.name,
+                    ind,
+                });
+
+                auks.printEncodeMethod(
+                    verkisto,
+                    field.field_type_enum,
+                    "val",
+                    "",
+                );
+
+                try verkisto.print(
+                    \\    {s}            tuta_longo += try buffer.encodeVarint((@as(u32, {d}) << 3) | {d});
+                    \\    {s}        }},
+                    \\
+                , .{
+                    ind,
+                    field.number,
+                    wire_type,
+                    ind,
+                });
+            },
+        }
+    }
+
+    try verkisto.print(
+        \\    {s}    }}
+        \\
+        \\
+    , .{ind});
+}
+
+/// Genera serializacion para todos los oneofs de un mensaje.
+fn skribiSeriigiOneOfs(msg: prs.Message, ind: []const u8) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiSeriigiOneOf(oneof_decl, ind);
+    }
+}
+
+/////////////////////////////////////
+/// OneOf - Generado de deseriigi()
+/////////////////////////////////////
+fn skribiDeseriigiOneOfBranches(
+    oneof_decl: prs.OneOfDecl,
+    indent: []const u8,
+    unua: *bool,
+) !void {
+    const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+    for (oneof_decl.fields) |field| {
+        const field_type = field.field_type;
+        const field_type_enum = field.field_type_enum;
+        const field_number = field.number;
+        const wire_type = auks.getOneOfWireType(field);
+
+        const temp_name = std.fmt.allocPrint(
+            std.heap.page_allocator,
+            "{s}_{s}_val",
+            .{ oneof_decl.name, field.name },
+        ) catch unreachable;
+
+        try verkisto.print(
+            \\{s}        {s} ( field_number == {d} and wire_type == {d} )
+            \\
+        , .{
+            indent,
+            if (unua.*) "if" else "else if",
+            field_number,
+            wire_type,
+        });
+
+        switch (field_type_enum) {
+            .TYPE_MESSAGE => {
+                if (estasImportitaTipo(field_type)) {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const raw = try buffer.decodeBytes(try buffer.decodeVarint());
+                        \\{s}            defer allocator.free(raw);
+                        \\{s}
+                        \\{s}            const {s} =
+                        \\{s}                try {s}.deseriigiElBin(
+                        \\{s}                    allocator,
+                        \\{s}                    raw,
+                        \\{s}                    .BF_PROTOBUF,
+                        \\{s}                );
+                        \\{s}
+                        \\{s}            mia_Mesagho.deinit{s}(allocator);
+                        \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        temp_name,
+                        indent,
+                        auks.mapiProtoTiponAlZig(field_type),
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        union_name,
+                        indent,
+                        oneof_decl.name,
+                        field.name,
+                        temp_name,
+                        indent,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const {s} = try {s}.deseriigi(
+                        \\{s}                allocator,
+                        \\{s}                buffer,
+                        \\{s}                try buffer.decodeVarint(),
+                        \\{s}            );
+                        \\{s}
+                        \\{s}            mia_Mesagho.deinit{s}(allocator);
+                        \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent,
+                        indent,
+                        temp_name,
+                        field_type,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        indent,
+                        union_name,
+                        indent,
+                        oneof_decl.name,
+                        field.name,
+                        temp_name,
+                        indent,
+                    });
+                }
+            },
+
+            .TYPE_STRING => {
+                try verkisto.print(
+                    \\{s}        {{
+                    \\{s}            const {s} = try buffer.decodeString(try buffer.decodeVarint());
+                    \\{s}            mia_Mesagho.deinit{s}(allocator);
+                    \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}        }}
+                    \\
+                , .{
+                    indent,
+                    indent,
+                    temp_name,
+                    indent,
+                    union_name,
+                    indent,
+                    oneof_decl.name,
+                    field.name,
+                    temp_name,
+                    indent,
+                });
+            },
+
+            .TYPE_BYTES => {
+                try verkisto.print(
+                    \\{s}        {{
+                    \\{s}            const {s} = try buffer.decodeBytes(try buffer.decodeVarint());
+                    \\{s}            mia_Mesagho.deinit{s}(allocator);
+                    \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}        }}
+                    \\
+                , .{
+                    indent,
+                    indent,
+                    temp_name,
+                    indent,
+                    union_name,
+                    indent,
+                    oneof_decl.name,
+                    field.name,
+                    temp_name,
+                    indent,
+                });
+            },
+
+            .TYPE_ENUM => {
+                try verkisto.print(
+                    \\{s}        {{
+                    \\{s}            const {s} = try std.meta.intToEnum({s}, try buffer.decodeVarint());
+                    \\{s}            mia_Mesagho.deinit{s}(allocator);
+                    \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}        }}
+                    \\
+                , .{
+                    indent,
+                    indent,
+                    temp_name,
+                    field_type,
+                    indent,
+                    union_name,
+                    indent,
+                    oneof_decl.name,
+                    field.name,
+                    temp_name,
+                    indent,
+                });
+            },
+
+            else => {
+                try verkisto.print(
+                    \\{s}        {{
+                    \\{s}            const {s} = try 
+                , .{
+                    indent,
+                    indent,
+                    temp_name,
+                });
+
+                auks.printDecodeMethod(
+                    verkisto,
+                    field_type_enum,
+                    "",
+                    ";\n",
+                    "try buffer.decodeVarint()",
+                );
+
+                try verkisto.print(
+                    \\{s}            mia_Mesagho.deinit{s}(allocator);
+                    \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}        }}
+                    \\
+                , .{
+                    indent,
+                    union_name,
+                    indent,
+                    oneof_decl.name,
+                    field.name,
+                    temp_name,
+                    indent,
+                });
+            },
+        }
+
+        unua.* = false;
+    }
+}
+
+/// Genera las ramas de deserializacion de todos los oneofs de un mensaje.
+fn skribiDeseriigiOneOfs(
+    msg: prs.Message,
+    indent: []const u8,
+    unua: *bool,
+) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiDeseriigiOneOfBranches(oneof_decl, indent, unua);
+    }
+}
+
 fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
     for (messages) |msg| {
         try verkisto.print("{s}pub const {s} = struct {{\n", .{ ind, msg.name });
 
+        const indent = std.mem.concatWithSentinel(
+            std.heap.page_allocator,
+            u8,
+            &[_][]const u8{ ind, "    " },
+            0,
+        ) catch unreachable;
+
         if (msg.internal_enums.len > 0) {
-            const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try skribiEnums(msg.internal_enums, indent);
         }
 
         if (msg.internal_msgs.len > 0) {
-            const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             try skribiMesaghojn(msg.internal_msgs, indent);
         }
 
         // /////////////
-        // Skribi kampoj
+        // Skribi oneof union(enum)
+        // Los oneof se generan como tipos internos del mensaje.
+        // Ejemplo:
+        //     pub const Params = union(enum) {
+        //         none: void,
+        //         mcast: MCastConfig,
+        //         bcast: BCastConfig,
+        //     };
+        if (msg.oneofs.len > 0) {
+            try skribiOneOfUnions(msg, indent);
+        }
+
+        // /////////////
+        // Skribi kampoj normalaj
         for (msg.fields, 0..) |field, i| {
             var default_value_string: []const u8 = field.default_value orelse "null";
             if (field.default_value != null and msg.fields[i].field_type_enum == .TYPE_ENUM) {
-                default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default_value_string }, 0) catch unreachable;
-                const zigType = auks.mapiZigType(field.field_type, field.label, default_value_string);
-                try verkisto.print("{s}    {s}: {s},\n", .{ ind, field.name, zigType });
+                default_value_string = std.mem.concatWithSentinel(
+                    std.heap.page_allocator,
+                    u8,
+                    &[_][]const u8{ ".", default_value_string },
+                    0,
+                ) catch unreachable;
+
+                const zigType = auks.mapiZigType(
+                    field.field_type,
+                    field.label,
+                    default_value_string,
+                );
+
+                try verkisto.print(
+                    "{s}    {s}: {s},\n",
+                    .{ ind, field.name, zigType },
+                );
             } else {
-                const zigType = auks.mapiZigType(field.field_type, field.label, field.default_value);
-                try verkisto.print("{s}    {s}: {s},\n", .{ ind, field.name, zigType });
+                const zigType = auks.mapiZigType(
+                    field.field_type,
+                    field.label,
+                    field.default_value,
+                );
+
+                try verkisto.print(
+                    "{s}    {s}: {s},\n",
+                    .{ ind, field.name, zigType },
+                );
             }
+        }
+
+        // /////////////
+        // Skribi kampoj oneof
+        // Cada oneof se representa como un campo cuyo tipo es la union(enum)
+        // generada previamente dentro del mismo struct.
+        // Ejemplo:
+        //     pub const Params = union(enum) { ... };
+        //     params: Params,
+        for (msg.oneofs) |oneof_decl| {
+            const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+            try verkisto.print(
+                "{s}    {s}: {s},\n",
+                .{ ind, oneof_decl.name, union_name },
+            );
         }
         try verkisto.print("\n", .{});
 
-        const indent = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
         try skribiInitDefault(msg, indent);
+        if (msg.oneofs.len > 0) {
+            try skribiOneOfDeinitHelpers(msg, indent);
+        }
         try skribiDeInit(msg, indent);
 
         // /////////////
@@ -214,7 +768,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\/// Seriigi Binaran Tipon
         \\/// //////////////////////////////////////////
         \\
-        \\pub const BinaraFormato = enum(u32) {{
+        \\pub const BinaraFormato = enum(u64) {{
         \\    BF_PROTOBUF,
         \\    BF_ASN1_DER,
         \\    BF_OMG_CDR,
@@ -554,6 +1108,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\
         \\    const dosiera_long = try dosiero.getEndPos();
         \\    var enhavo = allocator.alloc(u8, dosiera_long + 1) catch return error.OutOfMemory;
+        \\    defer allocator.free(enhavo);
         \\
         \\    _ = try dosiero.readAll(enhavo[0..dosiera_long]);
         \\    enhavo[dosiera_long] = 0;
@@ -917,6 +1472,25 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         }
     }
 
+    // -----------------------------------------
+    // OneOfs
+    // -----------------------------------------
+    if (!uses_allocator) {
+        for (msg.oneofs) |oneof_decl| {
+            for (oneof_decl.fields) |field| {
+                if (field.field_type_enum == .TYPE_MESSAGE or
+                    field.field_type_enum == .TYPE_STRING or
+                    field.field_type_enum == .TYPE_BYTES)
+                {
+                    uses_allocator = true;
+                    break;
+                }
+            }
+
+            if (uses_allocator) break;
+        }
+    }
+
     try verkisto.print(
         \\    {s}fn seriigi(self: *const {s}, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {{
         \\ 
@@ -939,6 +1513,13 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     , .{
         ind,
     });
+
+    // -----------------------------------------
+    // OneOfs
+    // -----------------------------------------
+    if (msg.oneofs.len > 0) {
+        try skribiSeriigiOneOfs(msg, ind);
+    }
 
     const nf = msg.fields.len;
     for (msg.fields, 0..) |_, i| {
@@ -1086,6 +1667,9 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
     });
 
     var unua = true;
+    if (msg.oneofs.len > 0) {
+        try skribiDeseriigiOneOfs(msg, indent, &unua);
+    }
     const field_nums = msg.fields.len;
     for (msg.fields, 0..) |field, i| {
         const field_name = field.name;
@@ -1853,6 +2437,22 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
+    // OneOfs
+    // -----------------------------------------
+    // En protobuf, un oneof puede no tener ninguna alternativa activa.
+    // La variante "none" no existe en el .proto, es una convencion interna
+    // del codigo Zig generado para que initDefault() sea seguro y explicito.
+    for (msg.oneofs) |oneof_decl| {
+        try verkisto.print(
+            \\{s}        .{s} = .{{ .none = {{}} }},
+            \\
+        , .{
+            ind,
+            oneof_decl.name,
+        });
+    }
+
+    // -----------------------------------------
     // Cierre
     // -----------------------------------------
     try verkisto.print(
@@ -1987,6 +2587,21 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
             //     \\
             // , .{ ind, f.name });
         }
+    }
+
+    // -----------------------------------------
+    // OneOfs
+    // -----------------------------------------
+    for (msg.oneofs) |oneof_decl| {
+        const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+        try verkisto.print(
+            \\{s}    self.deinit{s}(allocator);
+            \\
+        , .{
+            ind,
+            union_name,
+        });
     }
 
     // -----------------------------------------

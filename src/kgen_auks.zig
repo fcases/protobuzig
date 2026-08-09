@@ -1,7 +1,11 @@
+/// kgen_auks.zig
+///
 const std = @import("std");
 const equal = std.mem.eql;
 const prs = @import("mecha_prs.zig");
 const tpj = prs.Tipoj;
+
+const shpa = std.heap.page_allocator;
 
 /////////////////////////////////////
 /// Auksiliaraj Funkcioj
@@ -40,7 +44,7 @@ pub fn skribiFieldInit(verkisto: *std.Io.Writer, field: prs.Field) !void {
 fn skribiEnumValue(verkisto: *std.Io.Writer, field: prs.Field) !void {
     var default_value_string: []const u8 = field.default_value orelse "null";
 
-    default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default_value_string }, 0) catch unreachable;
+    default_value_string = std.mem.concatWithSentinel(shpa, u8, &[_][]const u8{ ".", default_value_string }, 0) catch unreachable;
     try verkisto.print("{s},\n", .{default_value_string});
 }
 
@@ -58,8 +62,8 @@ pub fn mapiZigType(protoType: []const u8, label: []const u8, default_value: ?[]c
 
     var finalBaseTypo: []u8 = undefined;
     if (default_value != null) {
-        finalBaseTypo = std.fmt.allocPrint(std.heap.page_allocator, "{s}{s}{s} = {s} ", .{ opt, rep, baseType, dfv }) catch unreachable;
-    } else finalBaseTypo = std.fmt.allocPrint(std.heap.page_allocator, "{s}{s}{s}{s}", .{ opt, rep, baseType, nul }) catch unreachable;
+        finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s} = {s} ", .{ opt, rep, baseType, dfv }) catch unreachable;
+    } else finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s}{s}", .{ opt, rep, baseType, nul }) catch unreachable;
 
     return finalBaseTypo;
 }
@@ -110,15 +114,122 @@ pub fn mapiProtoTiponAlZig(protoType: []const u8) []const u8 {
     if (std.mem.lastIndexOfScalar(u8, baseType, '.')) |last_dot| {
         const alias = baseType[last_dot + 1 ..];
         baseType = std.fmt.allocPrint(
-            std.heap.page_allocator,
+            shpa,
             "{s}.{s}",
             .{ alias, baseType },
         ) catch unreachable;
     }
 
-    const finalBaseTypo: []u8 = std.fmt.allocPrint(std.heap.page_allocator, "{s}", .{baseType}) catch unreachable;
+    const finalBaseTypo: []u8 = std.fmt.allocPrint(shpa, "{s}", .{baseType}) catch unreachable;
 
     return finalBaseTypo;
+}
+
+/////////////////////////////////////
+/// OneOf - Auksiliaraj Funkcioj
+/////////////////////////////////////
+///
+/// Estas funkcioj ne generas kodon rekte.
+/// Ili helpas al kgeneratoro.zig trakti oneof-ojn kiel Zig union(enum).
+///
+/// Ekzemploj:
+///     params           -> Params
+///     transport_params -> TransportParams
+///
+/// Noto:
+/// - En protobuf, oneof ne havas propran wire-formaton.
+/// - Cxiu kampo de oneof seriigxas kiel normala kampo.
+/// - La semantiko "nur unu aktiva alternativo" apartenas al la generita kodo.
+pub fn mapiOneOfNomonAlZigTipo(oneof_name: []const u8) []const u8 {
+    if (oneof_name.len == 0) {
+        return "OneOf";
+    }
+
+    var out = std.ArrayList(u8).empty;
+    var upper_next = true;
+
+    for (oneof_name) |c| {
+        if (c == '_') {
+            upper_next = true;
+            continue;
+        }
+
+        if (upper_next) {
+            out.append(shpa, std.ascii.toUpper(c)) catch {};
+            upper_next = false;
+        } else {
+            out.append(shpa, c) catch {};
+        }
+    }
+
+    return out.toOwnedSlice(shpa) catch &[_]u8{};
+}
+
+/// Devuelve el tipo Zig de una alternativa de oneof.
+///
+/// Ejemplo:
+///     MCastConfig mcast = 10;
+///
+/// Devuelve:
+///     MCastConfig
+///
+/// Si el tipo esta cualificado/importado, reutiliza la misma logica que los
+/// campos normales.
+pub fn mapiOneOfFieldTiponAlZig(field: prs.OneOfField) []const u8 {
+    return mapiProtoTiponAlZig(field.field_type);
+}
+
+/// Devuelve el wire type protobuf de una alternativa oneof.
+///
+/// Importante:
+/// - oneof NO tiene wire type propio.
+/// - Cada alternativa usa el wire type de su tipo real.
+pub fn getOneOfWireType(field: prs.OneOfField) u3 {
+    return getWireType(field.field_type_enum);
+}
+
+/// Indica si una alternativa de oneof requiere limpieza explicita.
+///
+/// Casos que requieren deinit/free:
+/// - message: debe llamar a deinit(allocator)
+/// - string: debe liberar memoria si ha sido duplicada
+/// - bytes: debe liberar memoria si ha sido duplicada
+///
+/// En TransportConfig.params todos los casos actuales son mensajes, por tanto
+/// todos necesitan deinit.
+pub fn oneOfFieldNeedsDeinit(field: prs.OneOfField) bool {
+    return switch (field.field_type_enum) {
+        .TYPE_MESSAGE,
+        .TYPE_STRING,
+        .TYPE_BYTES,
+        => true,
+
+        else => false,
+    };
+}
+
+/// Indica si un oneof completo necesita allocator durante deinit.
+///
+/// Se usara para decidir si el deinit generado debe marcar allocator como usado.
+pub fn oneOfNeedsAllocator(oneof_decl: prs.OneOfDecl) bool {
+    for (oneof_decl.fields) |field| {
+        if (oneOfFieldNeedsDeinit(field)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/// Indica si algun oneof de un mensaje necesita allocator en deinit.
+pub fn anyOneOfNeedsAllocator(oneofs: []prs.OneOfDecl) bool {
+    for (oneofs) |oneof_decl| {
+        if (oneOfNeedsAllocator(oneof_decl)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Wire Type        Valor   Descripción Tipos Lógicos Mapeados
@@ -139,20 +250,7 @@ pub fn getWireType(field_type: tpj) u3 {
 
 pub fn estasPackable(field_type: tpj) bool {
     return switch (field_type) {
-        .TYPE_INT32,
-        .TYPE_INT64,
-        .TYPE_UINT32,
-        .TYPE_UINT64,
-        .TYPE_SINT32,
-        .TYPE_SINT64,
-        .TYPE_FIXED32,
-        .TYPE_FIXED64,
-        .TYPE_SFIXED32,
-        .TYPE_SFIXED64,
-        .TYPE_FLOAT,
-        .TYPE_DOUBLE,
-        .TYPE_BOOL,
-        .TYPE_ENUM => true,
+        .TYPE_INT32, .TYPE_INT64, .TYPE_UINT32, .TYPE_UINT64, .TYPE_SINT32, .TYPE_SINT64, .TYPE_FIXED32, .TYPE_FIXED64, .TYPE_SFIXED32, .TYPE_SFIXED64, .TYPE_FLOAT, .TYPE_DOUBLE, .TYPE_BOOL, .TYPE_ENUM => true,
         else => false,
     };
 }
@@ -246,25 +344,15 @@ pub fn printParseValueExpr(
     val_expr: []const u8,
 ) void {
     return switch (field_type) {
-        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 =>
-            verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 =>
-            verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_UINT32, .TYPE_FIXED32 =>
-            verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_UINT64, .TYPE_FIXED64 =>
-            verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_FLOAT =>
-            verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}) catch {},
-        .TYPE_DOUBLE =>
-            verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}) catch {},
-        .TYPE_BOOL =>
-            verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}) catch {},
-        .TYPE_ENUM =>
-            verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }) catch {},
-        .TYPE_STRING, .TYPE_BYTES =>
-            verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}) catch {},
-        else =>
-            verkisto.print("{s}", .{val_expr}) catch {},
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_UINT32, .TYPE_FIXED32 => verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_UINT64, .TYPE_FIXED64 => verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}) catch {},
+        .TYPE_FLOAT => verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}) catch {},
+        .TYPE_DOUBLE => verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}) catch {},
+        .TYPE_BOOL => verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}) catch {},
+        .TYPE_ENUM => verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }) catch {},
+        .TYPE_STRING, .TYPE_BYTES => verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}) catch {},
+        else => verkisto.print("{s}", .{val_expr}) catch {},
     };
 }
