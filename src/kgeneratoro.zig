@@ -130,15 +130,12 @@ fn skribiEnums(enums: []prs.Enum, ind: []const u8) !void {
 /// OneOf - Generado de union(enum)
 /////////////////////////////////////
 /// Genera los tipos Zig asociados a los oneof de un mensaje.
-///
 /// Ejemplo protobuf:
-///
 ///     oneof params {
 ///         MCastConfig mcast = 10;
 ///         BCastConfig bcast = 11;
 ///     }
 /// Salida Zig:
-///
 ///     pub const Params = union(enum) {
 ///         none: void,
 ///         mcast: MCastConfig,
@@ -768,7 +765,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\/// Seriigi Binaran Tipon
         \\/// //////////////////////////////////////////
         \\
-        \\pub const BinaraFormato = enum(u64) {{
+        \\pub const BinaraFormato = enum(u32) {{
         \\    BF_PROTOBUF = 0,
         \\    BF_OMG_CDR = 1,
         \\    BF_ASN1_BER = 2,
@@ -856,6 +853,7 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.print(
         \\fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: * const T, b_formato: BinaraFormato, path: []const u8) !void {{
         \\    const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
+        \\    defer allocator.free(teksto);
         \\
         \\    var dosiero = try std.fs.cwd().createFile(path, .{{ .truncate = true }});
         \\    defer dosiero.close();
@@ -1055,8 +1053,9 @@ fn skribiGeneralajnFunkciojn() !void {
         \\    return bytes;
         \\}}
         \\
-        \\fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato, path: []const u8) !void {{
+        \\fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, path: []const u8, t_formato: TekstaFormato) !void {{
         \\    const teksto = try skribiTiponAlTeksto(allocator, T, value, t_formato);
+        \\    defer allocator.free(teksto);
         \\
         \\    var dosiero = try std.fs.cwd().createFile(path, .{{ .truncate = true }});
         \\    defer dosiero.close();
@@ -1082,7 +1081,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            }};
         \\        }},
         \\        .TF_JSON => {{
-        \\            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{{ .ignore_unknown_fields = true }}) catch |err| {{
+        \\            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{{ .ignore_unknown_fields = false, .allocate = .alloc_always }}) catch |err| {{
         \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
         \\                return err;
         \\            }};
@@ -1210,8 +1209,9 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
             if (needs_indent) {
                 try verkisto.print(
                     \\{s}        const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
+                    \\{s}            defer allocator.free(indent);
                     \\
-                , .{ind});
+                , .{ ind, ind });
             }
 
             if (estasImportitaTipo(f.field_type)) {
@@ -1219,11 +1219,13 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     try verkisto.print(
                         \\{s}        var {s}_item = val;
                         \\{s}        const {s}_text = try {s}_item.skribiAlTeksto(allocator, .TF_PROTOBUF);
+                        \\{s}        defer allocator.free({s}_text);
                         \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                         \\
                     , .{
                         ind,    f.name,
                         ind,    f.name,
+                        f.name, ind,
                         f.name, ind,
                         f.name, f.name,
                     });
@@ -1231,11 +1233,13 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     try verkisto.print(
                         \\{s}        var {s}_item = obj;
                         \\{s}        const {s}_text = try {s}_item.skribiAlTeksto(allocator, .TF_PROTOBUF);
+                        \\{s}        defer allocator.free({s}_text);
                         \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                         \\
                     , .{
                         ind,    f.name,
                         ind,    f.name,
+                        f.name, ind,
                         f.name, ind,
                         f.name, f.name,
                     });
@@ -1243,38 +1247,79 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     try verkisto.print(
                         \\{s}        var {s}_item = self.{s};
                         \\{s}        const {s}_text = try {s}_item.skribiAlTeksto(allocator, .TF_PROTOBUF);
+                        \\{s}        defer allocator.free({s}_text);
                         \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                         \\
                     , .{
-                        ind, f.name, f.name,
-                        ind, f.name, f.name,
-                        ind, f.name, f.name,
+                        ind,    f.name, f.name,
+                        ind,    f.name, f.name,
+                        ind,    f.name, ind,
+                        f.name, f.name,
                     });
                 }
             } else if (f.label_enum == .LABEL_OPTIONAL) {
                 try verkisto.print(
-                    \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind }});
+                    \\{s}            const {s}_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                    \\{s}            defer allocator.free({s}_text);
                     \\
-                , .{ ind, f.name });
-            } else {
-                try verkisto.print(
-                    \\{s}        try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ind, try {s}{s}.skribiAlProtobufTeksto(allocator,indent),ind }});
+                    \\{s}            try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
                     \\
                 , .{
-                    ind,
+                    ind,    f.name,
+                    ind,    f.name,
+                    ind,    f.name,
                     f.name,
-                    if (f.label_enum == .LABEL_REPEATED) "" else "self.",
-                    if (f.label_enum == .LABEL_REPEATED) "obj" else f.name,
+                });
+            } else {
+                try verkisto.print(
+                    \\{s}            const {s}_text = try {s}{s}.skribiAlProtobufTeksto(allocator, indent);
+                    \\{s}            defer allocator.free({s}_text);
+                    \\
+                    \\{s}            try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
+                    \\
+                , .{
+                    ind,                                                  f.name,
+                    if (f.label_enum == .LABEL_REPEATED) "" else "self.", if (f.label_enum == .LABEL_REPEATED) "obj" else f.name,
+                    ind,                                                  f.name,
+                    ind,                                                  f.name,
+                    f.name,
                 });
             }
         } else {
-            if (f.label_enum == .LABEL_REPEATED) {
+            if (f.field_type_enum == .TYPE_ENUM) {
+                if (f.label_enum == .LABEL_REPEATED) {
+                    try verkisto.print(
+                        \\{s}        try bufro.print(allocator, "{{s}}{s}: {{s}}\n", .{{ ind, @tagName(obj) }});
+                        \\
+                    , .{
+                        ind, f.name,
+                    });
+                } else if (f.label_enum == .LABEL_OPTIONAL) {
+                    try verkisto.print(
+                        \\{s}        try bufro.print(allocator, "{{s}}{s}: {{s}}\n", .{{ ind, @tagName(val) }});
+                        \\
+                    , .{
+                        ind, f.name,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}        try bufro.print(allocator, "{{s}}{s}: {{s}}\n", .{{ ind, @tagName(self.{s}) }});
+                        \\
+                    , .{
+                        ind,
+                        f.name,
+                        f.name,
+                    });
+                }
+            } else if (f.label_enum == .LABEL_REPEATED) {
                 try verkisto.print(
                     \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, obj }});
                     \\
                 , .{
-                    ind,                                                   f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    ind,
+                    f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
                     if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
                 });
             } else if (f.label_enum == .LABEL_OPTIONAL) {
@@ -1282,8 +1327,10 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ ind, val }});
                     \\
                 , .{
-                    ind,                                                   f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    ind,
+                    f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
                     if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
                 });
             } else {
@@ -1291,20 +1338,22 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     \\{s}        try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, self.{s} }});
                     \\
                 , .{
-                    ind,                                                   f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", if (f.field_type_enum == .TYPE_STRING) "s" else "any",
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "", f.name,
+                    ind,
+                    f.name,
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
+                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
+                    f.name,
                 });
             }
         }
-        // if (f.label_enum == .LABEL_REPEATED or f.label_enum == .LABEL_OPTIONAL) {
-        if (f.label_enum == .LABEL_REPEATED or (f.label_enum == .LABEL_OPTIONAL and f.field_type_enum == .TYPE_MESSAGE)) {
+        if (f.label_enum == .LABEL_REPEATED or
+            (f.label_enum == .LABEL_OPTIONAL and f.field_type_enum == .TYPE_MESSAGE))
+        {
             try verkisto.print(
-                \\{s}        }} 
+                \\{s}        }}
                 \\
-            , .{
-                ind,
-            });
+            , .{ind});
         }
     }
     try verkisto.print(
