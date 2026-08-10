@@ -21,13 +21,18 @@ pub const AppConfig = struct {
     Domains: []DomainCfg,
 
     pub fn initDefault(allocator: all.Allocator) !AppConfig {
-        const self = try allocator.create(AppConfig);
-        self.* = AppConfig{
+        return AppConfig {
             .ActivateTrace = false,
             .TraceLevel = 0,
             .Domains = try allocator.alloc(DomainCfg, 0),
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const AppConfig, allocator: all.Allocator) void {
+        for (self.Domains) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.Domains);
     }
 
     pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -55,8 +60,12 @@ pub const AppConfig = struct {
             try bufro.print(allocator,"{s}TraceLevel: {any}\n",.{ ind, val });
         for(self.Domains) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}Domains {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const Domains_text = try obj.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(Domains_text);
+
+            try bufro.print(allocator, "{s}Domains {{\n{s}{s}}}\n", .{ ind, Domains_text, ind });
+        }
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -88,37 +97,38 @@ pub const AppConfig = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *AppConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, AppConfig, @as(*AppConfig,self), b_formato);
+    pub fn seriigiAlBin(self: *const AppConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, AppConfig, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *AppConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const AppConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, b_formato);
     }
 
-    fn seriigi(self: *const AppConfig, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const AppConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
         var tuta_longo: usize = 0;
  
-        for (self.Domains) |item| {
-            const Domains_longa = try item.seriigi( buffer );
-            tuta_longo += Domains_longa;
-            tuta_longo += try buffer.encodeVarint(Domains_longa);
-            tuta_longo += try buffer.encodeVarint(26);
-        }  // 11  rept - no def - varlong 
+    for (self.Domains) |item| {
+        const Domains_longa = try item.seriigi( allocator, buffer );
+        tuta_longo += Domains_longa;
+        tuta_longo += try buffer.encodeVarint(Domains_longa);
+        tuta_longo += try buffer.encodeVarint(26);
+    }  // 11  rept - no def - varlong 
 
-        if( self.TraceLevel ) |val| {
-            if( val != 0 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(16);
-            }
-        }  //2 opt - def - no varlong
+    if( self.TraceLevel ) |val| {
+        if( val != 0 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(16);
+        }
+    }  //2 opt - def - no varlong
 
-        if( self.ActivateTrace ) |val| {
-            if( val != false )  {
-                tuta_longo += try buffer.encodeBool( val );
-                tuta_longo += try buffer.encodeVarint(8);
-            }
-        }  //2 opt - def - no varlong
+    if( self.ActivateTrace ) |val| {
+        if( val != false )  {
+            tuta_longo += try buffer.encodeBool( val );
+            tuta_longo += try buffer.encodeVarint(8);
+        }
+    }  //2 opt - def - no varlong
 
         return tuta_longo;
     }
@@ -159,7 +169,7 @@ pub const AppConfig = struct {
 
         return mia_Mesagho;
     }
-};
+};    // AppConfig
 
 pub const DomainCfg = struct {
     Id: i32,
@@ -170,8 +180,7 @@ pub const DomainCfg = struct {
     CrossConnector: ?CrossConnectorDef = null,
 
     pub fn initDefault(allocator: all.Allocator) !DomainCfg {
-        const self = try allocator.create(DomainCfg);
-        self.* = DomainCfg{
+        return DomainCfg {
             .Id = 0,
             .ActivateDefaultTransport = false,
             .DirectDispacthToSubs = false,
@@ -179,7 +188,19 @@ pub const DomainCfg = struct {
             .Transports = try allocator.alloc(TransportDef, 0),
             .CrossConnector = null,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const DomainCfg, allocator: all.Allocator) void {
+        if( self.KeyFile ) |f| {
+            allocator.free(f);
+        }
+        for (self.Transports) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.Transports);
+        if (self.CrossConnector) |item| {
+            item.deinit(allocator);
+        }
     }
 
     pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -209,12 +230,20 @@ pub const DomainCfg = struct {
             try bufro.print(allocator,"{s}KeyFile: \"{s}\"\n",.{ ind, val });
         for(self.Transports) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}Transports {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const Transports_text = try obj.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(Transports_text);
+
+            try bufro.print(allocator, "{s}Transports {{\n{s}{s}}}\n", .{ ind, Transports_text, ind });
+        }
         if( self.CrossConnector ) |val|  {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}CrossConnector {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const CrossConnector_text = try val.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(CrossConnector_text);
+
+            try bufro.print(allocator, "{s}CrossConnector {{\n{s}{s}}}\n", .{ ind, CrossConnector_text, ind });
+        }
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -259,49 +288,50 @@ pub const DomainCfg = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *DomainCfg, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, DomainCfg, @as(*DomainCfg,self), b_formato);
+    pub fn seriigiAlBin(self: *const DomainCfg, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, DomainCfg, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, b_formato);
     }
 
-    fn seriigi(self: *const DomainCfg, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const DomainCfg, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
         var tuta_longo: usize = 0;
  
-        if ( self.CrossConnector ) |val| {
-            const st_longa = try val.seriigi( buffer );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(50);
-        }  //3  opt - no def - varlong
+    if ( self.CrossConnector ) |val| {
+        const st_longa = try val.seriigi( allocator, buffer );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(50);
+    }  //3  opt - no def - varlong
 
-        for (self.Transports) |item| {
-            const Transports_longa = try item.seriigi( buffer );
-            tuta_longo += Transports_longa;
-            tuta_longo += try buffer.encodeVarint(Transports_longa);
-            tuta_longo += try buffer.encodeVarint(42);
-        }  // 11  rept - no def - varlong 
+    for (self.Transports) |item| {
+        const Transports_longa = try item.seriigi( allocator, buffer );
+        tuta_longo += Transports_longa;
+        tuta_longo += try buffer.encodeVarint(Transports_longa);
+        tuta_longo += try buffer.encodeVarint(42);
+    }  // 11  rept - no def - varlong 
 
-        if ( self.KeyFile ) |val| {
-            const st_longa = try buffer.encodeString( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(34);
-        }  //3  opt - no def - varlong
+    if ( self.KeyFile ) |val| {
+        const st_longa = try buffer.encodeString( val );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(34);
+    }  //3  opt - no def - varlong
 
-        if( self.DirectDispacthToSubs ) |val| {
-            if( val != false )  {
-                tuta_longo += try buffer.encodeBool( val );
-                tuta_longo += try buffer.encodeVarint(24);
-            }
-        }  //2 opt - def - no varlong
+    if( self.DirectDispacthToSubs ) |val| {
+        if( val != false )  {
+            tuta_longo += try buffer.encodeBool( val );
+            tuta_longo += try buffer.encodeVarint(24);
+        }
+    }  //2 opt - def - no varlong
 
         if( self.ActivateDefaultTransport != false )  {
             tuta_longo += try buffer.encodeBool( self.ActivateDefaultTransport );
             tuta_longo += try buffer.encodeVarint(16);
-        }  //6  req - def - no varlong
+    }  //6  req - def - no varlong
 
         tuta_longo += try buffer.encodeInt32( self.Id );
         tuta_longo += try buffer.encodeVarint(8);
@@ -352,7 +382,7 @@ pub const DomainCfg = struct {
 
         return mia_Mesagho;
     }
-};
+};    // DomainCfg
 
 pub const TransportDef = struct {
     TransportName: []const u8 = "MCastDefault0" ,
@@ -364,17 +394,30 @@ pub const TransportDef = struct {
     UDPStarParams: ?UDPStarDefConfig = null,
 
     pub fn initDefault(allocator: all.Allocator) !TransportDef {
-        const self = try allocator.create(TransportDef);
-        self.* = TransportDef{
-            .TransportName = "MCastDefault0",
-            .DllImport = "Default",
-            .TransportClass = "Default",
+        return TransportDef {
+            .TransportName = try allocator.dupe(u8, "MCastDefault0"),
+            .DllImport = try allocator.dupe(u8, "Default"),
+            .TransportClass = try allocator.dupe(u8, "Default"),
             .ReceiveOwnMsgs = false,
             .MCastParams = null,
             .BCastParams = null,
             .UDPStarParams = null,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const TransportDef, allocator: all.Allocator) void {
+        allocator.free(self.TransportName);
+        allocator.free(self.DllImport);
+        allocator.free(self.TransportClass);
+        if (self.MCastParams) |item| {
+            item.deinit(allocator);
+        }
+        if (self.BCastParams) |item| {
+            item.deinit(allocator);
+        }
+        if (self.UDPStarParams) |item| {
+            item.deinit(allocator);
+        }
     }
 
     pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -403,16 +446,28 @@ pub const TransportDef = struct {
             try bufro.print(allocator,"{s}ReceiveOwnMsgs: {any}\n",.{ ind, val });
         if( self.MCastParams ) |val|  {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}MCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const MCastParams_text = try val.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(MCastParams_text);
+
+            try bufro.print(allocator, "{s}MCastParams {{\n{s}{s}}}\n", .{ ind, MCastParams_text, ind });
+        }
         if( self.BCastParams ) |val|  {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}BCastParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const BCastParams_text = try val.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(BCastParams_text);
+
+            try bufro.print(allocator, "{s}BCastParams {{\n{s}{s}}}\n", .{ ind, BCastParams_text, ind });
+        }
         if( self.UDPStarParams ) |val|  {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}UDPStarParams {{\n{s}{s}}}\n", .{ind, try val.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const UDPStarParams_text = try val.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(UDPStarParams_text);
+
+            try bufro.print(allocator, "{s}UDPStarParams {{\n{s}{s}}}\n", .{ ind, UDPStarParams_text, ind });
+        }
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -461,65 +516,66 @@ pub const TransportDef = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *TransportDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, TransportDef, @as(*TransportDef,self), b_formato);
+    pub fn seriigiAlBin(self: *const TransportDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, TransportDef, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *TransportDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const TransportDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, b_formato);
     }
 
-    fn seriigi(self: *const TransportDef, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const TransportDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
         var tuta_longo: usize = 0;
  
-        if ( self.UDPStarParams ) |val| {
-            const st_longa = try val.seriigi( buffer );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(58);
-        }  //3  opt - no def - varlong
+    if ( self.UDPStarParams ) |val| {
+        const st_longa = try val.seriigi( allocator, buffer );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(58);
+    }  //3  opt - no def - varlong
 
-        if ( self.BCastParams ) |val| {
-            const st_longa = try val.seriigi( buffer );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(50);
-        }  //3  opt - no def - varlong
+    if ( self.BCastParams ) |val| {
+        const st_longa = try val.seriigi( allocator, buffer );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(50);
+    }  //3  opt - no def - varlong
 
-        if ( self.MCastParams ) |val| {
-            const st_longa = try val.seriigi( buffer );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(42);
-        }  //3  opt - no def - varlong
+    if ( self.MCastParams ) |val| {
+        const st_longa = try val.seriigi( allocator, buffer );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(42);
+    }  //3  opt - no def - varlong
 
-        if( self.ReceiveOwnMsgs ) |val| {
-            if( val != false )  {
-                tuta_longo += try buffer.encodeBool( val );
-                tuta_longo += try buffer.encodeVarint(32);
-            }
-        }  //2 opt - def - no varlong
+    if( self.ReceiveOwnMsgs ) |val| {
+        if( val != false )  {
+            tuta_longo += try buffer.encodeBool( val );
+            tuta_longo += try buffer.encodeVarint(32);
+        }
+    }  //2 opt - def - no varlong
 
-        if ( ! equal(u8, self.TransportClass, "Default") ) {
-            const st_longa = try buffer.encodeString( self.TransportClass );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(26);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.TransportClass, "Default") ) {
+        const st_longa = try buffer.encodeString( self.TransportClass );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(26);
+    }  //8 req - def - varlong
 
-        if ( ! equal(u8, self.DllImport, "Default") ) {
-            const st_longa = try buffer.encodeString( self.DllImport );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(18);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.DllImport, "Default") ) {
+        const st_longa = try buffer.encodeString( self.DllImport );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(18);
+    }  //8 req - def - varlong
 
-        if ( ! equal(u8, self.TransportName, "MCastDefault0") ) {
-            const st_longa = try buffer.encodeString( self.TransportName );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(10);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.TransportName, "MCastDefault0") ) {
+        const st_longa = try buffer.encodeString( self.TransportName );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+    }  //8 req - def - varlong
 
         return tuta_longo;
     }
@@ -566,7 +622,7 @@ pub const TransportDef = struct {
 
         return mia_Mesagho;
     }
-};
+};    // TransportDef
 
 pub const MCastDefConfig = struct {
     LocalAddress: []const u8 = "Any" ,
@@ -577,16 +633,19 @@ pub const MCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !MCastDefConfig {
-        const self = try allocator.create(MCastDefConfig);
-        self.* = MCastDefConfig{
-            .LocalAddress = "Any",
-            .MCastAddress = "239.255.0.1",
+        return MCastDefConfig {
+            .LocalAddress = try allocator.dupe(u8, "Any"),
+            .MCastAddress = try allocator.dupe(u8, "239.255.0.1"),
             .Port = 40069,
             .TTL = 1,
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const MCastDefConfig, allocator: all.Allocator) void {
+        allocator.free(self.LocalAddress);
+        allocator.free(self.MCastAddress);
     }
 
     pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -658,56 +717,58 @@ pub const MCastDefConfig = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *MCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, MCastDefConfig, @as(*MCastDefConfig,self), b_formato);
+    pub fn seriigiAlBin(self: *const MCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, MCastDefConfig, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, b_formato);
     }
 
-    fn seriigi(self: *const MCastDefConfig, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const MCastDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
         var tuta_longo: usize = 0;
  
-        if( self.SendBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(48);
-            }
-        }  //2 opt - def - no varlong
+    if( self.SendBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(48);
+        }
+    }  //2 opt - def - no varlong
 
-        if( self.ReceiveBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(40);
-            }
-        }  //2 opt - def - no varlong
+    if( self.ReceiveBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(40);
+        }
+    }  //2 opt - def - no varlong
 
-        if( self.TTL ) |val| {
-            if( val != 1 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(32);
-            }
-        }  //2 opt - def - no varlong
+    if( self.TTL ) |val| {
+        if( val != 1 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(32);
+        }
+    }  //2 opt - def - no varlong
 
         if( self.Port != 40069 )  {
             tuta_longo += try buffer.encodeInt32( self.Port );
             tuta_longo += try buffer.encodeVarint(24);
-        }  //6  req - def - no varlong
+    }  //6  req - def - no varlong
 
-        if ( ! equal(u8, self.MCastAddress, "239.255.0.1") ) {
-            const st_longa = try buffer.encodeString( self.MCastAddress );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(18);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.MCastAddress, "239.255.0.1") ) {
+        const st_longa = try buffer.encodeString( self.MCastAddress );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(18);
+    }  //8 req - def - varlong
 
-        if ( ! equal(u8, self.LocalAddress, "Any") ) {
-            const st_longa = try buffer.encodeString( self.LocalAddress );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(10);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.LocalAddress, "Any") ) {
+        const st_longa = try buffer.encodeString( self.LocalAddress );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+    }  //8 req - def - varlong
 
         return tuta_longo;
     }
@@ -752,7 +813,7 @@ pub const MCastDefConfig = struct {
 
         return mia_Mesagho;
     }
-};
+};    // MCastDefConfig
 
 pub const BCastDefConfig = struct {
     LocalAddress: []const u8 = "Any" ,
@@ -762,15 +823,18 @@ pub const BCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !BCastDefConfig {
-        const self = try allocator.create(BCastDefConfig);
-        self.* = BCastDefConfig{
-            .LocalAddress = "Any",
-            .BCastAddress = "192.168.2.255",
+        return BCastDefConfig {
+            .LocalAddress = try allocator.dupe(u8, "Any"),
+            .BCastAddress = try allocator.dupe(u8, "192.168.2.255"),
             .Port = 40069,
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const BCastDefConfig, allocator: all.Allocator) void {
+        allocator.free(self.LocalAddress);
+        allocator.free(self.BCastAddress);
     }
 
     pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -836,49 +900,51 @@ pub const BCastDefConfig = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *BCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, BCastDefConfig, @as(*BCastDefConfig,self), b_formato);
+    pub fn seriigiAlBin(self: *const BCastDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, BCastDefConfig, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, b_formato);
     }
 
-    fn seriigi(self: *const BCastDefConfig, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const BCastDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
         var tuta_longo: usize = 0;
  
-        if( self.SendBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(40);
-            }
-        }  //2 opt - def - no varlong
+    if( self.SendBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(40);
+        }
+    }  //2 opt - def - no varlong
 
-        if( self.ReceiveBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(32);
-            }
-        }  //2 opt - def - no varlong
+    if( self.ReceiveBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(32);
+        }
+    }  //2 opt - def - no varlong
 
         if( self.Port != 40069 )  {
             tuta_longo += try buffer.encodeInt32( self.Port );
             tuta_longo += try buffer.encodeVarint(24);
-        }  //6  req - def - no varlong
+    }  //6  req - def - no varlong
 
-        if ( ! equal(u8, self.BCastAddress, "192.168.2.255") ) {
-            const st_longa = try buffer.encodeString( self.BCastAddress );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(18);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.BCastAddress, "192.168.2.255") ) {
+        const st_longa = try buffer.encodeString( self.BCastAddress );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(18);
+    }  //8 req - def - varlong
 
-        if ( ! equal(u8, self.LocalAddress, "Any") ) {
-            const st_longa = try buffer.encodeString( self.LocalAddress );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(10);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.LocalAddress, "Any") ) {
+        const st_longa = try buffer.encodeString( self.LocalAddress );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+    }  //8 req - def - varlong
 
         return tuta_longo;
     }
@@ -921,7 +987,7 @@ pub const BCastDefConfig = struct {
 
         return mia_Mesagho;
     }
-};
+};    // BCastDefConfig
 
 pub const UDPStarDefConfig = struct {
     LocalAddress: []const u8 = "Any" ,
@@ -931,15 +997,21 @@ pub const UDPStarDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !UDPStarDefConfig {
-        const self = try allocator.create(UDPStarDefConfig);
-        self.* = UDPStarDefConfig{
-            .LocalAddress = "Any",
+        return UDPStarDefConfig {
+            .LocalAddress = try allocator.dupe(u8, "Any"),
             .Port = 40069,
             .EndPoint = try allocator.alloc(EndPointDef, 0),
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const UDPStarDefConfig, allocator: all.Allocator) void {
+        allocator.free(self.LocalAddress);
+        for (self.EndPoint) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.EndPoint);
     }
 
     pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -965,8 +1037,12 @@ pub const UDPStarDefConfig = struct {
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
         for(self.EndPoint) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            try bufro.print(allocator, "{s}EndPoint {{\n{s}{s}}}\n", .{ind, try obj.skribiAlProtobufTeksto(allocator,indent),ind });
-        } 
+            defer allocator.free(indent);
+            const EndPoint_text = try obj.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(EndPoint_text);
+
+            try bufro.print(allocator, "{s}EndPoint {{\n{s}{s}}}\n", .{ ind, EndPoint_text, ind });
+        }
         if( self.ReceiveBuffer ) |val|  
             try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
         if( self.SendBuffer ) |val|  
@@ -1010,49 +1086,50 @@ pub const UDPStarDefConfig = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *UDPStarDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig,self), b_formato);
+    pub fn seriigiAlBin(self: *const UDPStarDefConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, UDPStarDefConfig, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, b_formato);
     }
 
-    fn seriigi(self: *const UDPStarDefConfig, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const UDPStarDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
         var tuta_longo: usize = 0;
  
-        if( self.SendBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(40);
-            }
-        }  //2 opt - def - no varlong
+    if( self.SendBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(40);
+        }
+    }  //2 opt - def - no varlong
 
-        if( self.ReceiveBuffer ) |val| {
-            if( val != 134217727 )  {
-                tuta_longo += try buffer.encodeInt32( val );
-                tuta_longo += try buffer.encodeVarint(32);
-            }
-        }  //2 opt - def - no varlong
+    if( self.ReceiveBuffer ) |val| {
+        if( val != 134217727 )  {
+            tuta_longo += try buffer.encodeInt32( val );
+            tuta_longo += try buffer.encodeVarint(32);
+        }
+    }  //2 opt - def - no varlong
 
-        for (self.EndPoint) |item| {
-            const EndPoint_longa = try item.seriigi( buffer );
-            tuta_longo += EndPoint_longa;
-            tuta_longo += try buffer.encodeVarint(EndPoint_longa);
-            tuta_longo += try buffer.encodeVarint(26);
-        }  // 11  rept - no def - varlong 
+    for (self.EndPoint) |item| {
+        const EndPoint_longa = try item.seriigi( allocator, buffer );
+        tuta_longo += EndPoint_longa;
+        tuta_longo += try buffer.encodeVarint(EndPoint_longa);
+        tuta_longo += try buffer.encodeVarint(26);
+    }  // 11  rept - no def - varlong 
 
         if( self.Port != 40069 )  {
             tuta_longo += try buffer.encodeInt32( self.Port );
             tuta_longo += try buffer.encodeVarint(16);
-        }  //6  req - def - no varlong
+    }  //6  req - def - no varlong
 
-        if ( ! equal(u8, self.LocalAddress, "Any") ) {
-            const st_longa = try buffer.encodeString( self.LocalAddress );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(10);
-        }  //8 req - def - varlong
+    if ( ! equal(u8, self.LocalAddress, "Any") ) {
+        const st_longa = try buffer.encodeString( self.LocalAddress );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+    }  //8 req - def - varlong
 
         return tuta_longo;
     }
@@ -1097,19 +1174,21 @@ pub const UDPStarDefConfig = struct {
 
         return mia_Mesagho;
     }
-};
+};    // UDPStarDefConfig
 
 pub const EndPointDef = struct {
     Host: []const u8,
     Port: i32 = 40069 ,
 
     pub fn initDefault(allocator: all.Allocator) !EndPointDef {
-        const self = try allocator.create(EndPointDef);
-        self.* = EndPointDef{
-            .Host = "", 
+        return EndPointDef {
+            .Host = try allocator.dupe(u8, ""),
             .Port = 40069,
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const EndPointDef, allocator: all.Allocator) void {
+        allocator.free(self.Host);
     }
 
     pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1158,21 +1237,23 @@ pub const EndPointDef = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *EndPointDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, EndPointDef, @as(*EndPointDef,self), b_formato);
+    pub fn seriigiAlBin(self: *const EndPointDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, EndPointDef, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, b_formato);
     }
 
-    fn seriigi(self: *const EndPointDef, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const EndPointDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
         var tuta_longo: usize = 0;
  
         if( self.Port != 40069 )  {
             tuta_longo += try buffer.encodeInt32( self.Port );
             tuta_longo += try buffer.encodeVarint(16);
-        }  //6  req - def - no varlong
+    }  //6  req - def - no varlong
 
         const Host_longa = try buffer.encodeString( self.Host );
         tuta_longo += Host_longa;
@@ -1215,17 +1296,22 @@ pub const EndPointDef = struct {
 
         return mia_Mesagho;
     }
-};
+};    // EndPointDef
 
 pub const CrossConnectorDef = struct {
     Transports: [][]const u8,
 
     pub fn initDefault(allocator: all.Allocator) !CrossConnectorDef {
-        const self = try allocator.create(CrossConnectorDef);
-        self.* = CrossConnectorDef{
+        return CrossConnectorDef {
             .Transports = try allocator.alloc([]const u8, 0),
         };
-        return self.*;
+    }
+
+    pub fn deinit(self: *const CrossConnectorDef, allocator: all.Allocator) void {
+        for (self.Transports) |item| {
+            allocator.free(item);
+        }
+        allocator.free(self.Transports);
     }
 
     pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1249,7 +1335,7 @@ pub const CrossConnectorDef = struct {
 
         for(self.Transports) |obj| {
             try bufro.print(allocator,"{s}Transports: \"{s}\"\n",.{ind, obj });
-        } 
+        }
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -1263,7 +1349,7 @@ pub const CrossConnectorDef = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "Transports" ) ) { 
-                try Transports_list.append(allocator, val); 
+                try Transports_list.append(allocator, allocator.dupe(u8, val) catch "");
                 continue;
             }
         }
@@ -1272,23 +1358,25 @@ pub const CrossConnectorDef = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *CrossConnectorDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, CrossConnectorDef, @as(*CrossConnectorDef,self), b_formato);
+    pub fn seriigiAlBin(self: *const CrossConnectorDef, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, CrossConnectorDef, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+    pub fn seriigiAlDosiero(self: *const CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
         return try seriigiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, b_formato);
     }
 
-    fn seriigi(self: *const CrossConnectorDef, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const CrossConnectorDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
         var tuta_longo: usize = 0;
  
-        for (self.Transports) |item| {
-            const Transports_longa = try buffer.encodeString( item );
-            tuta_longo += Transports_longa;
-            tuta_longo += try buffer.encodeVarint(Transports_longa);
-            tuta_longo += try buffer.encodeVarint(10);
-        }  // 11  rept - no def - varlong 
+    for (self.Transports) |item| {
+        const Transports_longa = try buffer.encodeString( item );
+        tuta_longo += Transports_longa;
+        tuta_longo += try buffer.encodeVarint(Transports_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+    }  // 11  rept - no def - varlong 
 
         return tuta_longo;
     }
@@ -1325,7 +1413,7 @@ pub const CrossConnectorDef = struct {
 
         return mia_Mesagho;
     }
-};
+};    // CrossConnectorDef
 
     };   // Config
 };   // ProtocolBus
@@ -1340,25 +1428,26 @@ pub const CrossConnectorDef = struct {
 /// //////////////////////////////////////////
 
 pub const BinaraFormato = enum(u32) {
-    BF_PROTOBUF,
-    BF_ASN1_DER,
-    BF_OMG_CDR,
-    BF_BASE64,
-    BF_BINPB2TEKSTO_HEX,
-    BF_BINPB2TEKSTO_DEC,
+    BF_PROTOBUF = 0,
+    BF_OMG_CDR = 1,
+    BF_ASN1_BER = 2,
+    BF_ASN1_DER = 3,
+    BF_BASE64 = 10,
+    BF_BINPB2TEKSTO_HEX = 11,
+    BF_BINPB2TEKSTO_DEC = 12,
 };
 
-fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: *T) ![]const u8 {
+fn seriigiTipon(allocator: all.Allocator, comptime T: type, value: * const T) ![]const u8 {
     var mia_enc = try EncodeBuffer.init(allocator, 48 * 1024);
     defer mia_enc.deinit();
 
-    const longo = try value.seriigi(&mia_enc);
+    const longo = try value.seriigi(allocator, &mia_enc);
     const bytes = try allocator.alloc(u8, longo);
     std.mem.copyForwards(u8, bytes, mia_enc.data());
     return bytes;
 }
 
-fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato) ![]const u8 {
+fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: * const T, b_formato: BinaraFormato) ![]const u8 {
     var parsed: []const u8 = undefined;
     switch (b_formato) {
         .BF_PROTOBUF => {
@@ -1409,8 +1498,9 @@ fn seriigiTiponAlBin(allocator: all.Allocator, comptime T: type, value: *T, b_fo
     return parsed;
 }
 
-fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, b_formato: BinaraFormato, path: []const u8) !void {
+fn seriigiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: * const T, b_formato: BinaraFormato, path: []const u8) !void {
     const teksto = try seriigiTiponAlBin(allocator, T, value, b_formato);
+    defer allocator.free(teksto);
 
     var dosiero = try std.fs.cwd().createFile(path, .{ .truncate = true });
     defer dosiero.close();
@@ -1490,6 +1580,37 @@ fn deseriigiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []c
 
 const zon = std.zon;
 
+fn parseEnumValue(comptime E: type, tok: []const u8) !E {
+    if (std.meta.stringToEnum(E, tok)) |v| return v;
+    const n = try std.fmt.parseInt(u64, tok, 10);
+    return try std.meta.intToEnum(E, n);
+}
+
+fn legiSubProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) ![]const u8 {
+    var bufro: std.ArrayList(u8) = .empty;
+    var depth: usize = 1;
+
+    while (it.next()) |tok| {
+        if (equal(u8, tok, "{")) {
+            depth += 1;
+            try bufro.print(allocator, "{ ", .{});
+            continue;
+        }
+
+        if (equal(u8, tok, "}")) {
+            depth -= 1;
+            if (depth == 0) break;
+            try bufro.print(allocator, "} ", .{});
+            continue;
+        }
+
+        try bufro.print(allocator, "{s} ", .{tok});
+    }
+
+    if (depth != 0) return error.InvalidFormat;
+    return try bufro.toOwnedSlice(allocator);
+}
+
 pub const TekstaFormato = enum(u32) {
     TF_ZIG_ZON,
     TF_PROTOBUF,
@@ -1512,14 +1633,20 @@ pub fn skribiTiponAlTeksto(allocator: all.Allocator, comptime T: type, value: *T
                 std.debug.print("eraro dum seriigo: {}\n", .{err});
                 return err;
             };
-            bytes = skribila_asignilo.writer.buffered();
+            bytes = skribila_asignilo.toOwnedSlice() catch |err| {
+                std.debug.print("eraro dum seriigo: {}\n", .{err});
+               return err;
+            };
         },
         .TF_JSON => {
             std.json.fmt(self, .{ .whitespace = .indent_3 }).format(&skribila_asignilo.writer) catch |err| {
                 std.debug.print("eraro dum seriigo: {}\n", .{err});
                 return err;
             };
-            bytes = skribila_asignilo.writer.buffered();
+            bytes = skribila_asignilo.toOwnedSlice() catch |err| {
+                std.debug.print("eraro dum seriigo: {}\n", .{err});
+               return err;
+            };
         },
         .TF_PROTOBUF => {
             bytes = self.skribiAlProtobufTeksto(allocator, "") catch |err| {
@@ -1535,8 +1662,9 @@ pub fn skribiTiponAlTeksto(allocator: all.Allocator, comptime T: type, value: *T
     return bytes;
 }
 
-fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, t_formato: TekstaFormato, path: []const u8) !void {
+fn skribiTiponAlDosiero(allocator: all.Allocator, comptime T: type, value: *T, path: []const u8, t_formato: TekstaFormato) !void {
     const teksto = try skribiTiponAlTeksto(allocator, T, value, t_formato);
+    defer allocator.free(teksto);
 
     var dosiero = try std.fs.cwd().createFile(path, .{ .truncate = true });
     defer dosiero.close();
@@ -1557,7 +1685,7 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
             };
         },
         .TF_JSON => {
-            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{ .ignore_unknown_fields = true }) catch |err| {
+            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{ .ignore_unknown_fields = false, .allocate = .alloc_always }) catch |err| {
                 std.debug.print("eraro dun deseriigo: {}\n", .{err});
                 return err;
             };
@@ -1584,6 +1712,7 @@ pub fn legiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []co
 
     const dosiera_long = try dosiero.getEndPos();
     var enhavo = allocator.alloc(u8, dosiera_long + 1) catch return error.OutOfMemory;
+    defer allocator.free(enhavo);
 
     _ = try dosiero.readAll(enhavo[0..dosiera_long]);
     enhavo[dosiera_long] = 0;

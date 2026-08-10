@@ -10,64 +10,146 @@ const DecodeBuffer = encdec.DecodeBuffer;
 
 const TokenIterType = std.mem.TokenIterator(u8, .any);
 
-pub const geo = struct {
+pub const k6bus = struct {
+
+    pub const security = struct {
 
 
-pub const Estacion = struct {
-    nombre: []const u8,
-    id: ?u32 = null,
+pub const CryptoMode = enum(u64) {
+   CRYPTO_NONE = 0,
+   CRYPTO_AES_256_CBC = 1,
+   CRYPTO_AES_256_GCM = 2,
+   CRYPTO_CHACHA20_POLY1305 = 3,
+};
 
-    pub fn initDefault(allocator: all.Allocator) !Estacion {
-        return Estacion {
-            .nombre = try allocator.dupe(u8, ""),
-            .id = null,
+pub const KeyRegistry = struct {
+    Version: ?u32 = 1 ,
+    Date: []const u8,
+    Time: []const u8,
+    Sender: []const u8,
+    Phrase: ?[]const u8 = null,
+    Salt: ?[]const u8 = null,
+    Mode: ?CryptoMode = .CRYPTO_AES_256_GCM ,
+    KeyId: ?u32 = 0 ,
+    Key: []const u8,
+    LegacyIV: ?[]const u8 = null,
+
+    pub fn initDefault(allocator: all.Allocator) !KeyRegistry {
+        return KeyRegistry {
+            .Version = 1,
+            .Date = try allocator.dupe(u8, ""),
+            .Time = try allocator.dupe(u8, ""),
+            .Sender = try allocator.dupe(u8, ""),
+            .Phrase = null,
+            .Salt = null,
+            .Mode = .CRYPTO_AES_256_GCM,
+            .KeyId = 0,
+            .Key = try allocator.dupe(u8, ""),
+            .LegacyIV = null,
         };
     }
 
-    pub fn deinit(self: *const Estacion, allocator: all.Allocator) void {
-        allocator.free(self.nombre);
+    pub fn deinit(self: *const KeyRegistry, allocator: all.Allocator) void {
+        allocator.free(self.Date);
+        allocator.free(self.Time);
+        allocator.free(self.Sender);
+        if( self.Phrase ) |f| {
+            allocator.free(f);
+        }
+        if( self.Salt ) |f| {
+            allocator.free(f);
+        }
+        allocator.free(self.Key);
+        if( self.LegacyIV ) |f| {
+            allocator.free(f);
+        }
     }
 
-    pub fn skribiAlTeksto(self: *Estacion, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
-        return try skribiTiponAlTeksto(allocator, Estacion, @as(*Estacion, self), t_formato);
+    pub fn skribiAlTeksto(self: *KeyRegistry, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, KeyRegistry, @as(*KeyRegistry, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *Estacion, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
-        try skribiTiponAlDosiero(allocator, Estacion, @as(*Estacion, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *KeyRegistry, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, KeyRegistry, @as(*KeyRegistry, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !Estacion {
-        return try legiTiponElTeksto(allocator, Estacion, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !KeyRegistry {
+        return try legiTiponElTeksto(allocator, KeyRegistry, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !Estacion {
-        return try legiTiponElDosiero(allocator, Estacion, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !KeyRegistry {
+        return try legiTiponElDosiero(allocator, KeyRegistry, path, t_formato);
     }
 
-    fn skribiAlProtobufTeksto(self: *const Estacion, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+    fn skribiAlProtobufTeksto(self: *const KeyRegistry, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
-        if( self.id ) |val|  
-            try bufro.print(allocator,"{s}id: {any}\n",.{ ind, val });
+        if( self.Version ) |val|  
+            try bufro.print(allocator,"{s}Version: {any}\n",.{ ind, val });
+        try bufro.print(allocator,"{s}Date: \"{s}\"\n",.{ind, self.Date });
+        try bufro.print(allocator,"{s}Time: \"{s}\"\n",.{ind, self.Time });
+        try bufro.print(allocator,"{s}Sender: \"{s}\"\n",.{ind, self.Sender });
+        if( self.Phrase ) |val|  
+            try bufro.print(allocator,"{s}Phrase: \"{s}\"\n",.{ ind, val });
+        if( self.Salt ) |val|  
+            try bufro.print(allocator,"{s}Salt: \"{s}\"\n",.{ ind, val });
+        if( self.Mode ) |val|  
+            try bufro.print(allocator, "{s}Mode: {s}\n", .{ ind, @tagName(val) });
+        if( self.KeyId ) |val|  
+            try bufro.print(allocator,"{s}KeyId: {any}\n",.{ ind, val });
+        try bufro.print(allocator,"{s}Key: {any}\n",.{ind, self.Key });
+        if( self.LegacyIV ) |val|  
+            try bufro.print(allocator,"{s}LegacyIV: {any}\n",.{ ind, val });
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !Estacion {
-        var mia_Mesagho= try Estacion.initDefault(allocator); 
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !KeyRegistry {
+        var mia_Mesagho= try KeyRegistry.initDefault(allocator); 
 
 
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
-                mia_Mesagho.nombre =  allocator.dupe(u8, val) catch "";
+            if( equal(u8, tok, "Version" ) ) { 
+                mia_Mesagho.Version =  std.fmt.parseInt(u32,val,10) catch 0;
                 continue;
             }
-            if( equal(u8, tok, "id" ) ) { 
-                mia_Mesagho.id =  std.fmt.parseInt(u32,val,10) catch 0;
+            if( equal(u8, tok, "Date" ) ) { 
+                mia_Mesagho.Date =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Time" ) ) { 
+                mia_Mesagho.Time =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Sender" ) ) { 
+                mia_Mesagho.Sender =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Phrase" ) ) { 
+                mia_Mesagho.Phrase =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Salt" ) ) { 
+                mia_Mesagho.Salt =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "Mode" ) ) { 
+                mia_Mesagho.Mode = parseEnumValue(CryptoMode, val) catch (std.meta.intToEnum(CryptoMode, 0) catch unreachable);
+                continue;
+            }
+            if( equal(u8, tok, "KeyId" ) ) { 
+                mia_Mesagho.KeyId =  std.fmt.parseInt(u32,val,10) catch 0;
+                continue;
+            }
+            if( equal(u8, tok, "Key" ) ) { 
+                mia_Mesagho.Key =  allocator.dupe(u8, val) catch "";
+                continue;
+            }
+            if( equal(u8, tok, "LegacyIV" ) ) { 
+                mia_Mesagho.LegacyIV =  allocator.dupe(u8, val) catch "";
                 continue;
             }
         }
@@ -75,183 +157,98 @@ pub const Estacion = struct {
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *const Estacion, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, Estacion, self, b_formato);
+    pub fn seriigiAlBin(self: *const KeyRegistry, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, KeyRegistry, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *const Estacion, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, Estacion, @as(*Estacion, self), path, b_formato);
+    pub fn seriigiAlDosiero(self: *const KeyRegistry, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, KeyRegistry, @as(*KeyRegistry, self), path, b_formato);
     }
 
-    fn seriigi(self: *const Estacion, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const KeyRegistry, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
  
         _ = allocator;
         var tuta_longo: usize = 0;
  
-        if( self.id ) |val| {
-            tuta_longo += try buffer.encodeUint32( val );
-            tuta_longo += try buffer.encodeVarint(16);
-        }   //1 opt - no def - no varlong
+    if ( self.LegacyIV ) |val| {
+        const st_longa = try buffer.encodeBytes( val );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(82);
+    }  //3  opt - no def - varlong
 
-        const nombre_longa = try buffer.encodeString( self.nombre );
-        tuta_longo += nombre_longa;
-        tuta_longo += try buffer.encodeVarint(nombre_longa);
-        tuta_longo += try buffer.encodeVarint(10);
+        const Key_longa = try buffer.encodeBytes( self.Key );
+        tuta_longo += Key_longa;
+        tuta_longo += try buffer.encodeVarint(Key_longa);
+        tuta_longo += try buffer.encodeVarint(74);
         //7  req - no def - varlong
 
-        return tuta_longo;
-    }
-
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !Estacion {
-        return try deseriigiTiponElBin(allocator, Estacion, input, b_formato);
-    }
-
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !Estacion {
-        return try deseriigiTiponElDosiero(allocator, Estacion, path, b_formato);
-    }
-
-    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !Estacion {
-        var mia_Mesagho= try Estacion.initDefault(allocator);
-
-        var end: usize = undefined;
-        if (data_length) |val|
-            end = buffer.read_index + val
-        else
-            end = buffer.buffer.len;
-
-
-        while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
-            const wire_type = key & 0x7;  
-            const field_number = key >> 3;
-
-            if ( field_number == 1 and wire_type == 2 ) 
-                mia_Mesagho.nombre = try buffer.decodeString(  try buffer.decodeVarint() )
-            else if ( field_number == 2 and wire_type == 0 ) 
-                mia_Mesagho.id = try buffer.decodeUint32();
+    if( self.KeyId ) |val| {
+        if( val != 0 )  {
+            tuta_longo += try buffer.encodeUint32( val );
+            tuta_longo += try buffer.encodeVarint(64);
         }
+    }  //2 opt - def - no varlong
 
-
-        return mia_Mesagho;
-    }
-};    // Estacion
-
-pub const Ciudad = struct {
-    nombre: ?[]const u8 = null,
-    estaciones: []Estacion,
-
-    pub fn initDefault(allocator: all.Allocator) !Ciudad {
-        return Ciudad {
-            .nombre = null,
-            .estaciones = try allocator.alloc(Estacion, 0),
-        };
-    }
-
-    pub fn deinit(self: *const Ciudad, allocator: all.Allocator) void {
-        if( self.nombre ) |f| {
-            allocator.free(f);
+    if( self.Mode ) |val| {
+        if( val != .CRYPTO_AES_256_GCM )  {
+            tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
+            tuta_longo += try buffer.encodeVarint(56);
         }
-        for (self.estaciones) |item| {
-            item.deinit(allocator);
-        }
-        allocator.free(self.estaciones);
-    }
+    }  //2 opt - def - no varlong
 
-    pub fn skribiAlTeksto(self: *Ciudad, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
-        return try skribiTiponAlTeksto(allocator, Ciudad, @as(*Ciudad, self), t_formato);
-    }
-
-    pub fn skribiAlDosiero(self: *Ciudad, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
-        try skribiTiponAlDosiero(allocator, Ciudad, @as(*Ciudad, self), path, t_formato);
-    }
-
-    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !Ciudad {
-        return try legiTiponElTeksto(allocator, Ciudad, input, t_formato);
-    }
-
-    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !Ciudad {
-        return try legiTiponElDosiero(allocator, Ciudad, path, t_formato);
-    }
-
-    fn skribiAlProtobufTeksto(self: *const Ciudad, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-        var bufro:std.ArrayList(u8)= .empty;
-
-        if( self.nombre ) |val|  
-            try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ ind, val });
-        for(self.estaciones) |obj| {
-            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            defer allocator.free(indent);
-            const estaciones_text = try obj.skribiAlProtobufTeksto(allocator, indent);
-            defer allocator.free(estaciones_text);
-
-            try bufro.print(allocator, "{s}estaciones {{\n{s}{s}}}\n", .{ ind, estaciones_text, ind });
-        }
-
-        return bufro.toOwnedSlice(allocator);
-    }
-
-    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !Ciudad {
-        var mia_Mesagho= try Ciudad.initDefault(allocator); 
-
-        var estaciones_list: std.ArrayList(Estacion) = .empty; 
-        while (it.next()) |tok| {
-            if( equal(u8, tok, "}" ) ) break;
-            const val = it.next() orelse return error.InvalidFormat;
-
-            if( equal(u8, tok, "nombre" ) ) { 
-                mia_Mesagho.nombre =  allocator.dupe(u8, val) catch "";
-                continue;
-            }
-            if( equal(u8, tok, "estaciones" ) ) { 
-                const sub_msg = try Estacion.legiElProtobufTeksto(allocator, it); 
-                try estaciones_list.append(allocator, sub_msg); 
-                continue;
-            }
-        }
-        mia_Mesagho.estaciones = try estaciones_list.toOwnedSlice(allocator); 
-
-        return mia_Mesagho;
-    }
-
-    pub fn seriigiAlBin(self: *const Ciudad, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, Ciudad, self, b_formato);
-    }
-
-    pub fn seriigiAlDosiero(self: *const Ciudad, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, Ciudad, @as(*Ciudad, self), path, b_formato);
-    }
-
-    fn seriigi(self: *const Ciudad, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
- 
-        var tuta_longo: usize = 0;
- 
-    for (self.estaciones) |item| {
-        const estaciones_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += estaciones_longa;
-        tuta_longo += try buffer.encodeVarint(estaciones_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong 
-
-    if ( self.nombre ) |val| {
+    if ( self.Salt ) |val| {
         const st_longa = try buffer.encodeString( val );
         tuta_longo += st_longa;
         tuta_longo += try buffer.encodeVarint(st_longa);
-        tuta_longo += try buffer.encodeVarint(10);
+        tuta_longo += try buffer.encodeVarint(50);
     }  //3  opt - no def - varlong
+
+    if ( self.Phrase ) |val| {
+        const st_longa = try buffer.encodeString( val );
+        tuta_longo += st_longa;
+        tuta_longo += try buffer.encodeVarint(st_longa);
+        tuta_longo += try buffer.encodeVarint(42);
+    }  //3  opt - no def - varlong
+
+        const Sender_longa = try buffer.encodeString( self.Sender );
+        tuta_longo += Sender_longa;
+        tuta_longo += try buffer.encodeVarint(Sender_longa);
+        tuta_longo += try buffer.encodeVarint(34);
+        //7  req - no def - varlong
+
+        const Time_longa = try buffer.encodeString( self.Time );
+        tuta_longo += Time_longa;
+        tuta_longo += try buffer.encodeVarint(Time_longa);
+        tuta_longo += try buffer.encodeVarint(26);
+        //7  req - no def - varlong
+
+        const Date_longa = try buffer.encodeString( self.Date );
+        tuta_longo += Date_longa;
+        tuta_longo += try buffer.encodeVarint(Date_longa);
+        tuta_longo += try buffer.encodeVarint(18);
+        //7  req - no def - varlong
+
+    if( self.Version ) |val| {
+        if( val != 1 )  {
+            tuta_longo += try buffer.encodeUint32( val );
+            tuta_longo += try buffer.encodeVarint(8);
+        }
+    }  //2 opt - def - no varlong
 
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !Ciudad {
-        return try deseriigiTiponElBin(allocator, Ciudad, input, b_formato);
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !KeyRegistry {
+        return try deseriigiTiponElBin(allocator, KeyRegistry, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !Ciudad {
-        return try deseriigiTiponElDosiero(allocator, Ciudad, path, b_formato);
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !KeyRegistry {
+        return try deseriigiTiponElDosiero(allocator, KeyRegistry, path, b_formato);
     }
 
-    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !Ciudad {
-        var mia_Mesagho= try Ciudad.initDefault(allocator);
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !KeyRegistry {
+        var mia_Mesagho= try KeyRegistry.initDefault(allocator);
 
         var end: usize = undefined;
         if (data_length) |val|
@@ -259,26 +256,41 @@ pub const Ciudad = struct {
         else
             end = buffer.buffer.len;
 
-        var estaciones_list: std.ArrayList(Estacion) = .empty; 
 
         while (buffer.read_index < end) {
             const key: u64 = buffer.decodeVarint() catch 0 ;    
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
-            if ( field_number == 1 and wire_type == 2 ) 
-                mia_Mesagho.nombre = try buffer.decodeString(  try buffer.decodeVarint() )
+            if ( field_number == 1 and wire_type == 0 ) 
+                mia_Mesagho.Version = try buffer.decodeUint32()
             else if ( field_number == 2 and wire_type == 2 ) 
-                { try estaciones_list.append( allocator, try Estacion.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+                mia_Mesagho.Date = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 3 and wire_type == 2 ) 
+                mia_Mesagho.Time = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 4 and wire_type == 2 ) 
+                mia_Mesagho.Sender = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 5 and wire_type == 2 ) 
+                mia_Mesagho.Phrase = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 6 and wire_type == 2 ) 
+                mia_Mesagho.Salt = try buffer.decodeString(  try buffer.decodeVarint() )
+            else if ( field_number == 7 and wire_type == 0 ) 
+                mia_Mesagho.Mode = try std.meta.intToEnum(CryptoMode, try buffer.decodeVarint() ) 
+            else if ( field_number == 8 and wire_type == 0 ) 
+                mia_Mesagho.KeyId = try buffer.decodeUint32()
+            else if ( field_number == 9 and wire_type == 2 ) 
+                mia_Mesagho.Key = try buffer.decodeBytes(  try buffer.decodeVarint() )
+            else if ( field_number == 10 and wire_type == 2 ) 
+                mia_Mesagho.LegacyIV = try buffer.decodeBytes(  try buffer.decodeVarint() );
         }
 
-        mia_Mesagho.estaciones = try estaciones_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
     }
-};    // Ciudad
+};    // KeyRegistry
 
-};   // geo
+    };   // security
+};   // k6bus
 
 //////////////////////////////////////////////
 /// //////////////////////////////////////////

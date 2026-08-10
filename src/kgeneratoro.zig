@@ -127,6 +127,241 @@ fn skribiEnums(enums: []prs.Enum, ind: []const u8) !void {
 }
 
 /////////////////////////////////////
+/// OneOf - Generado de Protobuf Text
+/////////////////////////////////////
+/// Genera el codigo de escritura Protobuf Text de un oneof.
+/// Importante:
+/// - En Protobuf Text, el oneof no se escribe como contenedor.
+/// - Se escribe directamente la alternativa activa.
+/// - Ejemplo:
+///     mcast {
+///         mcast_address: "239.255.0.1"
+///         port: 40069
+///     }
+/// - .none no se escribe.
+fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
+    try verkisto.print(
+        \\{s}        switch (self.{s}) {{
+        \\{s}            .none => {{}},
+        \\
+    , .{
+        ind,
+        oneof_decl.name,
+        ind,
+    });
+
+    for (oneof_decl.fields) |field| {
+        switch (field.field_type_enum) {
+            .TYPE_MESSAGE => {
+                try verkisto.print(
+                    \\{s}            .{s} => |val| {{
+                    \\{s}                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{{ ind, "    " }}, 0) catch unreachable;
+                    \\{s}                defer allocator.free(indent);
+                    \\
+                , .{
+                    ind,
+                    field.name,
+                    ind,
+                    ind,
+                });
+
+                if (estasImportitaTipo(field.field_type)) {
+                    try verkisto.print(
+                        \\{s}                var {s}_item = val;
+                        \\{s}                const {s}_text = try {s}_item.skribiAlTeksto(allocator, .TF_PROTOBUF);
+                        \\{s}                defer allocator.free({s}_text);
+                        \\
+                        \\{s}                try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
+                        \\{s}            }},
+                        \\
+                    , .{
+                        ind,
+                        field.name,
+
+                        ind,
+                        field.name,
+                        field.name,
+
+                        ind,
+                        field.name,
+
+                        ind,
+                        field.name,
+                        field.name,
+
+                        ind,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}                const {s}_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                        \\{s}                defer allocator.free({s}_text);
+                        \\
+                        \\{s}                try bufro.print(allocator, "{{s}}{s} {{{{\n{{s}}{{s}}}}}}\n", .{{ ind, {s}_text, ind }});
+                        \\{s}            }},
+                        \\
+                    , .{
+                        ind,
+                        field.name,
+
+                        ind,
+                        field.name,
+
+                        ind,
+                        field.name,
+                        field.name,
+
+                        ind,
+                    });
+                }
+            },
+
+            .TYPE_STRING => {
+                try verkisto.print(
+                    \\{s}            .{s} => |val| {{
+                    \\{s}                try bufro.print(allocator, "{{s}}{s}: \"{{s}}\"\n", .{{ ind, val }});
+                    \\{s}            }},
+                    \\
+                , .{
+                    ind,
+                    field.name,
+
+                    ind,
+                    field.name,
+
+                    ind,
+                });
+            },
+
+            .TYPE_ENUM => {
+                try verkisto.print(
+                    \\{s}            .{s} => |val| {{
+                    \\{s}                try bufro.print(allocator, "{{s}}{s}: {{s}}\n", .{{ ind, @tagName(val) }});
+                    \\{s}            }},
+                    \\
+                , .{
+                    ind,
+                    field.name,
+
+                    ind,
+                    field.name,
+
+                    ind,
+                });
+            },
+
+            else => {
+                try verkisto.print(
+                    \\{s}            .{s} => |val| {{
+                    \\{s}                try bufro.print(allocator, "{{s}}{s}: {{any}}\n", .{{ ind, val }});
+                    \\{s}            }},
+                    \\
+                , .{
+                    ind,
+                    field.name,
+
+                    ind,
+                    field.name,
+
+                    ind,
+                });
+            },
+        }
+    }
+
+    try verkisto.print(
+        \\{s}        }}
+        \\
+        \\
+    , .{
+        ind,
+    });
+}
+
+/// Genera escritura Protobuf Text para todos los oneofs de un mensaje.
+fn skribiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiPBTekstoOneOf(oneof_decl, ind);
+    }
+}
+
+/////////////////////////////////////
+/// OneOf - Lectura Protobuf Text
+/////////////////////////////////////
+/// Genera las ramas de lectura Protobuf Text para un oneof.
+/// En Protobuf Text, el oneof no aparece como contenedor.
+/// La alternativa aparece directamente:
+///     mcast {
+///         ...
+///     }
+/// Por tanto se detecta por tok == "mcast", "bcast", etc.
+/// Regla:
+/// Si aparece mas de una alternativa del mismo oneof, gana la ultima.
+/// Antes de asignar una nueva alternativa, liberamos la anterior.
+fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
+    const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
+
+    for (oneof_decl.fields) |field| {
+        const temp_name = std.fmt.allocPrint(
+            std.heap.page_allocator,
+            "{s}_{s}_val",
+            .{ oneof_decl.name, field.name },
+        ) catch unreachable;
+
+        switch (field.field_type_enum) {
+            .TYPE_MESSAGE => {
+                try verkisto.print(
+                    \\{s}            if( equal(u8, tok, "{s}" ) ) {{
+                    \\{s}                if( ! equal(u8, val, "{{" ) ) return error.InvalidFormat;
+                    \\{s}                const {s} = try {s}.legiElProtobufTeksto(allocator, it);
+                    \\
+                    \\{s}                mia_Mesagho.deinit{s}(allocator);
+                    \\{s}                mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}                continue;
+                    \\{s}            }}
+                    \\
+                , .{
+                    ind,
+                    field.name,
+
+                    ind,
+
+                    ind,
+                    temp_name,
+                    field.field_type,
+
+                    ind,
+                    union_name,
+
+                    ind,
+                    oneof_decl.name,
+                    field.name,
+                    temp_name,
+
+                    ind,
+
+                    ind,
+                });
+            },
+
+            else => {
+                // De momento cubrimos TYPE_MESSAGE, que es el caso actual:
+                // TransportConfig.params y PanelSimple.datos.
+                //
+                // Las ramas scalar/string/enum se pueden anadir despues si
+                // aparece un oneof con alternativas no-message.
+            },
+        }
+    }
+}
+
+/// Genera lectura Protobuf Text para todos los oneofs de un mensaje.
+fn skribiLegiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
+    for (msg.oneofs) |oneof_decl| {
+        try skribiLegiPBTekstoOneOf(oneof_decl, ind);
+    }
+}
+
+/////////////////////////////////////
 /// OneOf - Generado de union(enum)
 /////////////////////////////////////
 /// Genera los tipos Zig asociados a los oneof de un mensaje.
@@ -1356,6 +1591,11 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
             , .{ind});
         }
     }
+
+    if (msg.oneofs.len > 0) {
+        try skribiPBTekstoOneOfs(msg, ind);
+    }
+
     try verkisto.print(
         \\
         \\{s}        return bufro.toOwnedSlice(allocator);
@@ -1461,6 +1701,10 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
             \\{s}            }}
             \\
         , .{ ind, ind });
+    }
+
+    if (msg.oneofs.len > 0) {
+        try skribiLegiPBTekstoOneOfs(msg, ind);
     }
 
     try verkisto.print( // Fino de la while(it.next())

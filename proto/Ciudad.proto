@@ -6,7 +6,7 @@ package geo;
 // Estacion
 // -------------------------
 message Estacion {
-    optional string nombre = 1;
+    required string nombre = 1;
     optional uint32 id     = 2;
 }
 
