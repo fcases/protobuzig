@@ -16,7 +16,8 @@ message CCtrol {
 message EstRemCtrol {
     required string nombre = 1;
     repeated EstMeteo meteos = 2;
-    repeated SnrTrafico datos_tr =3;
+    repeated SnrTrafico datos_tr = 3;
+    repeated PanelInfoV paneles = 4;
 }
 
 // -------------------------
@@ -44,14 +45,14 @@ message SnrTrafico {
 // ---------------------------
 message PanelInfoV {
     required string nombre = 1;
-    repeated PanelSimple elementos = 2;
+    repeated PanelBase elementos = 2;
 }
 
 // ---------------------------
 // Panel Informacion Variable
 // ---------------------------
 enum TipoPanel { SENIAL = 0; TEXTO = 1; }
-message PanelSimple {
+message PanelBase {
     required string nombre = 1;
     required TipoPanel tipo = 2;
     oneof datos {

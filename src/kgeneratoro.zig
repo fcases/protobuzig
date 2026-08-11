@@ -159,10 +159,8 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     \\{s}                defer allocator.free(indent);
                     \\
                 , .{
-                    ind,
-                    field.name,
-                    ind,
-                    ind,
+                    ind, field.name,
+                    ind, ind,
                 });
 
                 if (estasImportitaTipo(field.field_type)) {
@@ -175,20 +173,11 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                         \\{s}            }},
                         \\
                     , .{
-                        ind,
-                        field.name,
-
-                        ind,
-                        field.name,
-                        field.name,
-
-                        ind,
-                        field.name,
-
-                        ind,
-                        field.name,
-                        field.name,
-
+                        ind,        field.name,
+                        ind,        field.name,
+                        field.name, ind,
+                        field.name, ind,
+                        field.name, field.name,
                         ind,
                     });
                 } else {
@@ -200,21 +189,13 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                         \\{s}            }},
                         \\
                     , .{
-                        ind,
-                        field.name,
-
-                        ind,
-                        field.name,
-
-                        ind,
-                        field.name,
-                        field.name,
-
-                        ind,
+                        ind,        field.name,
+                        ind,        field.name,
+                        ind,        field.name,
+                        field.name, ind,
                     });
                 }
             },
-
             .TYPE_STRING => {
                 try verkisto.print(
                     \\{s}            .{s} => |val| {{
@@ -222,16 +203,11 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     \\{s}            }},
                     \\
                 , .{
-                    ind,
-                    field.name,
-
-                    ind,
-                    field.name,
-
+                    ind, field.name,
+                    ind, field.name,
                     ind,
                 });
             },
-
             .TYPE_ENUM => {
                 try verkisto.print(
                     \\{s}            .{s} => |val| {{
@@ -239,16 +215,23 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     \\{s}            }},
                     \\
                 , .{
-                    ind,
-                    field.name,
-
-                    ind,
-                    field.name,
-
+                    ind, field.name,
+                    ind, field.name,
                     ind,
                 });
             },
-
+            .TYPE_BYTES => {
+                try verkisto.print(
+                    \\{s}            .{s} => |val| {{
+                    \\{s}                try bufro.print(allocator, "{{s}}{s}: \"{{s}}\"\n", .{{ ind, val }});
+                    \\{s}            }},
+                    \\
+                , .{
+                    ind, field.name,
+                    ind, field.name,
+                    ind,
+                });
+            },
             else => {
                 try verkisto.print(
                     \\{s}            .{s} => |val| {{
@@ -256,12 +239,8 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     \\{s}            }},
                     \\
                 , .{
-                    ind,
-                    field.name,
-
-                    ind,
-                    field.name,
-
+                    ind, field.name,
+                    ind, field.name,
                     ind,
                 });
             },
@@ -306,49 +285,126 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
+        defer std.heap.page_allocator.free(temp_name);
 
         switch (field.field_type_enum) {
             .TYPE_MESSAGE => {
                 try verkisto.print(
                     \\{s}            if( equal(u8, tok, "{s}" ) ) {{
                     \\{s}                if( ! equal(u8, val, "{{" ) ) return error.InvalidFormat;
-                    \\{s}                const {s} = try {s}.legiElProtobufTeksto(allocator, it);
                     \\
+                , .{
+                    ind,
+                    field.name,
+                    ind,
+                });
+
+                if (estasImportitaTipo(field.field_type)) {
+                    try verkisto.print(
+                        \\{s}                const sub_text = try legiSubProtobufTeksto(allocator, it);
+                        \\{s}                defer allocator.free(sub_text);
+                        \\{s}                const {s} = try {s}.legiElTeksto(allocator, sub_text, .TF_PROTOBUF);
+                        \\
+                    , .{
+                        ind,
+                        ind,
+                        ind,
+                        temp_name,
+                        auks.mapiProtoTiponAlZig(field.field_type),
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}                const {s} = try {s}.legiElProtobufTeksto(allocator, it);
+                        \\
+                    , .{
+                        ind, temp_name, field.field_type,
+                    });
+                }
+
+                try verkisto.print(
                     \\{s}                mia_Mesagho.deinit{s}(allocator);
                     \\{s}                mia_Mesagho.{s} = .{{ .{s} = {s} }};
                     \\{s}                continue;
                     \\{s}            }}
                     \\
                 , .{
-                    ind,
-                    field.name,
+                    ind,        union_name,
+                    ind,        oneof_decl.name,
+                    field.name, temp_name,
+                    ind,        ind,
+                });
+            },
 
-                    ind,
+            .TYPE_STRING,
+            .TYPE_BYTES,
+            => {
+                try verkisto.print(
+                    \\{s}            if( equal(u8, tok, "{s}" ) ) {{
+                    \\{s}                const {s} = try allocator.dupe(u8, val);
+                    \\{s}                mia_Mesagho.deinit{s}(allocator);
+                    \\{s}                mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}                continue;
+                    \\{s}            }}
+                    \\
+                , .{
+                    ind,        field.name,
+                    ind,        temp_name,
+                    ind,        union_name,
+                    ind,        oneof_decl.name,
+                    field.name, temp_name,
+                    ind,        ind,
+                });
+            },
 
-                    ind,
-                    temp_name,
-                    field.field_type,
-
-                    ind,
-                    union_name,
-
-                    ind,
-                    oneof_decl.name,
-                    field.name,
-                    temp_name,
-
-                    ind,
-
-                    ind,
+            .TYPE_ENUM => {
+                try verkisto.print(
+                    \\{s}            if( equal(u8, tok, "{s}" ) ) {{
+                    \\{s}                const {s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);
+                    \\{s}                mia_Mesagho.deinit{s}(allocator);
+                    \\{s}                mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}                continue;
+                    \\{s}            }}
+                    \\
+                , .{
+                    ind,              field.name,
+                    ind,              temp_name,
+                    field.field_type, field.field_type,
+                    ind,              union_name,
+                    ind,              oneof_decl.name,
+                    field.name,       temp_name,
+                    ind,              ind,
                 });
             },
 
             else => {
-                // De momento cubrimos TYPE_MESSAGE, que es el caso actual:
-                // TransportConfig.params y PanelSimple.datos.
-                //
-                // Las ramas scalar/string/enum se pueden anadir despues si
-                // aparece un oneof con alternativas no-message.
+                try verkisto.print(
+                    \\{s}            if( equal(u8, tok, "{s}" ) ) {{
+                    \\{s}                const {s} = 
+                , .{
+                    ind, field.name,
+                    ind, temp_name,
+                });
+
+                auks.printParseValueExpr(
+                    verkisto,
+                    field.field_type_enum,
+                    field.field_type,
+                    "val",
+                );
+
+                try verkisto.print(
+                    \\;
+                    \\{s}                mia_Mesagho.deinit{s}(allocator);
+                    \\{s}                mia_Mesagho.{s} = .{{ .{s} = {s} }};
+                    \\{s}                continue;
+                    \\{s}            }}
+                    \\
+                , .{
+                    ind,        union_name,
+                    ind,        oneof_decl.name,
+                    field.name, temp_name,
+                    ind,        ind,
+                });
             },
         }
     }
@@ -1644,9 +1700,11 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
             if (estasImportitaTipo(field.field_type)) {
                 try verkisto.print(
                     \\{s}                const sub_text = try legiSubProtobufTeksto(allocator, it);
+                    \\{s}                defer allocator.free(sub_text);
                     \\{s}                const sub_msg = try {s}.legiElTeksto(allocator, sub_text, .TF_PROTOBUF);
                     \\
                 , .{
+                    ind,
                     ind,
                     ind,
                     auks.mapiProtoTiponAlZig(field.field_type),
@@ -1685,11 +1743,38 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
                 try verkisto.print(
                     \\{s}                
                 , .{ind});
+
                 if (field.field_type_enum == .TYPE_ENUM) {
                     try verkisto.print(
                         "mia_Mesagho.{s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);\n",
                         .{ field.name, field.field_type, field.field_type },
                     );
+                } else if (field.field_type_enum == .TYPE_STRING) {
+                    if (field.label_enum == .LABEL_OPTIONAL) {
+                        try verkisto.print(
+                            \\if (mia_Mesagho.{s}) |old| {{
+                            \\{s}                    allocator.free(old);
+                            \\{s}                }}
+                            \\{s}                mia_Mesagho.{s} = try allocator.dupe(u8, val);
+                            \\
+                        , .{
+                            field.name,
+                            ind,
+                            ind,
+                            ind,
+                            field.name,
+                        });
+                    } else {
+                        try verkisto.print(
+                            \\allocator.free(mia_Mesagho.{s});
+                            \\{s}                mia_Mesagho.{s} = try allocator.dupe(u8, val);
+                            \\
+                        , .{
+                            field.name,
+                            ind,
+                            field.name,
+                        });
+                    }
                 } else {
                     auks.printParseType(verkisto, field.field_type_enum, field.name);
                 }
@@ -1714,12 +1799,55 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 
     for (msg.fields) |field| {
         if (field.label_enum == .LABEL_REPEATED) {
-            try verkisto.print(
-                \\{s}        mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
-                \\
-            , .{
-                ind, field.name, field.name,
-            });
+            switch (field.field_type_enum) {
+                .TYPE_MESSAGE => {
+                    try verkisto.print(
+                        \\{s}        for (mia_Mesagho.{s}) |item| {{
+                        \\{s}            item.deinit(allocator);
+                        \\{s}        }}
+                        \\{s}        allocator.free(mia_Mesagho.{s});
+                        \\{s}        mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
+                        \\
+                    , .{
+                        ind,        field.name,
+                        ind,        ind,
+                        ind,        field.name,
+                        ind,        field.name,
+                        field.name,
+                    });
+                },
+
+                .TYPE_STRING,
+                .TYPE_BYTES,
+                => {
+                    try verkisto.print(
+                        \\{s}        for (mia_Mesagho.{s}) |item| {{
+                        \\{s}            allocator.free(item);
+                        \\{s}        }}
+                        \\{s}        allocator.free(mia_Mesagho.{s});
+                        \\{s}        mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
+                        \\
+                    , .{
+                        ind,        field.name,
+                        ind,        ind,
+                        ind,        field.name,
+                        ind,        field.name,
+                        field.name,
+                    });
+                },
+
+                else => {
+                    try verkisto.print(
+                        \\{s}        allocator.free(mia_Mesagho.{s});
+                        \\{s}        mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
+                        \\
+                    , .{
+                        ind,        field.name,
+                        ind,        field.name,
+                        field.name,
+                    });
+                },
+            }
         }
     }
 

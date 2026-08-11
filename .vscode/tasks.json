@@ -23,7 +23,7 @@
             "args": [
                 "build-exe",
                 "example/testo_main.zig",
-                "-femit-bin=zig-out/bin/testo",
+                "-femit-bin=zig-out/bin/testo_main",
                 "-fllvm",
             ],
             "group": {
@@ -33,6 +33,42 @@
             "problemMatcher": [],
             "dependsOn": [
                 "Copy encdec"
+            ]
+        },
+        {
+            "label": "build test2",
+            "type": "shell",
+            "command": "zig",
+            "args": [
+                "build-exe",
+                "example/testo2.zig",
+                "-femit-bin=zig-out/bin/testo2",
+                "-fllvm",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "dependsOn": [
+                "Copy encdec"
+            ]
+        },
+        {
+            "label": "build all tests",
+            "type": "shell",
+            "command": "echo",
+            "args": [
+                "building testo_main y testo2",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "dependsOn": [
+                "build test",
+                "build test2",
             ]
         },
         {
