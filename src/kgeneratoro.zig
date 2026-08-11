@@ -912,12 +912,8 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
     for (messages) |msg| {
         try verkisto.print("{s}pub const {s} = struct {{\n", .{ ind, msg.name });
 
-        const indent = std.mem.concatWithSentinel(
-            std.heap.page_allocator,
-            u8,
-            &[_][]const u8{ ind, "    " },
-            0,
-        ) catch unreachable;
+        const indent =
+            std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
 
         if (msg.internal_enums.len > 0) {
             try skribiEnums(msg.internal_enums, indent);
@@ -942,38 +938,49 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
 
         // /////////////
         // Skribi kampoj normalaj
-        for (msg.fields, 0..) |field, i| {
-            var default_value_string: []const u8 = field.default_value orelse "null";
-            if (field.default_value != null and msg.fields[i].field_type_enum == .TYPE_ENUM) {
-                default_value_string = std.mem.concatWithSentinel(
-                    std.heap.page_allocator,
-                    u8,
-                    &[_][]const u8{ ".", default_value_string },
-                    0,
-                ) catch unreachable;
+        for (msg.fields) |field| {
+            const is_owned_string_or_bytes =
+                field.field_type_enum == .TYPE_STRING or
+                field.field_type_enum == .TYPE_BYTES;
 
-                const zigType = auks.mapiZigType(
-                    field.field_type,
-                    field.label,
-                    default_value_string,
-                );
+            // Si el campo es owned y deinit() lo va a liberar,
+            // no debemos generar defaults literales en la declaracion.
+            // Correcto:
+            //     mcast_address: []const u8,
+            // El valor por defecto owned se materializa en initDefault().
+            var default_for_decl: ?[]const u8 =
+                if (is_owned_string_or_bytes and field.default_value != null)
+                    null
+                else
+                    field.default_value;
 
-                try verkisto.print(
-                    "{s}    {s}: {s},\n",
-                    .{ ind, field.name, zigType },
-                );
-            } else {
-                const zigType = auks.mapiZigType(
-                    field.field_type,
-                    field.label,
-                    field.default_value,
-                );
+            var allocated_default_for_decl: ?[]const u8 = null;
+            defer if (allocated_default_for_decl) |s| {
+                std.heap.page_allocator.free(s);
+            };
 
-                try verkisto.print(
-                    "{s}    {s}: {s},\n",
-                    .{ ind, field.name, zigType },
-                );
+            if (default_for_decl != null and field.field_type_enum == .TYPE_ENUM) {
+                allocated_default_for_decl =
+                    std.mem.concatWithSentinel(
+                        std.heap.page_allocator,
+                        u8,
+                        &[_][]const u8{ ".", default_for_decl.? },
+                        0,
+                    ) catch unreachable;
+
+                default_for_decl = allocated_default_for_decl;
             }
+
+            const zigType = auks.mapiZigType(
+                field.field_type,
+                field.label,
+                default_for_decl,
+            );
+
+            try verkisto.print(
+                "{s}    {s}: {s},\n",
+                .{ ind, field.name, zigType },
+            );
         }
 
         // /////////////
