@@ -28,6 +28,15 @@ pub const Estacion = struct {
         allocator.free(self.nombre);
     }
 
+    pub fn setNombre(
+        self: *Estacion,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.nombre);
+        self.nombre = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *Estacion, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, Estacion, @as(*Estacion, self), t_formato);
     }
@@ -63,7 +72,8 @@ pub const Estacion = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "nombre" ) ) { 
-                mia_Mesagho.nombre =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.nombre);
+                mia_Mesagho.nombre = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "id" ) ) { 
@@ -199,7 +209,10 @@ pub const Ciudad = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "nombre" ) ) { 
-                mia_Mesagho.nombre =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.nombre) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.nombre = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "estaciones" ) ) { 
@@ -208,6 +221,10 @@ pub const Ciudad = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.estaciones) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.estaciones);
         mia_Mesagho.estaciones = try estaciones_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;

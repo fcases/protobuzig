@@ -92,6 +92,10 @@ pub const AppConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.Domains) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.Domains);
         mia_Mesagho.Domains = try Domains_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -269,7 +273,10 @@ pub const DomainCfg = struct {
                 continue;
             }
             if( equal(u8, tok, "KeyFile" ) ) { 
-                mia_Mesagho.KeyFile =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.KeyFile) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.KeyFile = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Transports" ) ) { 
@@ -283,6 +290,10 @@ pub const DomainCfg = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.Transports) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.Transports);
         mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -385,9 +396,9 @@ pub const DomainCfg = struct {
 };    // DomainCfg
 
 pub const TransportDef = struct {
-    TransportName: []const u8 = "MCastDefault0" ,
-    DllImport: []const u8 = "Default" ,
-    TransportClass: []const u8 = "Default" ,
+    TransportName: []const u8,
+    DllImport: []const u8,
+    TransportClass: []const u8,
     ReceiveOwnMsgs: ?bool = false ,
     MCastParams: ?MCastDefConfig = null,
     BCastParams: ?BCastDefConfig = null,
@@ -418,6 +429,33 @@ pub const TransportDef = struct {
         if (self.UDPStarParams) |item| {
             item.deinit(allocator);
         }
+    }
+
+    pub fn setTransportName(
+        self: *TransportDef,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.TransportName);
+        self.TransportName = try allocator.dupe(u8, value);
+    }
+
+    pub fn setDllImport(
+        self: *TransportDef,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.DllImport);
+        self.DllImport = try allocator.dupe(u8, value);
+    }
+
+    pub fn setTransportClass(
+        self: *TransportDef,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.TransportClass);
+        self.TransportClass = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -481,15 +519,18 @@ pub const TransportDef = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "TransportName" ) ) { 
-                mia_Mesagho.TransportName =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.TransportName);
+                mia_Mesagho.TransportName = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "DllImport" ) ) { 
-                mia_Mesagho.DllImport =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.DllImport);
+                mia_Mesagho.DllImport = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "TransportClass" ) ) { 
-                mia_Mesagho.TransportClass =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.TransportClass);
+                mia_Mesagho.TransportClass = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "ReceiveOwnMsgs" ) ) { 
@@ -625,8 +666,8 @@ pub const TransportDef = struct {
 };    // TransportDef
 
 pub const MCastDefConfig = struct {
-    LocalAddress: []const u8 = "Any" ,
-    MCastAddress: []const u8 = "239.255.0.1" ,
+    LocalAddress: []const u8,
+    MCastAddress: []const u8,
     Port: i32 = 40069 ,
     TTL: ?i32 = 1 ,
     ReceiveBuffer: ?i32 = 134217727 ,
@@ -646,6 +687,24 @@ pub const MCastDefConfig = struct {
     pub fn deinit(self: *const MCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.MCastAddress);
+    }
+
+    pub fn setLocalAddress(
+        self: *MCastDefConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.LocalAddress);
+        self.LocalAddress = try allocator.dupe(u8, value);
+    }
+
+    pub fn setMCastAddress(
+        self: *MCastDefConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.MCastAddress);
+        self.MCastAddress = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -689,11 +748,13 @@ pub const MCastDefConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) { 
-                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.LocalAddress);
+                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "MCastAddress" ) ) { 
-                mia_Mesagho.MCastAddress =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.MCastAddress);
+                mia_Mesagho.MCastAddress = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) { 
@@ -816,8 +877,8 @@ pub const MCastDefConfig = struct {
 };    // MCastDefConfig
 
 pub const BCastDefConfig = struct {
-    LocalAddress: []const u8 = "Any" ,
-    BCastAddress: []const u8 = "192.168.2.255" ,
+    LocalAddress: []const u8,
+    BCastAddress: []const u8,
     Port: i32 = 40069 ,
     ReceiveBuffer: ?i32 = 134217727 ,
     SendBuffer: ?i32 = 134217727 ,
@@ -835,6 +896,24 @@ pub const BCastDefConfig = struct {
     pub fn deinit(self: *const BCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.BCastAddress);
+    }
+
+    pub fn setLocalAddress(
+        self: *BCastDefConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.LocalAddress);
+        self.LocalAddress = try allocator.dupe(u8, value);
+    }
+
+    pub fn setBCastAddress(
+        self: *BCastDefConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.BCastAddress);
+        self.BCastAddress = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -876,11 +955,13 @@ pub const BCastDefConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) { 
-                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.LocalAddress);
+                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "BCastAddress" ) ) { 
-                mia_Mesagho.BCastAddress =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.BCastAddress);
+                mia_Mesagho.BCastAddress = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) { 
@@ -990,7 +1071,7 @@ pub const BCastDefConfig = struct {
 };    // BCastDefConfig
 
 pub const UDPStarDefConfig = struct {
-    LocalAddress: []const u8 = "Any" ,
+    LocalAddress: []const u8,
     Port: i32 = 40069 ,
     EndPoint: []EndPointDef,
     ReceiveBuffer: ?i32 = 134217727 ,
@@ -1012,6 +1093,15 @@ pub const UDPStarDefConfig = struct {
             item.deinit(allocator);
         }
         allocator.free(self.EndPoint);
+    }
+
+    pub fn setLocalAddress(
+        self: *UDPStarDefConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.LocalAddress);
+        self.LocalAddress = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1060,7 +1150,8 @@ pub const UDPStarDefConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) { 
-                mia_Mesagho.LocalAddress =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.LocalAddress);
+                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) { 
@@ -1081,6 +1172,10 @@ pub const UDPStarDefConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.EndPoint) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.EndPoint);
         mia_Mesagho.EndPoint = try EndPoint_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -1191,6 +1286,15 @@ pub const EndPointDef = struct {
         allocator.free(self.Host);
     }
 
+    pub fn setHost(
+        self: *EndPointDef,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.Host);
+        self.Host = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, EndPointDef, @as(*EndPointDef, self), t_formato);
     }
@@ -1225,7 +1329,8 @@ pub const EndPointDef = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "Host" ) ) { 
-                mia_Mesagho.Host =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.Host);
+                mia_Mesagho.Host = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) { 
@@ -1353,6 +1458,10 @@ pub const CrossConnectorDef = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.Transports) |item| {
+            allocator.free(item);
+        }
+        allocator.free(mia_Mesagho.Transports);
         mia_Mesagho.Transports = try Transports_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;

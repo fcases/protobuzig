@@ -65,6 +65,42 @@ pub const KeyRegistry = struct {
         }
     }
 
+    pub fn setDate(
+        self: *KeyRegistry,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.Date);
+        self.Date = try allocator.dupe(u8, value);
+    }
+
+    pub fn setTime(
+        self: *KeyRegistry,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.Time);
+        self.Time = try allocator.dupe(u8, value);
+    }
+
+    pub fn setSender(
+        self: *KeyRegistry,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.Sender);
+        self.Sender = try allocator.dupe(u8, value);
+    }
+
+    pub fn setKey(
+        self: *KeyRegistry,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.Key);
+        self.Key = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *KeyRegistry, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, KeyRegistry, @as(*KeyRegistry, self), t_formato);
     }
@@ -117,23 +153,32 @@ pub const KeyRegistry = struct {
                 continue;
             }
             if( equal(u8, tok, "Date" ) ) { 
-                mia_Mesagho.Date =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.Date);
+                mia_Mesagho.Date = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Time" ) ) { 
-                mia_Mesagho.Time =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.Time);
+                mia_Mesagho.Time = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Sender" ) ) { 
-                mia_Mesagho.Sender =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.Sender);
+                mia_Mesagho.Sender = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Phrase" ) ) { 
-                mia_Mesagho.Phrase =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.Phrase) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.Phrase = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Salt" ) ) { 
-                mia_Mesagho.Salt =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.Salt) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.Salt = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "Mode" ) ) { 

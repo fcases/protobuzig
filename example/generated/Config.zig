@@ -126,6 +126,10 @@ pub const AppConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.domains) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.domains);
         mia_Mesagho.domains = try domains_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -330,7 +334,10 @@ pub const DomainConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "key_file" ) ) { 
-                mia_Mesagho.key_file =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.key_file) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.key_file = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "binary_format" ) ) { 
@@ -360,7 +367,15 @@ pub const DomainConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.transports) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.transports);
         mia_Mesagho.transports = try transports_list.toOwnedSlice(allocator); 
+        for (mia_Mesagho.cross_connectors) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.cross_connectors);
         mia_Mesagho.cross_connectors = try cross_connectors_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -542,6 +557,15 @@ pub const TransportConfig = struct {
         self.deinitParams(allocator);
     }
 
+    pub fn setName(
+        self: *TransportConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.name);
+        self.name = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *TransportConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, TransportConfig, @as(*TransportConfig, self), t_formato);
     }
@@ -565,6 +589,50 @@ pub const TransportConfig = struct {
         try bufro.print(allocator, "{s}kind: {s}\n", .{ ind, @tagName(self.kind) });
         if( self.encoding ) |val|  
             try bufro.print(allocator, "{s}encoding: {s}\n", .{ ind, @tagName(val) });
+        switch (self.params) {
+            .none => {},
+            .mcast => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const mcast_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(mcast_text);
+
+                try bufro.print(allocator, "{s}mcast {{\n{s}{s}}}\n", .{ ind, mcast_text, ind });
+            },
+            .bcast => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const bcast_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(bcast_text);
+
+                try bufro.print(allocator, "{s}bcast {{\n{s}{s}}}\n", .{ ind, bcast_text, ind });
+            },
+            .udpstar => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const udpstar_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(udpstar_text);
+
+                try bufro.print(allocator, "{s}udpstar {{\n{s}{s}}}\n", .{ ind, udpstar_text, ind });
+            },
+            .usoxstar => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const usoxstar_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(usoxstar_text);
+
+                try bufro.print(allocator, "{s}usoxstar {{\n{s}{s}}}\n", .{ ind, usoxstar_text, ind });
+            },
+            .custom => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const custom_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(custom_text);
+
+                try bufro.print(allocator, "{s}custom {{\n{s}{s}}}\n", .{ ind, custom_text, ind });
+            },
+        }
+
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -578,7 +646,8 @@ pub const TransportConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "name" ) ) { 
-                mia_Mesagho.name =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.name);
+                mia_Mesagho.name = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "kind" ) ) { 
@@ -587,6 +656,41 @@ pub const TransportConfig = struct {
             }
             if( equal(u8, tok, "encoding" ) ) { 
                 mia_Mesagho.encoding = parseEnumValue(Encoding, val) catch (std.meta.intToEnum(Encoding, 0) catch unreachable);
+                continue;
+            }
+            if( equal(u8, tok, "mcast" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_mcast_val = try MCastConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .mcast = params_mcast_val };
+                continue;
+            }
+            if( equal(u8, tok, "bcast" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_bcast_val = try BCastConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .bcast = params_bcast_val };
+                continue;
+            }
+            if( equal(u8, tok, "udpstar" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_udpstar_val = try UDPStarConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .udpstar = params_udpstar_val };
+                continue;
+            }
+            if( equal(u8, tok, "usoxstar" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_usoxstar_val = try UnixSocketStarConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .usoxstar = params_usoxstar_val };
+                continue;
+            }
+            if( equal(u8, tok, "custom" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_custom_val = try CustomTransportConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .custom = params_custom_val };
                 continue;
             }
         }
@@ -753,8 +857,8 @@ pub const TransportConfig = struct {
 };    // TransportConfig
 
 pub const MCastConfig = struct {
-    local_address: ?[]const u8 = "Any" ,
-    mcast_address: []const u8 = "239.255.0.1" ,
+    local_address: ?[]const u8 = null,
+    mcast_address: []const u8,
     port: i32 = 40069 ,
     ttl: ?i32 = 1 ,
     receive_buffer: ?i32 = 134217727 ,
@@ -776,6 +880,15 @@ pub const MCastConfig = struct {
             allocator.free(f);
         }
         allocator.free(self.mcast_address);
+    }
+
+    pub fn setMcastAddress(
+        self: *MCastConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.mcast_address);
+        self.mcast_address = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *MCastConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -820,11 +933,15 @@ pub const MCastConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "local_address" ) ) { 
-                mia_Mesagho.local_address =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.local_address) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.local_address = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "mcast_address" ) ) { 
-                mia_Mesagho.mcast_address =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.mcast_address);
+                mia_Mesagho.mcast_address = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "port" ) ) { 
@@ -949,7 +1066,7 @@ pub const MCastConfig = struct {
 };    // MCastConfig
 
 pub const BCastConfig = struct {
-    local_address: ?[]const u8 = "Any" ,
+    local_address: ?[]const u8 = null,
     bcast_address: []const u8,
     port: i32 = 40069 ,
     receive_buffer: ?i32 = 134217727 ,
@@ -970,6 +1087,15 @@ pub const BCastConfig = struct {
             allocator.free(f);
         }
         allocator.free(self.bcast_address);
+    }
+
+    pub fn setBcastAddress(
+        self: *BCastConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.bcast_address);
+        self.bcast_address = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *BCastConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1012,11 +1138,15 @@ pub const BCastConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "local_address" ) ) { 
-                mia_Mesagho.local_address =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.local_address) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.local_address = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "bcast_address" ) ) { 
-                mia_Mesagho.bcast_address =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.bcast_address);
+                mia_Mesagho.bcast_address = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "port" ) ) { 
@@ -1127,7 +1257,7 @@ pub const BCastConfig = struct {
 };    // BCastConfig
 
 pub const UDPStarConfig = struct {
-    local_address: ?[]const u8 = "Any" ,
+    local_address: ?[]const u8 = null,
     port: i32,
     end_point: []EndPointConfig,
     receive_buffer: ?i32 = 134217727 ,
@@ -1200,7 +1330,10 @@ pub const UDPStarConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "local_address" ) ) { 
-                mia_Mesagho.local_address =  allocator.dupe(u8, val) catch "";
+                if (mia_Mesagho.local_address) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.local_address = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "port" ) ) { 
@@ -1221,6 +1354,10 @@ pub const UDPStarConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.end_point) |item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.end_point);
         mia_Mesagho.end_point = try end_point_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -1332,6 +1469,15 @@ pub const EndPointConfig = struct {
         allocator.free(self.host);
     }
 
+    pub fn setHost(
+        self: *EndPointConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.host);
+        self.host = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *EndPointConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, EndPointConfig, @as(*EndPointConfig, self), t_formato);
     }
@@ -1366,7 +1512,8 @@ pub const EndPointConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "host" ) ) { 
-                mia_Mesagho.host =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.host);
+                mia_Mesagho.host = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "port" ) ) { 
@@ -1462,6 +1609,15 @@ pub const UnixSocketStarConfig = struct {
         allocator.free(self.remote_socket_paths);
     }
 
+    pub fn setLocalSocketPath(
+        self: *UnixSocketStarConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.local_socket_path);
+        self.local_socket_path = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *UnixSocketStarConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, UnixSocketStarConfig, @as(*UnixSocketStarConfig, self), t_formato);
     }
@@ -1502,7 +1658,8 @@ pub const UnixSocketStarConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "local_socket_path" ) ) { 
-                mia_Mesagho.local_socket_path =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.local_socket_path);
+                mia_Mesagho.local_socket_path = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "remote_socket_paths" ) ) { 
@@ -1518,6 +1675,10 @@ pub const UnixSocketStarConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.remote_socket_paths) |item| {
+            allocator.free(item);
+        }
+        allocator.free(mia_Mesagho.remote_socket_paths);
         mia_Mesagho.remote_socket_paths = try remote_socket_paths_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
@@ -1625,6 +1786,33 @@ pub const CustomTransportConfig = struct {
         allocator.free(self.plug_in_lib);
     }
 
+    pub fn setSubType(
+        self: *CustomTransportConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.sub_type);
+        self.sub_type = try allocator.dupe(u8, value);
+    }
+
+    pub fn setConfig(
+        self: *CustomTransportConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.config);
+        self.config = try allocator.dupe(u8, value);
+    }
+
+    pub fn setPlugInLib(
+        self: *CustomTransportConfig,
+        allocator: all.Allocator,
+        value: []const u8,
+    ) !void {
+        allocator.free(self.plug_in_lib);
+        self.plug_in_lib = try allocator.dupe(u8, value);
+    }
+
     pub fn skribiAlTeksto(self: *CustomTransportConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, CustomTransportConfig, @as(*CustomTransportConfig, self), t_formato);
     }
@@ -1660,7 +1848,8 @@ pub const CustomTransportConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "sub_type" ) ) { 
-                mia_Mesagho.sub_type =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.sub_type);
+                mia_Mesagho.sub_type = try allocator.dupe(u8, val);
                 continue;
             }
             if( equal(u8, tok, "config" ) ) { 
@@ -1668,7 +1857,8 @@ pub const CustomTransportConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "plug_in_lib" ) ) { 
-                mia_Mesagho.plug_in_lib =  allocator.dupe(u8, val) catch "";
+                allocator.free(mia_Mesagho.plug_in_lib);
+                mia_Mesagho.plug_in_lib = try allocator.dupe(u8, val);
                 continue;
             }
         }
@@ -1801,6 +1991,10 @@ pub const CrossConnectorConfig = struct {
                 continue;
             }
         }
+        for (mia_Mesagho.transports) |item| {
+            allocator.free(item);
+        }
+        allocator.free(mia_Mesagho.transports);
         mia_Mesagho.transports = try transports_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;

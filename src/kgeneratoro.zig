@@ -1005,6 +1005,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
             try skribiOneOfDeinitHelpers(msg, indent);
         }
         try skribiDeInit(msg, indent);
+        try skribiOwnedStringSetters(msg, indent);
 
         // /////////////
         // Skribi kaj Legi funkcion al/el .TF_XXX teksto
@@ -2119,63 +2120,6 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
             indent, if (unua) "if" else "else if", field_number, wire_type,
         });
 
-        // ====================================
-
-        // switch (field_label) {
-        //     .LABEL_REPEATED => {
-        //         if (field.packed_value and auks.estasPackable(field_type_enum)) {
-        //             const typename_len = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ field_name, "_len" }, 0) catch unreachable;
-        //             try verkisto.print(
-        //                 \\{s}        {{
-        //                 \\{s}            const {s}_len = try buffer.decodeVarint();
-        //                 \\{s}            const {s}_end = buffer.read_index + {s}_len;
-        //                 \\{s}            while (buffer.read_index < {s}_end)
-        //                 \\{s}                try {s}_list.append( allocator, try
-        //             , .{
-        //                 indent,
-        //                 indent, field_name, // const _len
-        //                 indent, field_name, field_name, // const _end
-        //                 indent, field_name, // while
-        //                 indent, field_name, // append
-        //             });
-        //             auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
-        //             try verkisto.print(
-        //                 \\ );
-        //                 \\{s}            if (buffer.read_index != {s}_end) return error.AllocationFailed;
-        //                 \\{s}        }}
-        //                 \\
-        //             , .{
-        //                 indent, field_name,
-        //                 indent,
-        //             });
-        //         } else {
-        //             try verkisto.print(
-        //                 \\{s}            {{ try {s}_list.append( allocator, try
-        //             , .{
-        //                 indent, field_name,
-        //             });
-        //             auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", "", "try buffer.decodeVarint()");
-        //             try verkisto.print(" ); }}\n", .{});
-        //         }
-        //     },
-        //     .LABEL_REQUIRED => {
-        //         try verkisto.print(
-        //             \\{s}            mia_Mesagho.{s} = try
-        //         , .{
-        //             indent, field.name,
-        //         });
-        //         auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
-        //     },
-        //     else => {
-        //         try verkisto.print(
-        //             \\{s}            mia_Mesagho.{s} = try
-        //         , .{
-        //             indent, field.name,
-        //         });
-        //         auks.printDecodeMethod(verkisto, field_type_enum, if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM) field_type else "", if (i == field_nums - 1) ";\n" else "\n", "try buffer.decodeVarint()");
-        //     },
-        // }
-        // ====================================
         switch (field_label) {
             .LABEL_REPEATED => {
                 // packed repeated
@@ -2861,7 +2805,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
 
             continue;
         }
-        
+
         // -------------------------
         // required sin default
         // -------------------------
@@ -3060,4 +3004,70 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     });
 
     try verkisto.print("\n", .{});
+}
+
+// Helpers set para string y bytes owned.
+fn skribiSetNomon(allocator: std.mem.Allocator, field_name: []const u8) ![]const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+
+    try out.appendSlice(allocator, "set");
+
+    var capitalize_next = true;
+
+    for (field_name) |c| {
+        if (c == '_') {
+            capitalize_next = true;
+            continue;
+        }
+
+        if (capitalize_next) {
+            try out.append(allocator, std.ascii.toUpper(c));
+            capitalize_next = false;
+        } else {
+            try out.append(allocator, c);
+        }
+    }
+
+    return try out.toOwnedSlice(allocator);
+}
+
+fn skribiOwnedStringSetters(msg: prs.Message, ind: []const u8) !void {
+    for (msg.fields) |f| {
+        if (f.label_enum != .LABEL_REQUIRED) {
+            continue;
+        }
+
+        if (!(f.field_type_enum == .TYPE_STRING or
+            f.field_type_enum == .TYPE_BYTES))
+        {
+            continue;
+        }
+
+        const setter_name = try skribiSetNomon(
+            std.heap.page_allocator,
+            f.name,
+        );
+        defer std.heap.page_allocator.free(setter_name);
+
+        try verkisto.print(
+            \\{s}pub fn {s}(
+            \\{s}    self: *{s},
+            \\{s}    allocator: all.Allocator,
+            \\{s}    value: []const u8,
+            \\{s}) !void {{
+            \\{s}    allocator.free(self.{s});
+            \\{s}    self.{s} = try allocator.dupe(u8, value);
+            \\{s}}}
+            \\
+            \\
+        , .{
+            ind,    setter_name,
+            ind,    msg.name,
+            ind,    ind,
+            ind,    ind,
+            f.name, ind,
+            f.name, ind,
+        });
+    }
 }
