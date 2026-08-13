@@ -2847,6 +2847,22 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         }
 
         // -------------------------
+        // required enum sin default
+        // -------------------------
+        if (f.field_type_enum == .TYPE_ENUM) {
+            try verkisto.print(
+                \\{s}        .{s} = std.meta.intToEnum({s}, 0) catch unreachable,
+                \\
+            , .{
+                ind,
+                f.name,
+                auks.mapiProtoTiponAlZig(f.field_type),
+            });
+
+            continue;
+        }
+        
+        // -------------------------
         // required sin default
         // -------------------------
         if (f.field_type_enum == .TYPE_STRING or
