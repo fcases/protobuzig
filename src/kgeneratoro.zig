@@ -2053,7 +2053,8 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 
     try verkisto.print(
         \\{s}fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !{s} {{
-        \\{s}    var mia_Mesagho= try {s}.initDefault(allocator);
+        \\{s}    var mia_Mesagho = try {s}.initDefault(allocator);
+        \\{s}    errdefer mia_Mesagho.deinit(allocator);
         \\
         \\{s}    var end: usize = undefined;
         \\{s}    if (data_length) |val|
@@ -2067,7 +2068,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
         indent, msg.name,
         indent, indent,
         indent, indent,
-        indent,
+        indent, indent,
     });
 
     for (msg.fields) |field| {
@@ -2250,6 +2251,33 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         indent,
                         indent,
                     });
+                } else if (field_type_enum == .TYPE_STRING or field_type_enum == .TYPE_BYTES) {
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            allocator.free(mia_Mesagho.{s});
+                        \\{s}            mia_Mesagho.{s} = try 
+                    , .{
+                        indent,
+                        indent,
+                        field.name,
+                        indent,
+                        field.name,
+                    });
+
+                    auks.printDecodeMethod(
+                        verkisto,
+                        field_type_enum,
+                        "",
+                        ";\n",
+                        "try buffer.decodeVarint()",
+                    );
+
+                    try verkisto.print(
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent,
+                    });
                 } else {
                     try verkisto.print(
                         \\{s}            mia_Mesagho.{s} = try 
@@ -2335,12 +2363,49 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 
     for (msg.fields) |field| {
         if (field.label_enum == .LABEL_REPEATED) {
-            try verkisto.print(
-                \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator); 
-                \\
-            , .{
-                indent, field.name, field.name,
-            });
+            if (field.field_type_enum == .TYPE_MESSAGE) {
+                try verkisto.print(
+                    \\{s}    for (mia_Mesagho.{s}) |*item| {{
+                    \\{s}        item.deinit(allocator);
+                    \\{s}    }}
+                    \\{s}    allocator.free(mia_Mesagho.{s});
+                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\
+                , .{
+                    indent,     field.name,
+                    indent,     indent,
+                    indent,     field.name,
+                    indent,     field.name,
+                    field.name,
+                });
+            } else if (field.field_type_enum == .TYPE_STRING or
+                field.field_type_enum == .TYPE_BYTES)
+            {
+                try verkisto.print(
+                    \\{s}    for (mia_Mesagho.{s}) |item| {{
+                    \\{s}        allocator.free(item);
+                    \\{s}    }}
+                    \\{s}    allocator.free(mia_Mesagho.{s});
+                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\
+                , .{
+                    indent,     field.name,
+                    indent,     indent,
+                    indent,     field.name,
+                    indent,     field.name,
+                    field.name,
+                });
+            } else {
+                try verkisto.print(
+                    \\{s}    allocator.free(mia_Mesagho.{s});
+                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\
+                , .{
+                    indent,     field.name,
+                    indent,     field.name,
+                    field.name,
+                });
+            }
         }
     }
 
