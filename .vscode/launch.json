@@ -6,7 +6,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/protobuzig",
-            "args": ["proto/AppCfg.proto"],
+            "args": ["--output_dir", "example/generated/", "proto/cctrol.proto"],
             "cwd": "${workspaceFolder}",
             "env": {},
             "console": "integratedTerminal",

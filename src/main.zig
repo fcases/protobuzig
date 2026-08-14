@@ -1,6 +1,7 @@
 const std = @import("std");
 const analizilo = @import("analizilo.zig");
 const kgen = @import("kgeneratoro.zig");
+const kgapi = @import("kgenapi.zig");
 
 const CliOptions = struct {
     proto_dir: []const u8 = ".",
@@ -46,6 +47,12 @@ pub fn main() !void {
     defer analizilo.liberiProtoDosieron(&ast_proto_dosiero);
 
     try kgen.generiZigKodon(
+        proto_path,
+        opts.output_dir,
+        &ast_proto_dosiero,
+    );
+
+    try kgapi.generiZigAPI(
         proto_path,
         opts.output_dir,
         &ast_proto_dosiero,
@@ -126,7 +133,7 @@ fn printHelp() void {
         \\  protobuzig --proto_dir protos/k6bus --output_dir generated/core Msg.proto
         \\  protobuzig --verbose --proto_dir protos/k6bus --output_dir generated/core Packet.proto
         \\
-        ,
+    ,
         .{},
     );
 }

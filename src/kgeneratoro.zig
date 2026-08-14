@@ -1374,7 +1374,9 @@ fn skribiGeneralajnFunkciojn() !void {
         \\    var parsed: T = undefined;
         \\    switch (t_formato) {{
         \\        .TF_ZIG_ZON => {{
-        \\            parsed = zon.parse.fromSlice(T, allocator, @ptrCast(input), null, .{{}}) catch |err| {{
+        \\            const zon_input = try allocator.dupeZ(u8, input);
+        \\            defer allocator.free(zon_input);
+        \\            parsed = zon.parse.fromSlice(T, allocator, zon_input, null, .{{}}) catch |err| {{
         \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
         \\                return err;
         \\            }};
