@@ -2251,17 +2251,23 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         indent,
                         indent,
                     });
-                } else if (field_type_enum == .TYPE_STRING or field_type_enum == .TYPE_BYTES) {
+                } else if (field_type_enum == .TYPE_STRING or
+                    field_type_enum == .TYPE_BYTES)
+                {
+                    const tmp_name = try std.fmt.allocPrint(
+                        std.heap.page_allocator,
+                        "tmp_{s}",
+                        .{field.name},
+                    );
+                    defer std.heap.page_allocator.free(tmp_name);
+
                     try verkisto.print(
                         \\{s}        {{
-                        \\{s}            allocator.free(mia_Mesagho.{s});
-                        \\{s}            mia_Mesagho.{s} = try 
+                        \\{s}            const {s} = try 
                     , .{
                         indent,
                         indent,
-                        field.name,
-                        indent,
-                        field.name,
+                        tmp_name,
                     });
 
                     auks.printDecodeMethod(
@@ -2273,9 +2279,16 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                     );
 
                     try verkisto.print(
+                        \\{s}            allocator.free(mia_Mesagho.{s});
+                        \\{s}            mia_Mesagho.{s} = {s};
                         \\{s}        }}
                         \\
                     , .{
+                        indent,
+                        field.name,
+                        indent,
+                        field.name,
+                        tmp_name,
                         indent,
                     });
                 } else {
@@ -2299,7 +2312,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                 }
             },
             else => {
-                // optional message
+                // optional imported message
                 if (field_type_enum == .TYPE_MESSAGE and estasImportitaTipo(field_type)) {
                     try verkisto.print(
                         \\{s}        {{
@@ -2327,6 +2340,50 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         indent,
                         indent,
                         indent,
+                        indent,
+                    });
+                } else if (field_type_enum == .TYPE_STRING or
+                    field_type_enum == .TYPE_BYTES)
+                {
+                    const tmp_name = try std.fmt.allocPrint(
+                        std.heap.page_allocator,
+                        "tmp_{s}",
+                        .{field.name},
+                    );
+                    defer std.heap.page_allocator.free(tmp_name);
+
+                    try verkisto.print(
+                        \\{s}        {{
+                        \\{s}            const {s} = try 
+                    , .{
+                        indent,
+                        indent,
+                        tmp_name,
+                    });
+
+                    auks.printDecodeMethod(
+                        verkisto,
+                        field_type_enum,
+                        "",
+                        ";\n",
+                        "try buffer.decodeVarint()",
+                    );
+
+                    try verkisto.print(
+                        \\{s}            if (mia_Mesagho.{s}) |old| {{
+                        \\{s}                allocator.free(old);
+                        \\{s}            }}
+                        \\{s}            mia_Mesagho.{s} = {s};
+                        \\{s}        }}
+                        \\
+                    , .{
+                        indent,
+                        field.name,
+                        indent,
+                        indent,
+                        indent,
+                        field.name,
+                        tmp_name,
                         indent,
                     });
                 } else {
@@ -2363,47 +2420,55 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
 
     for (msg.fields) |field| {
         if (field.label_enum == .LABEL_REPEATED) {
+            const tmp_name = try std.fmt.allocPrint(
+                std.heap.page_allocator,
+                "tmp_{s}",
+                .{field.name},
+            );
+            defer std.heap.page_allocator.free(tmp_name);
+
             if (field.field_type_enum == .TYPE_MESSAGE) {
                 try verkisto.print(
+                    \\{s}    const {s} = try {s}_list.toOwnedSlice(allocator);
                     \\{s}    for (mia_Mesagho.{s}) |*item| {{
                     \\{s}        item.deinit(allocator);
                     \\{s}    }}
                     \\{s}    allocator.free(mia_Mesagho.{s});
-                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\{s}    mia_Mesagho.{s} = {s};
                     \\
                 , .{
-                    indent,     field.name,
-                    indent,     indent,
-                    indent,     field.name,
-                    indent,     field.name,
-                    field.name,
+                    indent, tmp_name,   field.name,
+                    indent, field.name, indent,
+                    indent, indent,     field.name,
+                    indent, field.name, tmp_name,
                 });
             } else if (field.field_type_enum == .TYPE_STRING or
                 field.field_type_enum == .TYPE_BYTES)
             {
                 try verkisto.print(
+                    \\{s}    const {s} = try {s}_list.toOwnedSlice(allocator);
                     \\{s}    for (mia_Mesagho.{s}) |item| {{
                     \\{s}        allocator.free(item);
                     \\{s}    }}
                     \\{s}    allocator.free(mia_Mesagho.{s});
-                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\{s}    mia_Mesagho.{s} = {s};
                     \\
                 , .{
-                    indent,     field.name,
-                    indent,     indent,
-                    indent,     field.name,
-                    indent,     field.name,
-                    field.name,
+                    indent, tmp_name,   field.name,
+                    indent, field.name, indent,
+                    indent, indent,     field.name,
+                    indent, field.name, tmp_name,
                 });
             } else {
                 try verkisto.print(
+                    \\{s}    const {s} = try {s}_list.toOwnedSlice(allocator);
                     \\{s}    allocator.free(mia_Mesagho.{s});
-                    \\{s}    mia_Mesagho.{s} = try {s}_list.toOwnedSlice(allocator);
+                    \\{s}    mia_Mesagho.{s} = {s};
                     \\
                 , .{
-                    indent,     field.name,
-                    indent,     field.name,
-                    field.name,
+                    indent,     tmp_name,   field.name,
+                    indent,     field.name, indent,
+                    field.name, tmp_name,
                 });
             }
         }
