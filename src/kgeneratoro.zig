@@ -1674,10 +1674,11 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 
     try verkisto.print(
         \\{s}    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !{s} {{
-        \\{s}        var mia_Mesagho= try {s}.initDefault(allocator); 
+        \\{s}        var mia_Mesagho = try {s}.initDefault(allocator);
+        \\{s}        errdefer mia_Mesagho.deinit(allocator);
         \\
         \\
-    , .{ ind, msg.name, ind, msg.name });
+    , .{ ind, msg.name, ind, msg.name, ind });
 
     for (msg.fields) |field| {
         if (field.label_enum == .LABEL_REPEATED) {
