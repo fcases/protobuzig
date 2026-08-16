@@ -41,13 +41,14 @@ const std = @import("std");
 // -----------------------------------------------------------------------------
 
 const Api = @import("generated/cctrol_api.zig");
+const ConfigApi = @import("generated/Config_api.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const result = gpa.deinit();
         if (result == .leak) {
-            std.debug.print("etst3: GPA detected leaks\n", .{});
+            std.debug.print("testo3: GPA detected leaks\n", .{});
         }
     }
 
@@ -56,21 +57,241 @@ pub fn main() !void {
     try testEstMeteoRoundTripBinario(allocator);
     try testEstMeteoRoundTripTexto(allocator);
 
-    std.debug.print("etst3: OK\n", .{});
+    try testOptionales(allocator);
+    try testRepeatedScalar(allocator);
+
+    std.debug.print("testo3: OK\n", .{});
 }
 
-fn testEstMeteoRoundTripBinario(
-    allocator: std.mem.Allocator,
-) !void {
+fn testRepeatedScalar(allocator: std.mem.Allocator) !void {
+    var trafico = try Api.SnrTrafico.initDefault(allocator);
+    defer trafico.deinit(allocator);
+
+    try trafico.setSeccion(allocator, "A-23/KM-12");
+    trafico.setCarriles(2);
+
+    try trafico.appendVelMedia(allocator, 82.5);
+    try trafico.appendVelMedia(allocator, 79.2);
+
+    try trafico.appendVehiculosMin(allocator, 24.0);
+    try trafico.appendVehiculosMin(allocator, 21.0);
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico.getVelMediaCount(),
+    );
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico.getVehiculosMinCount(),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico.getVelMediaAt(0),
+            82.5,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico.getVelMediaAt(1),
+            79.2,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico.getVehiculosMinAt(0),
+            24.0,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico.getVehiculosMinAt(1),
+            21.0,
+            0.001,
+        ),
+    );
+
+    const bin = try trafico.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin);
+
+    var trafico2 = try Api.SnrTrafico.deserializeFromBin(
+        allocator,
+        bin,
+        .BF_PROTOBUF,
+    );
+    defer trafico2.deinit(allocator);
+
+    const text = try trafico2.writeToText(allocator, .TF_JSON);
+    defer allocator.free(text);
+    std.debug.print("testo3: trafico2 = \n {s}\n", .{text});
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico2.getVelMediaCount(),
+    );
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico2.getVehiculosMinCount(),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVelMediaAt(0),
+            82.5,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVelMediaAt(1),
+            79.2,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVehiculosMinAt(0),
+            24.0,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVehiculosMinAt(1),
+            21.0,
+            0.001,
+        ),
+    );
+
+    try trafico2.clearVelMedia(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 0),
+        trafico2.getVelMediaCount(),
+    );
+
+    try trafico2.setVelMedia(
+        allocator,
+        &[_]f32{
+            90.0,
+            91.5,
+        },
+    );
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico2.getVelMediaCount(),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVelMediaAt(0),
+            90.0,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVelMediaAt(1),
+            91.5,
+            0.001,
+        ),
+    );
+
+    try trafico2.clearVehiculosMin(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 0),
+        trafico2.getVehiculosMinCount(),
+    );
+
+    try trafico2.setVehiculosMin(
+        allocator,
+        &[_]f32{
+            30.0,
+            31.5,
+        },
+    );
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        trafico2.getVehiculosMinCount(),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVehiculosMinAt(0),
+            30.0,
+            0.001,
+        ),
+    );
+
+    try std.testing.expect(
+        approxEqAbs(
+            f32,
+            try trafico2.getVehiculosMinAt(1),
+            31.5,
+            0.001,
+        ),
+    );
+
+    std.debug.print(
+        "testo3: repeated scalar SnrTrafico OK seccion={s} carriles={d} vel_count={d} veh_count={d}\n",
+        .{
+            trafico2.getSeccion(),
+            trafico2.getCarriles(),
+            trafico2.getVelMediaCount(),
+            trafico2.getVehiculosMinCount(),
+        },
+    );
+}
+
+fn testOptionales(allocator: std.mem.Allocator) !void {
+    var cfg = try ConfigApi.AppConfig.initDefault(allocator);
+    defer cfg.deinit(allocator);
+
+    cfg.setVersion(1);
+    try std.testing.expect(cfg.hasVersion());
+    try std.testing.expectEqual(@as(?u32, 1), cfg.getVersion());
+    cfg.clearVersion();
+    try std.testing.expect(!cfg.hasVersion());
+    try std.testing.expectEqual(@as(?u32, null), cfg.getVersion());
+}
+
+fn testEstMeteoRoundTripBinario(allocator: std.mem.Allocator) !void {
     var meteo = try Api.EstMeteo.initDefault(allocator);
     defer meteo.deinit(allocator);
 
-    // Temporal hasta generar setters en cctrol_api.zig.
-    allocator.free(meteo.impl.nombre);
-    meteo.impl.nombre = try allocator.dupe(u8, "meteo-api-1");
-    meteo.impl.temp = 23;
-    meteo.impl.v_viento = 12.5;
-    meteo.impl.dir_viento = 270.0;
+    try meteo.setNombre(allocator, "meteo-api-1");
+    meteo.setTemp(23);
+    meteo.setVViento(14.5);
+    meteo.setDirViento(270.0);
 
     const bin = try meteo.serializeToBin(
         allocator,
@@ -89,40 +310,36 @@ fn testEstMeteoRoundTripBinario(
         meteo2,
         "meteo-api-1",
         23,
-        12.5,
+        14.5,
         270.0,
     );
 
     std.debug.print(
-        "etst3: bin roundtrip EstMeteo OK nombre={s} temp={d} viento={d:.2} dir={d:.2}\n",
+        "testo3: bin roundtrip EstMeteo OK nombre={s} temp={d} viento={d:.2} dir={d:.2}\n",
         .{
-            meteo2.impl.nombre,
-            meteo2.impl.temp,
-            meteo2.impl.v_viento,
-            meteo2.impl.dir_viento,
+            meteo2.getNombre(),
+            meteo2.getTemp(),
+            meteo2.getVViento(),
+            meteo2.getDirViento(),
         },
     );
 }
 
-fn testEstMeteoRoundTripTexto(
-    allocator: std.mem.Allocator,
-) !void {
+fn testEstMeteoRoundTripTexto(allocator: std.mem.Allocator) !void {
     var meteo = try Api.EstMeteo.initDefault(allocator);
     defer meteo.deinit(allocator);
 
-    // Temporal hasta generar setters en cctrol_api.zig.
-    allocator.free(meteo.impl.nombre);
-    meteo.impl.nombre = try allocator.dupe(u8, "meteo-api-texto-1");
-    meteo.impl.temp = 24;
-    meteo.impl.v_viento = 13.5;
-    meteo.impl.dir_viento = 180.0;
+    try meteo.setNombre(allocator, "meteo-api-1");
+    meteo.setTemp(24);
+    meteo.setVViento(13.5);
+    meteo.setDirViento(180.1);
 
     const text = try meteo.writeToText(
         allocator,
         .TF_ZIG_ZON,
     );
     defer allocator.free(text);
-    std.debug.print("{s}", .{text});
+    std.debug.print("{s}\n", .{text});
 
     var meteo2 = try Api.EstMeteo.readFromText(
         allocator,
@@ -133,19 +350,19 @@ fn testEstMeteoRoundTripTexto(
 
     try expectEstMeteo(
         meteo2,
-        "meteo-api-texto-1",
+        "meteo-api-1",
         24,
         13.5,
-        180.0,
+        180.1,
     );
 
     std.debug.print(
-        "etst3: text roundtrip EstMeteo OK nombre={s} temp={d} viento={d:.2} dir={d:.2}\n",
+        "testo3: text roundtrip EstMeteo OK nombre={s} temp={d} viento={d:.2} dir={d:.2}\n",
         .{
-            meteo2.impl.nombre,
-            meteo2.impl.temp,
-            meteo2.impl.v_viento,
-            meteo2.impl.dir_viento,
+            meteo2.getNombre(),
+            meteo2.getTemp(),
+            meteo2.getVViento(),
+            meteo2.getDirViento(),
         },
     );
 }
@@ -161,15 +378,15 @@ fn expectEstMeteo(
         return error.BadNombre;
     }
 
-    if (meteo.impl.temp != expected_temp) {
+    if (meteo.getTemp() != expected_temp) {
         return error.BadTemp;
     }
 
-    if (!approxEqAbs(f32, meteo.impl.v_viento, expected_v_viento, 0.001)) {
+    if (!approxEqAbs(f32, meteo.getVViento(), expected_v_viento, 0.001)) {
         return error.BadVViento;
     }
 
-    if (!approxEqAbs(f32, meteo.impl.dir_viento, expected_dir_viento, 0.001)) {
+    if (!approxEqAbs(f32, meteo.getDirViento(), expected_dir_viento, 0.001)) {
         return error.BadDirViento;
     }
 }

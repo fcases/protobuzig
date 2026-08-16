@@ -1005,7 +1005,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
             try skribiOneOfDeinitHelpers(msg, indent);
         }
         try skribiDeInit(msg, indent);
-        try skribiOwnedStringSetters(msg, indent);
+        // try skribiOwnedStringSetters(msg, indent);
 
         // /////////////
         // Skribi kaj Legi funkcion al/el .TF_XXX teksto
@@ -2710,19 +2710,41 @@ fn skribiRequiredDefaultVarLong(indent: []const u8, field_name: []const u8, fiel
 /// skribiSeriigi: Repeted Funkcioj
 /////////////////////////////////////
 ///
-fn skribiRepeatedNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, pck: bool) !void {
+fn skribiRepeatedNoDefaultNoVarLong(
+    indent: []const u8,
+    field_name: []const u8,
+    field_type: tpj,
+    field_number: u32,
+    wire_type: u3,
+    pck: bool,
+) !void {
     if (pck) {
         try verkisto.print(
-            \\    {s}    var {s}_longa: usize = 0; 
-            \\    {s}    for (self.{s}) |item| 
+            \\    {s}    var {s}_longa: usize = 0;
+            \\    {s}    var {s}_i: usize = self.{s}.len;
+            \\    {s}    while ({s}_i > 0) {{
+            \\    {s}        {s}_i -= 1;
+            \\    {s}        const item = self.{s}[{s}_i];
             \\    {s}        {s}_longa += try 
         , .{
-            indent, field_name, // s_longa
-            indent, field_name, // for
-            indent, field_name, // try
+            indent,     field_name,
+            indent,     field_name,
+            field_name, indent,
+            field_name, indent,
+            field_name, indent,
+            field_name, field_name,
+            indent,     field_name,
         });
-        auks.printEncodeMethod(verkisto, field_type, "", "item");
+
+        auks.printEncodeMethod(
+            verkisto,
+            field_type,
+            "",
+            "item",
+        );
+
         try verkisto.print(
+            \\    {s}    }}
             \\    {s}    tuta_longo += {s}_longa;
             \\    {s}    tuta_longo += try buffer.encodeVarint({s}_longa);
             \\    {s}    tuta_longo += try buffer.encodeVarint({d});
@@ -2730,36 +2752,62 @@ fn skribiRepeatedNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, 
             \\
             \\
         , .{
-            indent, field_name, // tuta = {s}_long
-            indent, field_name, // tuta = encode {s}_long
-            indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+            indent,
+            indent,
+            field_name,
+            indent,
+            field_name,
+            indent,
+            (@as(u32, field_number) << 3) | wire_type,
         });
+
         return;
     }
 
     try verkisto.print(
-        \\    {s}    for (self.{s}) |item| {{
+        \\    {s}    var {s}_i: usize = self.{s}.len;
+        \\    {s}    while ({s}_i > 0) {{
+        \\    {s}        {s}_i -= 1;
+        \\    {s}        const item = self.{s}[{s}_i];
         \\    {s}        tuta_longo += try 
     , .{
-        indent, field_name, // for
-        indent, // try
+        indent,     field_name, field_name,
+        indent,     field_name, indent,
+        field_name, indent,     field_name,
+        field_name, indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "", "item");
+
+    auks.printEncodeMethod(
+        verkisto,
+        field_type,
+        "",
+        "item",
+    );
+
     try verkisto.print(
         \\    {s}        tuta_longo += try buffer.encodeVarint({d});
-        \\    {s}    }}  // 9 rept - no def - no varlong 
+        \\    {s}    }}  // 9 rept - no def - no varlong
         \\
         \\
     , .{
-        indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+        indent, (@as(u32, field_number) << 3) | wire_type,
         indent,
     });
 }
-
-fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_type_name: []const u8, field_number: u32, wire_type: u3) !void {
+fn skribiRepeatedNoDefaultVarLong(
+    indent: []const u8,
+    field_name: []const u8,
+    field_type: tpj,
+    field_type_name: []const u8,
+    field_number: u32,
+    wire_type: u3,
+) !void {
     if (field_type == .TYPE_MESSAGE and estasImportitaTipo(field_type_name)) {
         try verkisto.print(
-            \\{s}    for (self.{s}) |item| {{
+            \\{s}    var {s}_i: usize = self.{s}.len;
+            \\{s}    while ({s}_i > 0) {{
+            \\{s}        {s}_i -= 1;
+            \\{s}        const item = self.{s}[{s}_i];
             \\{s}        var {s}_item = item;
             \\{s}        const {s}_bytes = try {s}_item.seriigiAlBin(allocator, .BF_PROTOBUF);
             \\{s}        defer allocator.free({s}_bytes);
@@ -2771,39 +2819,51 @@ fn skribiRepeatedNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
             \\
             \\
         , .{
-            indent,     field_name,
-            indent,     field_name,
-            indent,     field_name,
-            field_name, indent,
-            field_name, indent,
-            field_name, field_name,
-            indent,     field_name,
-            indent,     field_name,
-            indent,     (@as(u32, field_number) << 3) | wire_type,
-            indent,
+            indent,     field_name,                                field_name,
+            indent,     field_name,                                indent,
+            field_name, indent,                                    field_name,
+            field_name, indent,                                    field_name,
+            indent,     field_name,                                field_name,
+            indent,     field_name,                                indent,
+            field_name, field_name,                                indent,
+            field_name, indent,                                    field_name,
+            indent,     (@as(u32, field_number) << 3) | wire_type, indent,
         });
+
         return;
     }
 
     try verkisto.print(
-        \\{s}    for (self.{s}) |item| {{
+        \\{s}    var {s}_i: usize = self.{s}.len;
+        \\{s}    while ({s}_i > 0) {{
+        \\{s}        {s}_i -= 1;
+        \\{s}        const item = self.{s}[{s}_i];
         \\{s}        const {s}_longa = try 
     , .{
-        indent, field_name, // for
-        indent, field_name, // try
+        indent,     field_name, field_name,
+        indent,     field_name, indent,
+        field_name, indent,     field_name,
+        field_name, indent,     field_name,
     });
-    auks.printEncodeMethod(verkisto, field_type, "", "item");
+
+    auks.printEncodeMethod(
+        verkisto,
+        field_type,
+        "",
+        "item",
+    );
+
     try verkisto.print(
         \\{s}        tuta_longo += {s}_longa;
         \\{s}        tuta_longo += try buffer.encodeVarint({s}_longa);
         \\{s}        tuta_longo += try buffer.encodeVarint({d});
-        \\{s}    }}  // 11  rept - no def - varlong 
+        \\{s}    }}  // 11  rept - no def - varlong
         \\
         \\
     , .{
         indent, field_name,
         indent, field_name,
-        indent, (@as(u32, field_number) << 3) | wire_type, // encode key
+        indent, (@as(u32, field_number) << 3) | wire_type,
         indent,
     });
 }

@@ -32,7 +32,18 @@
             "cwd": "${workspaceFolder}",
             "env": {},
             "console": "integratedTerminal",
-            "preLaunchTask": "build test", 
+            "preLaunchTask": "build test2", 
+        },
+        {
+            "name": "Debug test3",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/testo3",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "console": "integratedTerminal",
+            "preLaunchTask": "build test3", 
         }
 
     ]

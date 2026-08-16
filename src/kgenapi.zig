@@ -5,6 +5,9 @@ const std = @import("std");
 const prs = @import("mecha_prs.zig");
 const pf = prs.ProtoFile;
 
+const kgen_auks = @import("kgen_auks.zig");
+const api_auks = @import("kgapi_auks.zig");
+
 // ============================================================================
 // kgenapi.zig
 // ============================================================================
@@ -96,6 +99,14 @@ pub fn generiZigAPI(
         &buf,
         proto_base_name,
         raw_file_name,
+        ast_proto_dosiero,
+    );
+
+    try skribiEnumAliases(
+        allocator,
+        &buf,
+        proto_base_name,
+        ast_proto_dosiero,
     );
 
     try skribiApiKomencanSekcion(
@@ -204,6 +215,39 @@ fn skribiDosieranKaplinion(
     });
 }
 
+fn skribiRawNamespaceExpr(
+    allocator: std.mem.Allocator,
+    proto_base_name: []const u8,
+    ast_proto_dosiero: *const pf,
+) ![]const u8 {
+    const package_name = ast_proto_dosiero.package_name orelse "";
+
+    if (package_name.len == 0) {
+        return try std.fmt.allocPrint(
+            allocator,
+            "RawFile.{s}",
+            .{proto_base_name},
+        );
+    }
+
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
+
+    try out.appendSlice(allocator, "RawFile");
+
+    var it = std.mem.splitScalar(u8, package_name, '.');
+    while (it.next()) |part| {
+        if (part.len == 0) {
+            continue;
+        }
+
+        try out.append(allocator, '.');
+        try out.appendSlice(allocator, part);
+    }
+
+    return try out.toOwnedSlice(allocator);
+}
+
 // ============================================================================
 // IMPORTS DEL FICHERO API
 // ============================================================================
@@ -212,7 +256,15 @@ fn skribiRawImportojn(
     buf: *std.ArrayList(u8),
     proto_base_name: []const u8,
     raw_file_name: []const u8,
+    ast_proto_dosiero: *const pf,
 ) !void {
+    const raw_namespace_expr = try skribiRawNamespaceExpr(
+        allocator,
+        proto_base_name,
+        ast_proto_dosiero,
+    );
+    defer allocator.free(raw_namespace_expr);
+
     try buf.print(allocator,
         \\const std = @import("std");
         \\
@@ -221,27 +273,71 @@ fn skribiRawImportojn(
         \\pub const TekstaFormato = RawFile.TekstaFormato;
         \\pub const BinaraFormato = RawFile.BinaraFormato;
         \\
+        \\// Alias al namespace raw generado.
+        \\// En fase intermedia apunta al package actual del fichero raw.
+        \\const Raw = {s};
+        \\
         \\// Alias intencionadamente llamado *_impl aunque en fase intermedia
         \\// apunte al namespace raw actual.
         \\//
         \\// Fase intermedia:
-        \\//   const {s}_impl = RawFile.{s};
+        \\//   const {s}_impl = Raw;
         \\//
         \\// Fase final:
-        \\//   const {s}_impl = RawFile.{s}_impl;
+        \\//   const {s}_impl = RawFile.<package>_impl;
         \\
-        \\const {s}_impl = RawFile.{s};
+        \\const {s}_impl = Raw;
         \\
         \\
     , .{
         raw_file_name,
-        proto_base_name,
-        proto_base_name,
-        proto_base_name,
+        raw_namespace_expr,
         proto_base_name,
         proto_base_name,
         proto_base_name,
     });
+}
+
+fn skribiEnumAliases(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    proto_base_name: []const u8,
+    ast_proto_dosiero: *const pf,
+) !void {
+    if (ast_proto_dosiero.enums.len == 0) {
+        return;
+    }
+
+    try buf.print(allocator,
+        \\// ============================================================================
+        \\// ALIASES PUBLICOS A ENUMS RAW / IMPL
+        \\// ============================================================================
+        \\//
+        \\// Los enums no necesitan wrapper. Se reexportan desde el namespace raw/impl.
+        \\//
+        \\// En fase intermedia:
+        \\//   pub const TipoPanel = cctrol_impl.TipoPanel;
+        \\//
+        \\// En fase final:
+        \\//   pub const TipoPanel = cctrol_impl.TipoPanel;
+        \\//
+        \\
+    , .{});
+
+    for (ast_proto_dosiero.enums) |enu| {
+        try buf.print(allocator,
+            \\pub const {s} = {s}_impl.{s};
+            \\
+        , .{
+            enu.name,
+            proto_base_name,
+            enu.name,
+        });
+    }
+
+    try buf.print(allocator,
+        \\
+    , .{});
 }
 
 // ============================================================================
@@ -418,6 +514,48 @@ fn skribiUnuWrapperStruct(
     buf: *std.ArrayList(u8),
     msg: prs.Message,
 ) !void {
+    try skribiWrapperStructKomenco(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiRequiredScalarOrEnumAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiOptionalScalarOrEnumAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiRepeatedScalarOrEnumAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiRequiredStringOrBytesAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiWrapperStructFin(
+        allocator,
+        buf,
+        msg,
+    );
+}
+
+fn skribiWrapperStructKomenco(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
     try buf.print(allocator,
         \\pub const {s} = struct {{
         \\    impl: {s}Impl,
@@ -434,6 +572,20 @@ fn skribiUnuWrapperStruct(
         \\        self.impl.deinit(allocator);
         \\    }}
         \\
+        \\
+    , .{
+        msg.name,
+        msg.name,
+        msg.name,
+    });
+}
+
+fn skribiWrapperStructFin(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    try buf.print(allocator,
         \\    pub fn writeToText(
         \\        self: *Self,
         \\        allocator: std.mem.Allocator,
@@ -545,10 +697,297 @@ fn skribiUnuWrapperStruct(
         msg.name,
         msg.name,
         msg.name,
-        msg.name,
-        msg.name,
-        msg.name,
     });
+}
+
+fn skribiRequiredScalarOrEnumAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRequiredScalarOrEnum(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        const zig_type = kgen_auks.mapiProtoTiponAlZig(
+            field.field_type,
+        );
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *Self, value: {s}) void {{
+            \\        self.impl.{s} = value;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) {s} {{
+            \\        return self.impl.{s};
+            \\    }}
+            \\
+            \\
+        , .{
+            set_name,
+            zig_type,
+            field.name,
+            get_name,
+            zig_type,
+            field.name,
+        });
+    }
+}
+
+fn skribiOptionalScalarOrEnumAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasOptionalScalarOrEnum(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        const has_name = try api_auks.skribiHasNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(has_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        const zig_type = kgen_auks.mapiProtoTiponAlZig(
+            field.field_type,
+        );
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *Self, value: {s}) void {{
+            \\        self.impl.{s} = value;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) ?{s} {{
+            \\        return self.impl.{s};
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) bool {{
+            \\        return self.impl.{s} != null;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self) void {{
+            \\        self.impl.{s} = null;
+            \\    }}
+            \\
+            \\
+        , .{
+            set_name,
+            zig_type,
+            field.name,
+
+            get_name,
+            zig_type,
+            field.name,
+
+            has_name,
+            field.name,
+
+            clear_name,
+            field.name,
+        });
+    }
+}
+
+fn skribiRepeatedScalarOrEnumAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRepeatedScalarOrEnum(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const append_name = try api_auks.skribiAppendNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(append_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        const count_name = try api_auks.skribiCountNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(count_name);
+
+        const at_name = try api_auks.skribiAtNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(at_name);
+
+        const zig_type = kgen_auks.mapiProtoTiponAlZig(
+            field.field_type,
+        );
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *const Self) usize {{
+            \\        return self.impl.{s}.len;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self, index: usize) !{s} {{
+            \\        if (index >= self.impl.{s}.len) {{
+            \\            return error.IndexOutOfBounds;
+            \\        }}
+            \\
+            \\        return self.impl.{s}[index];
+            \\    }}
+            \\
+            \\    pub fn {s}(
+            \\        self: *Self,
+            \\        allocator: std.mem.Allocator,
+            \\        value: {s},
+            \\    ) !void {{
+            \\        const old_len = self.impl.{s}.len;
+            \\
+            \\        self.impl.{s} = try allocator.realloc(
+            \\            self.impl.{s},
+            \\            old_len + 1,
+            \\        );
+            \\
+            \\        self.impl.{s}[old_len] = value;
+            \\    }}
+            \\
+            \\    pub fn {s}(
+            \\        self: *Self,
+            \\        allocator: std.mem.Allocator,
+            \\        values: []const {s},
+            \\    ) !void {{
+            \\        const tmp = try allocator.dupe({s}, values);
+            \\
+            \\        allocator.free(self.impl.{s});
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(
+            \\        self: *Self,
+            \\        allocator: std.mem.Allocator,
+            \\    ) !void {{
+            \\        allocator.free(self.impl.{s});
+            \\        self.impl.{s} = try allocator.alloc({s}, 0);
+            \\    }}
+            \\
+            \\
+        , .{
+            count_name,
+            field.name,
+
+            at_name,
+            zig_type,
+            field.name,
+            field.name,
+
+            append_name,
+            zig_type,
+            field.name,
+            field.name,
+            field.name,
+            field.name,
+
+            set_name,
+            zig_type,
+            zig_type,
+            field.name,
+            field.name,
+
+            clear_name,
+            field.name,
+            field.name,
+            zig_type,
+        });
+    }
+}
+
+fn skribiRequiredStringOrBytesAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRequiredStringOrBytes(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(
+            \\        self: *Self,
+            \\        allocator: std.mem.Allocator,
+            \\        value: []const u8,
+            \\    ) !void {{
+            \\        const tmp = try allocator.dupe(u8, value);
+            \\        allocator.free(self.impl.{s});
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) []const u8 {{
+            \\        return self.impl.{s};
+            \\    }}
+            \\
+        , .{
+            set_name,
+            field.name,
+            field.name,
+            get_name,
+            field.name,
+        });
+    }
 }
 
 // ============================================================================

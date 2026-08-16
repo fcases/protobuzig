@@ -32,7 +32,8 @@
             },
             "problemMatcher": [],
             "dependsOn": [
-                "Copy encdec"
+                "Copy encdec",
+                "Zig From Proto All",
             ]
         },
         {
@@ -51,7 +52,28 @@
             },
             "problemMatcher": [],
             "dependsOn": [
-                "Copy encdec"
+                "Copy encdec",
+                "Zig From Proto All",
+            ]
+        },
+        {
+            "label": "build test3",
+            "type": "shell",
+            "command": "zig",
+            "args": [
+                "build-exe",
+                "example/testo3.zig",
+                "-femit-bin=zig-out/bin/testo3",
+                "-fllvm",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [],
+            "dependsOn": [
+                "Copy encdec",
+                "Zig From Proto All",
             ]
         },
         {
@@ -69,6 +91,7 @@
             "dependsOn": [
                 "build test",
                 "build test2",
+                "build test3",
             ]
         },
         {
@@ -88,5 +111,63 @@
                 "isDefault": false
             },
         },
+        {
+            "label": "Zig From Proto cctrol",
+            "type": "shell",
+            "command": "${workspaceFolder}/zig-out/bin/protobuzig",
+            "args": [
+                "--output_dir",
+                "example/generated/",
+                "proto/cctrol.proto"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+        },
+        {
+            "label": "Zig From Proto Config",
+            "type": "shell",
+            "command": "${workspaceFolder}/zig-out/bin/protobuzig",
+            "args": [
+                "--output_dir",
+                "example/generated/",
+                "proto/Config.proto"
+            ],
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+        },
+        {
+            "label": "Zig From Proto All",
+            "type": "shell",
+            "command": "echo",
+            "args": [
+                " ",
+            ],
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "dependsOn": [
+                "Zig From Proto Config",
+                "Zig From Proto cctrol"
+            ]
+        },
+
+
     ]
 }

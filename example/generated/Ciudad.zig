@@ -64,7 +64,8 @@ pub const Estacion = struct {
     }
 
     fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !Estacion {
-        var mia_Mesagho= try Estacion.initDefault(allocator); 
+        var mia_Mesagho = try Estacion.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
 
 
         while (it.next()) |tok| {
@@ -121,7 +122,8 @@ pub const Estacion = struct {
     }
 
     fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !Estacion {
-        var mia_Mesagho= try Estacion.initDefault(allocator);
+        var mia_Mesagho = try Estacion.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
 
         var end: usize = undefined;
         if (data_length) |val|
@@ -136,7 +138,11 @@ pub const Estacion = struct {
             const field_number = key >> 3;
 
             if ( field_number == 1 and wire_type == 2 ) 
-                mia_Mesagho.nombre = try buffer.decodeString(  try buffer.decodeVarint() )
+            {
+                const tmp_nombre = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.nombre);
+                mia_Mesagho.nombre = tmp_nombre;
+            }
             else if ( field_number == 2 and wire_type == 0 ) 
                 mia_Mesagho.id = try buffer.decodeUint32();
         }
@@ -201,7 +207,8 @@ pub const Ciudad = struct {
     }
 
     fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !Ciudad {
-        var mia_Mesagho= try Ciudad.initDefault(allocator); 
+        var mia_Mesagho = try Ciudad.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
 
         var estaciones_list: std.ArrayList(Estacion) = .empty; 
         while (it.next()) |tok| {
@@ -268,7 +275,8 @@ pub const Ciudad = struct {
     }
 
     fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !Ciudad {
-        var mia_Mesagho= try Ciudad.initDefault(allocator);
+        var mia_Mesagho = try Ciudad.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
 
         var end: usize = undefined;
         if (data_length) |val|
@@ -284,12 +292,23 @@ pub const Ciudad = struct {
             const field_number = key >> 3;
 
             if ( field_number == 1 and wire_type == 2 ) 
-                mia_Mesagho.nombre = try buffer.decodeString(  try buffer.decodeVarint() )
+            {
+                const tmp_nombre = try buffer.decodeString(  try buffer.decodeVarint() );
+                if (mia_Mesagho.nombre) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.nombre = tmp_nombre;
+            }
             else if ( field_number == 2 and wire_type == 2 ) 
                 { try estaciones_list.append( allocator, try Estacion.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
         }
 
-        mia_Mesagho.estaciones = try estaciones_list.toOwnedSlice(allocator); 
+        const tmp_estaciones = try estaciones_list.toOwnedSlice(allocator);
+        for (mia_Mesagho.estaciones) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(mia_Mesagho.estaciones);
+        mia_Mesagho.estaciones = tmp_estaciones;
 
         return mia_Mesagho;
     }
@@ -558,7 +577,9 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
     var parsed: T = undefined;
     switch (t_formato) {
         .TF_ZIG_ZON => {
-            parsed = zon.parse.fromSlice(T, allocator, @ptrCast(input), null, .{}) catch |err| {
+            const zon_input = try allocator.dupeZ(u8, input);
+            defer allocator.free(zon_input);
+            parsed = zon.parse.fromSlice(T, allocator, zon_input, null, .{}) catch |err| {
                 std.debug.print("eraro dun deseriigo: {}\n", .{err});
                 return err;
             };

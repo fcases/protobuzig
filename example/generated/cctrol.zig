@@ -37,15 +37,6 @@ pub const CCtrol = struct {
         allocator.free(self.remotas);
     }
 
-    pub fn setNombre(
-        self: *CCtrol,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
-    }
-
     pub fn skribiAlTeksto(self: *CCtrol, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, CCtrol, @as(*CCtrol, self), t_formato);
     }
@@ -119,12 +110,15 @@ pub const CCtrol = struct {
  
         var tuta_longo: usize = 0;
  
-    for (self.remotas) |item| {
+    var remotas_i: usize = self.remotas.len;
+    while (remotas_i > 0) {
+        remotas_i -= 1;
+        const item = self.remotas[remotas_i];
         const remotas_longa = try item.seriigi( allocator, buffer );
         tuta_longo += remotas_longa;
         tuta_longo += try buffer.encodeVarint(remotas_longa);
         tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -210,15 +204,6 @@ pub const EstRemCtrol = struct {
             item.deinit(allocator);
         }
         allocator.free(self.paneles);
-    }
-
-    pub fn setNombre(
-        self: *EstRemCtrol,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *EstRemCtrol, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -330,26 +315,35 @@ pub const EstRemCtrol = struct {
  
         var tuta_longo: usize = 0;
  
-    for (self.paneles) |item| {
+    var paneles_i: usize = self.paneles.len;
+    while (paneles_i > 0) {
+        paneles_i -= 1;
+        const item = self.paneles[paneles_i];
         const paneles_longa = try item.seriigi( allocator, buffer );
         tuta_longo += paneles_longa;
         tuta_longo += try buffer.encodeVarint(paneles_longa);
         tuta_longo += try buffer.encodeVarint(34);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
-    for (self.datos_tr) |item| {
+    var datos_tr_i: usize = self.datos_tr.len;
+    while (datos_tr_i > 0) {
+        datos_tr_i -= 1;
+        const item = self.datos_tr[datos_tr_i];
         const datos_tr_longa = try item.seriigi( allocator, buffer );
         tuta_longo += datos_tr_longa;
         tuta_longo += try buffer.encodeVarint(datos_tr_longa);
         tuta_longo += try buffer.encodeVarint(26);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
-    for (self.meteos) |item| {
+    var meteos_i: usize = self.meteos.len;
+    while (meteos_i > 0) {
+        meteos_i -= 1;
+        const item = self.meteos[meteos_i];
         const meteos_longa = try item.seriigi( allocator, buffer );
         tuta_longo += meteos_longa;
         tuta_longo += try buffer.encodeVarint(meteos_longa);
         tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -441,15 +435,6 @@ pub const EstMeteo = struct {
 
     pub fn deinit(self: *const EstMeteo, allocator: all.Allocator) void {
         allocator.free(self.nombre);
-    }
-
-    pub fn setNombre(
-        self: *EstMeteo,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *EstMeteo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -608,15 +593,6 @@ pub const SnrTrafico = struct {
         allocator.free(self.vehiculos_min);
     }
 
-    pub fn setSeccion(
-        self: *SnrTrafico,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.seccion);
-        self.seccion = try allocator.dupe(u8, value);
-    }
-
     pub fn skribiAlTeksto(self: *SnrTrafico, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, SnrTrafico, @as(*SnrTrafico, self), t_formato);
     }
@@ -696,15 +672,21 @@ pub const SnrTrafico = struct {
         _ = allocator;
         var tuta_longo: usize = 0;
  
-        for (self.vehiculos_min) |item| {
+        var vehiculos_min_i: usize = self.vehiculos_min.len;
+        while (vehiculos_min_i > 0) {
+            vehiculos_min_i -= 1;
+            const item = self.vehiculos_min[vehiculos_min_i];
             tuta_longo += try buffer.encodeFloat( item );
             tuta_longo += try buffer.encodeVarint(37);
-        }  // 9 rept - no def - no varlong 
+        }  // 9 rept - no def - no varlong
 
-        for (self.vel_media) |item| {
+        var vel_media_i: usize = self.vel_media.len;
+        while (vel_media_i > 0) {
+            vel_media_i -= 1;
+            const item = self.vel_media[vel_media_i];
             tuta_longo += try buffer.encodeFloat( item );
             tuta_longo += try buffer.encodeVarint(29);
-        }  // 9 rept - no def - no varlong 
+        }  // 9 rept - no def - no varlong
 
         tuta_longo += try buffer.encodeUint32( self.carriles );
         tuta_longo += try buffer.encodeVarint(16);
@@ -789,15 +771,6 @@ pub const PanelInfoV = struct {
         allocator.free(self.elementos);
     }
 
-    pub fn setNombre(
-        self: *PanelInfoV,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
-    }
-
     pub fn skribiAlTeksto(self: *PanelInfoV, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, PanelInfoV, @as(*PanelInfoV, self), t_formato);
     }
@@ -871,12 +844,15 @@ pub const PanelInfoV = struct {
  
         var tuta_longo: usize = 0;
  
-    for (self.elementos) |item| {
+    var elementos_i: usize = self.elementos.len;
+    while (elementos_i > 0) {
+        elementos_i -= 1;
+        const item = self.elementos[elementos_i];
         const elementos_longa = try item.seriigi( allocator, buffer );
         tuta_longo += elementos_longa;
         tuta_longo += try buffer.encodeVarint(elementos_longa);
         tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -963,15 +939,6 @@ pub const PanelBase = struct {
     pub fn deinit(self: *const PanelBase, allocator: all.Allocator) void {
         allocator.free(self.nombre);
         self.deinitDatos(allocator);
-    }
-
-    pub fn setNombre(
-        self: *PanelBase,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *PanelBase, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1174,24 +1141,6 @@ pub const SenialInfo = struct {
         allocator.free(self.senial);
     }
 
-    pub fn setNombre(
-        self: *SenialInfo,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
-    }
-
-    pub fn setSenial(
-        self: *SenialInfo,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.senial);
-        self.senial = try allocator.dupe(u8, value);
-    }
-
     pub fn skribiAlTeksto(self: *SenialInfo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, SenialInfo, @as(*SenialInfo, self), t_formato);
     }
@@ -1326,24 +1275,6 @@ pub const TextoInfo = struct {
     pub fn deinit(self: *const TextoInfo, allocator: all.Allocator) void {
         allocator.free(self.nombre);
         allocator.free(self.texto);
-    }
-
-    pub fn setNombre(
-        self: *TextoInfo,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.nombre);
-        self.nombre = try allocator.dupe(u8, value);
-    }
-
-    pub fn setTexto(
-        self: *TextoInfo,
-        allocator: all.Allocator,
-        value: []const u8,
-    ) !void {
-        allocator.free(self.texto);
-        self.texto = try allocator.dupe(u8, value);
     }
 
     pub fn skribiAlTeksto(self: *TextoInfo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {

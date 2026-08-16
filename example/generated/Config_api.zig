@@ -1,14 +1,14 @@
 // ============================================================================
-// cctrol_api.zig
+// Config_api.zig
 // ============================================================================
 //
 // Fichero generado por ProtobuZig / kgenapi.zig.
 //
 // Proto base:
-//   cctrol
+//   Config
 //
 // Raw generado:
-//   cctrol.zig
+//   Config.zig
 //
 // Este fichero contiene wrappers/API segura sobre el raw generado.
 //
@@ -25,25 +25,25 @@
 
 const std = @import("std");
 
-const RawFile = @import("cctrol.zig");
+const RawFile = @import("Config.zig");
 
 pub const TekstaFormato = RawFile.TekstaFormato;
 pub const BinaraFormato = RawFile.BinaraFormato;
 
 // Alias al namespace raw generado.
 // En fase intermedia apunta al package actual del fichero raw.
-const Raw = RawFile.cctrol;
+const Raw = RawFile.k6bus.config;
 
 // Alias intencionadamente llamado *_impl aunque en fase intermedia
 // apunte al namespace raw actual.
 //
 // Fase intermedia:
-//   const cctrol_impl = Raw;
+//   const Config_impl = Raw;
 //
 // Fase final:
-//   const cctrol_impl = RawFile.<package>_impl;
+//   const Config_impl = RawFile.<package>_impl;
 
-const cctrol_impl = Raw;
+const Config_impl = Raw;
 
 // ============================================================================
 // ALIASES PUBLICOS A ENUMS RAW / IMPL
@@ -57,7 +57,10 @@ const cctrol_impl = Raw;
 // En fase final:
 //   pub const TipoPanel = cctrol_impl.TipoPanel;
 //
-pub const TipoPanel = cctrol_impl.TipoPanel;
+pub const BinaryFormat = Config_impl.BinaryFormat;
+pub const DispatchMode = Config_impl.DispatchMode;
+pub const TransportKind = Config_impl.TransportKind;
+pub const Encoding = Config_impl.Encoding;
 // ============================================================================
 // API SEGURA
 // ============================================================================
@@ -94,14 +97,16 @@ pub const TipoPanel = cctrol_impl.TipoPanel;
 // Fase final:
 //   EstMeteoImpl = cctrol_impl.EstMeteo_impl
 //
-const CCtrolImpl = cctrol_impl.CCtrol;
-const EstRemCtrolImpl = cctrol_impl.EstRemCtrol;
-const EstMeteoImpl = cctrol_impl.EstMeteo;
-const SnrTraficoImpl = cctrol_impl.SnrTrafico;
-const PanelInfoVImpl = cctrol_impl.PanelInfoV;
-const PanelBaseImpl = cctrol_impl.PanelBase;
-const SenialInfoImpl = cctrol_impl.SenialInfo;
-const TextoInfoImpl = cctrol_impl.TextoInfo;
+const AppConfigImpl = Config_impl.AppConfig;
+const DomainConfigImpl = Config_impl.DomainConfig;
+const TransportConfigImpl = Config_impl.TransportConfig;
+const MCastConfigImpl = Config_impl.MCastConfig;
+const BCastConfigImpl = Config_impl.BCastConfig;
+const UDPStarConfigImpl = Config_impl.UDPStarConfig;
+const EndPointConfigImpl = Config_impl.EndPointConfig;
+const UnixSocketStarConfigImpl = Config_impl.UnixSocketStarConfig;
+const CustomTransportConfigImpl = Config_impl.CustomTransportConfig;
+const CrossConnectorConfigImpl = Config_impl.CrossConnectorConfig;
 
 // ============================================================================
 // WRAPPERS PUBLICOS
@@ -121,14 +126,14 @@ const TextoInfoImpl = cctrol_impl.TextoInfo;
 //   - readFromText()
 //   - setters/getters/builders seguros
 //
-pub const CCtrol = struct {
-    impl: CCtrolImpl,
+pub const AppConfig = struct {
+    impl: AppConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try CCtrolImpl.initDefault(allocator),
+            .impl = try AppConfigImpl.initDefault(allocator),
         };
     }
 
@@ -136,19 +141,54 @@ pub const CCtrol = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setNombre(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+    pub fn setVersion(self: *Self, value: u32) void {
+        self.impl.version = value;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getVersion(self: *const Self) ?u32 {
+        return self.impl.version;
     }
+
+    pub fn hasVersion(self: *const Self) bool {
+        return self.impl.version != null;
+    }
+
+    pub fn clearVersion(self: *Self) void {
+        self.impl.version = null;
+    }
+
+    pub fn setActivateTrace(self: *Self, value: bool) void {
+        self.impl.activate_trace = value;
+    }
+
+    pub fn getActivateTrace(self: *const Self) ?bool {
+        return self.impl.activate_trace;
+    }
+
+    pub fn hasActivateTrace(self: *const Self) bool {
+        return self.impl.activate_trace != null;
+    }
+
+    pub fn clearActivateTrace(self: *Self) void {
+        self.impl.activate_trace = null;
+    }
+
+    pub fn setTraceLevel(self: *Self, value: i32) void {
+        self.impl.trace_level = value;
+    }
+
+    pub fn getTraceLevel(self: *const Self) ?i32 {
+        return self.impl.trace_level;
+    }
+
+    pub fn hasTraceLevel(self: *const Self) bool {
+        return self.impl.trace_level != null;
+    }
+
+    pub fn clearTraceLevel(self: *Self) void {
+        self.impl.trace_level = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -179,7 +219,7 @@ pub const CCtrol = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CCtrolImpl.legiElTeksto(
+            .impl = try AppConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -193,7 +233,7 @@ pub const CCtrol = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CCtrolImpl.legiElDosiero(
+            .impl = try AppConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -231,7 +271,7 @@ pub const CCtrol = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CCtrolImpl.deseriigiElBin(
+            .impl = try AppConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -245,7 +285,7 @@ pub const CCtrol = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CCtrolImpl.deseriigiElDosiero(
+            .impl = try AppConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -254,14 +294,14 @@ pub const CCtrol = struct {
     }
 };
 
-pub const EstRemCtrol = struct {
-    impl: EstRemCtrolImpl,
+pub const DomainConfig = struct {
+    impl: DomainConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try EstRemCtrolImpl.initDefault(allocator),
+            .impl = try DomainConfigImpl.initDefault(allocator),
         };
     }
 
@@ -269,19 +309,110 @@ pub const EstRemCtrol = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setNombre(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+    pub fn setId(self: *Self, value: u32) void {
+        self.impl.id = value;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getId(self: *const Self) u32 {
+        return self.impl.id;
     }
+
+    pub fn setActivateDefaultTransport(self: *Self, value: bool) void {
+        self.impl.activate_default_transport = value;
+    }
+
+    pub fn getActivateDefaultTransport(self: *const Self) ?bool {
+        return self.impl.activate_default_transport;
+    }
+
+    pub fn hasActivateDefaultTransport(self: *const Self) bool {
+        return self.impl.activate_default_transport != null;
+    }
+
+    pub fn clearActivateDefaultTransport(self: *Self) void {
+        self.impl.activate_default_transport = null;
+    }
+
+    pub fn setDirectDispatchToSubs(self: *Self, value: bool) void {
+        self.impl.direct_dispatch_to_subs = value;
+    }
+
+    pub fn getDirectDispatchToSubs(self: *const Self) ?bool {
+        return self.impl.direct_dispatch_to_subs;
+    }
+
+    pub fn hasDirectDispatchToSubs(self: *const Self) bool {
+        return self.impl.direct_dispatch_to_subs != null;
+    }
+
+    pub fn clearDirectDispatchToSubs(self: *Self) void {
+        self.impl.direct_dispatch_to_subs = null;
+    }
+
+    pub fn setBinaryFormat(self: *Self, value: BinaryFormat) void {
+        self.impl.binary_format = value;
+    }
+
+    pub fn getBinaryFormat(self: *const Self) ?BinaryFormat {
+        return self.impl.binary_format;
+    }
+
+    pub fn hasBinaryFormat(self: *const Self) bool {
+        return self.impl.binary_format != null;
+    }
+
+    pub fn clearBinaryFormat(self: *Self) void {
+        self.impl.binary_format = null;
+    }
+
+    pub fn setStartAtInit(self: *Self, value: bool) void {
+        self.impl.start_at_init = value;
+    }
+
+    pub fn getStartAtInit(self: *const Self) ?bool {
+        return self.impl.start_at_init;
+    }
+
+    pub fn hasStartAtInit(self: *const Self) bool {
+        return self.impl.start_at_init != null;
+    }
+
+    pub fn clearStartAtInit(self: *Self) void {
+        self.impl.start_at_init = null;
+    }
+
+    pub fn setDispatchMode(self: *Self, value: DispatchMode) void {
+        self.impl.dispatch_mode = value;
+    }
+
+    pub fn getDispatchMode(self: *const Self) ?DispatchMode {
+        return self.impl.dispatch_mode;
+    }
+
+    pub fn hasDispatchMode(self: *const Self) bool {
+        return self.impl.dispatch_mode != null;
+    }
+
+    pub fn clearDispatchMode(self: *Self) void {
+        self.impl.dispatch_mode = null;
+    }
+
+    pub fn setDispatchBatchTimeMs(self: *Self, value: u32) void {
+        self.impl.dispatch_batch_time_ms = value;
+    }
+
+    pub fn getDispatchBatchTimeMs(self: *const Self) ?u32 {
+        return self.impl.dispatch_batch_time_ms;
+    }
+
+    pub fn hasDispatchBatchTimeMs(self: *const Self) bool {
+        return self.impl.dispatch_batch_time_ms != null;
+    }
+
+    pub fn clearDispatchBatchTimeMs(self: *Self) void {
+        self.impl.dispatch_batch_time_ms = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -312,7 +443,7 @@ pub const EstRemCtrol = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try EstRemCtrolImpl.legiElTeksto(
+            .impl = try DomainConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -326,7 +457,7 @@ pub const EstRemCtrol = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try EstRemCtrolImpl.legiElDosiero(
+            .impl = try DomainConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -364,7 +495,7 @@ pub const EstRemCtrol = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try EstRemCtrolImpl.deseriigiElBin(
+            .impl = try DomainConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -378,7 +509,7 @@ pub const EstRemCtrol = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try EstRemCtrolImpl.deseriigiElDosiero(
+            .impl = try DomainConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -387,14 +518,14 @@ pub const EstRemCtrol = struct {
     }
 };
 
-pub const EstMeteo = struct {
-    impl: EstMeteoImpl,
+pub const TransportConfig = struct {
+    impl: TransportConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try EstMeteoImpl.initDefault(allocator),
+            .impl = try TransportConfigImpl.initDefault(allocator),
         };
     }
 
@@ -402,42 +533,42 @@ pub const EstMeteo = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setTemp(self: *Self, value: u32) void {
-        self.impl.temp = value;
+    pub fn setKind(self: *Self, value: TransportKind) void {
+        self.impl.kind = value;
     }
 
-    pub fn getTemp(self: *const Self) u32 {
-        return self.impl.temp;
+    pub fn getKind(self: *const Self) TransportKind {
+        return self.impl.kind;
     }
 
-    pub fn setVViento(self: *Self, value: f32) void {
-        self.impl.v_viento = value;
+    pub fn setEncoding(self: *Self, value: Encoding) void {
+        self.impl.encoding = value;
     }
 
-    pub fn getVViento(self: *const Self) f32 {
-        return self.impl.v_viento;
+    pub fn getEncoding(self: *const Self) ?Encoding {
+        return self.impl.encoding;
     }
 
-    pub fn setDirViento(self: *Self, value: f32) void {
-        self.impl.dir_viento = value;
+    pub fn hasEncoding(self: *const Self) bool {
+        return self.impl.encoding != null;
     }
 
-    pub fn getDirViento(self: *const Self) f32 {
-        return self.impl.dir_viento;
+    pub fn clearEncoding(self: *Self) void {
+        self.impl.encoding = null;
     }
 
-    pub fn setNombre(
+    pub fn setName(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+        allocator.free(self.impl.name);
+        self.impl.name = tmp;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getName(self: *const Self) []const u8 {
+        return self.impl.name;
     }
     pub fn writeToText(
         self: *Self,
@@ -469,7 +600,7 @@ pub const EstMeteo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try EstMeteoImpl.legiElTeksto(
+            .impl = try TransportConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -483,7 +614,7 @@ pub const EstMeteo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try EstMeteoImpl.legiElDosiero(
+            .impl = try TransportConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -521,7 +652,7 @@ pub const EstMeteo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try EstMeteoImpl.deseriigiElBin(
+            .impl = try TransportConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -535,7 +666,7 @@ pub const EstMeteo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try EstMeteoImpl.deseriigiElDosiero(
+            .impl = try TransportConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -544,14 +675,14 @@ pub const EstMeteo = struct {
     }
 };
 
-pub const SnrTrafico = struct {
-    impl: SnrTraficoImpl,
+pub const MCastConfig = struct {
+    impl: MCastConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try SnrTraficoImpl.initDefault(allocator),
+            .impl = try MCastConfigImpl.initDefault(allocator),
         };
     }
 
@@ -559,118 +690,74 @@ pub const SnrTrafico = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setCarriles(self: *Self, value: u32) void {
-        self.impl.carriles = value;
+    pub fn setPort(self: *Self, value: i32) void {
+        self.impl.port = value;
     }
 
-    pub fn getCarriles(self: *const Self) u32 {
-        return self.impl.carriles;
+    pub fn getPort(self: *const Self) i32 {
+        return self.impl.port;
     }
 
-    pub fn getVelMediaCount(self: *const Self) usize {
-        return self.impl.vel_media.len;
+    pub fn setTtl(self: *Self, value: i32) void {
+        self.impl.ttl = value;
     }
 
-    pub fn getVelMediaAt(self: *const Self, index: usize) !f32 {
-        if (index >= self.impl.vel_media.len) {
-            return error.IndexOutOfBounds;
-        }
-
-        return self.impl.vel_media[index];
+    pub fn getTtl(self: *const Self) ?i32 {
+        return self.impl.ttl;
     }
 
-    pub fn appendVelMedia(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: f32,
-    ) !void {
-        const old_len = self.impl.vel_media.len;
-
-        self.impl.vel_media = try allocator.realloc(
-            self.impl.vel_media,
-            old_len + 1,
-        );
-
-        self.impl.vel_media[old_len] = value;
+    pub fn hasTtl(self: *const Self) bool {
+        return self.impl.ttl != null;
     }
 
-    pub fn setVelMedia(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        values: []const f32,
-    ) !void {
-        const tmp = try allocator.dupe(f32, values);
-
-        allocator.free(self.impl.vel_media);
-        self.impl.vel_media = tmp;
+    pub fn clearTtl(self: *Self) void {
+        self.impl.ttl = null;
     }
 
-    pub fn clearVelMedia(
-        self: *Self,
-        allocator: std.mem.Allocator,
-    ) !void {
-        allocator.free(self.impl.vel_media);
-        self.impl.vel_media = try allocator.alloc(f32, 0);
+    pub fn setReceiveBuffer(self: *Self, value: i32) void {
+        self.impl.receive_buffer = value;
     }
 
-    pub fn getVehiculosMinCount(self: *const Self) usize {
-        return self.impl.vehiculos_min.len;
+    pub fn getReceiveBuffer(self: *const Self) ?i32 {
+        return self.impl.receive_buffer;
     }
 
-    pub fn getVehiculosMinAt(self: *const Self, index: usize) !f32 {
-        if (index >= self.impl.vehiculos_min.len) {
-            return error.IndexOutOfBounds;
-        }
-
-        return self.impl.vehiculos_min[index];
+    pub fn hasReceiveBuffer(self: *const Self) bool {
+        return self.impl.receive_buffer != null;
     }
 
-    pub fn appendVehiculosMin(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: f32,
-    ) !void {
-        const old_len = self.impl.vehiculos_min.len;
-
-        self.impl.vehiculos_min = try allocator.realloc(
-            self.impl.vehiculos_min,
-            old_len + 1,
-        );
-
-        self.impl.vehiculos_min[old_len] = value;
+    pub fn clearReceiveBuffer(self: *Self) void {
+        self.impl.receive_buffer = null;
     }
 
-    pub fn setVehiculosMin(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        values: []const f32,
-    ) !void {
-        const tmp = try allocator.dupe(f32, values);
-
-        allocator.free(self.impl.vehiculos_min);
-        self.impl.vehiculos_min = tmp;
+    pub fn setSendBuffer(self: *Self, value: i32) void {
+        self.impl.send_buffer = value;
     }
 
-    pub fn clearVehiculosMin(
-        self: *Self,
-        allocator: std.mem.Allocator,
-    ) !void {
-        allocator.free(self.impl.vehiculos_min);
-        self.impl.vehiculos_min = try allocator.alloc(f32, 0);
+    pub fn getSendBuffer(self: *const Self) ?i32 {
+        return self.impl.send_buffer;
     }
 
-    pub fn setSeccion(
+    pub fn hasSendBuffer(self: *const Self) bool {
+        return self.impl.send_buffer != null;
+    }
+
+    pub fn clearSendBuffer(self: *Self) void {
+        self.impl.send_buffer = null;
+    }
+
+    pub fn setMcastAddress(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.seccion);
-        self.impl.seccion = tmp;
+        allocator.free(self.impl.mcast_address);
+        self.impl.mcast_address = tmp;
     }
 
-    pub fn getSeccion(self: *const Self) []const u8 {
-        return self.impl.seccion;
+    pub fn getMcastAddress(self: *const Self) []const u8 {
+        return self.impl.mcast_address;
     }
     pub fn writeToText(
         self: *Self,
@@ -702,7 +789,7 @@ pub const SnrTrafico = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try SnrTraficoImpl.legiElTeksto(
+            .impl = try MCastConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -716,7 +803,7 @@ pub const SnrTrafico = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try SnrTraficoImpl.legiElDosiero(
+            .impl = try MCastConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -754,7 +841,7 @@ pub const SnrTrafico = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try SnrTraficoImpl.deseriigiElBin(
+            .impl = try MCastConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -768,7 +855,7 @@ pub const SnrTrafico = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try SnrTraficoImpl.deseriigiElDosiero(
+            .impl = try MCastConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -777,14 +864,14 @@ pub const SnrTrafico = struct {
     }
 };
 
-pub const PanelInfoV = struct {
-    impl: PanelInfoVImpl,
+pub const BCastConfig = struct {
+    impl: BCastConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try PanelInfoVImpl.initDefault(allocator),
+            .impl = try BCastConfigImpl.initDefault(allocator),
         };
     }
 
@@ -792,18 +879,58 @@ pub const PanelInfoV = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setNombre(
+    pub fn setPort(self: *Self, value: i32) void {
+        self.impl.port = value;
+    }
+
+    pub fn getPort(self: *const Self) i32 {
+        return self.impl.port;
+    }
+
+    pub fn setReceiveBuffer(self: *Self, value: i32) void {
+        self.impl.receive_buffer = value;
+    }
+
+    pub fn getReceiveBuffer(self: *const Self) ?i32 {
+        return self.impl.receive_buffer;
+    }
+
+    pub fn hasReceiveBuffer(self: *const Self) bool {
+        return self.impl.receive_buffer != null;
+    }
+
+    pub fn clearReceiveBuffer(self: *Self) void {
+        self.impl.receive_buffer = null;
+    }
+
+    pub fn setSendBuffer(self: *Self, value: i32) void {
+        self.impl.send_buffer = value;
+    }
+
+    pub fn getSendBuffer(self: *const Self) ?i32 {
+        return self.impl.send_buffer;
+    }
+
+    pub fn hasSendBuffer(self: *const Self) bool {
+        return self.impl.send_buffer != null;
+    }
+
+    pub fn clearSendBuffer(self: *Self) void {
+        self.impl.send_buffer = null;
+    }
+
+    pub fn setBcastAddress(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+        allocator.free(self.impl.bcast_address);
+        self.impl.bcast_address = tmp;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getBcastAddress(self: *const Self) []const u8 {
+        return self.impl.bcast_address;
     }
     pub fn writeToText(
         self: *Self,
@@ -835,7 +962,7 @@ pub const PanelInfoV = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try PanelInfoVImpl.legiElTeksto(
+            .impl = try BCastConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -849,7 +976,7 @@ pub const PanelInfoV = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try PanelInfoVImpl.legiElDosiero(
+            .impl = try BCastConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -887,7 +1014,7 @@ pub const PanelInfoV = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try PanelInfoVImpl.deseriigiElBin(
+            .impl = try BCastConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -901,7 +1028,7 @@ pub const PanelInfoV = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try PanelInfoVImpl.deseriigiElDosiero(
+            .impl = try BCastConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -910,14 +1037,14 @@ pub const PanelInfoV = struct {
     }
 };
 
-pub const PanelBase = struct {
-    impl: PanelBaseImpl,
+pub const UDPStarConfig = struct {
+    impl: UDPStarConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try PanelBaseImpl.initDefault(allocator),
+            .impl = try UDPStarConfigImpl.initDefault(allocator),
         };
     }
 
@@ -925,27 +1052,46 @@ pub const PanelBase = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setTipo(self: *Self, value: TipoPanel) void {
-        self.impl.tipo = value;
+    pub fn setPort(self: *Self, value: i32) void {
+        self.impl.port = value;
     }
 
-    pub fn getTipo(self: *const Self) TipoPanel {
-        return self.impl.tipo;
+    pub fn getPort(self: *const Self) i32 {
+        return self.impl.port;
     }
 
-    pub fn setNombre(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+    pub fn setReceiveBuffer(self: *Self, value: i32) void {
+        self.impl.receive_buffer = value;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getReceiveBuffer(self: *const Self) ?i32 {
+        return self.impl.receive_buffer;
     }
+
+    pub fn hasReceiveBuffer(self: *const Self) bool {
+        return self.impl.receive_buffer != null;
+    }
+
+    pub fn clearReceiveBuffer(self: *Self) void {
+        self.impl.receive_buffer = null;
+    }
+
+    pub fn setSendBuffer(self: *Self, value: i32) void {
+        self.impl.send_buffer = value;
+    }
+
+    pub fn getSendBuffer(self: *const Self) ?i32 {
+        return self.impl.send_buffer;
+    }
+
+    pub fn hasSendBuffer(self: *const Self) bool {
+        return self.impl.send_buffer != null;
+    }
+
+    pub fn clearSendBuffer(self: *Self) void {
+        self.impl.send_buffer = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -976,7 +1122,7 @@ pub const PanelBase = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try PanelBaseImpl.legiElTeksto(
+            .impl = try UDPStarConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -990,7 +1136,7 @@ pub const PanelBase = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try PanelBaseImpl.legiElDosiero(
+            .impl = try UDPStarConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -1028,7 +1174,7 @@ pub const PanelBase = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try PanelBaseImpl.deseriigiElBin(
+            .impl = try UDPStarConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -1042,7 +1188,7 @@ pub const PanelBase = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try PanelBaseImpl.deseriigiElDosiero(
+            .impl = try UDPStarConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -1051,14 +1197,14 @@ pub const PanelBase = struct {
     }
 };
 
-pub const SenialInfo = struct {
-    impl: SenialInfoImpl,
+pub const EndPointConfig = struct {
+    impl: EndPointConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try SenialInfoImpl.initDefault(allocator),
+            .impl = try EndPointConfigImpl.initDefault(allocator),
         };
     }
 
@@ -1066,31 +1212,26 @@ pub const SenialInfo = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setNombre(
+    pub fn setPort(self: *Self, value: i32) void {
+        self.impl.port = value;
+    }
+
+    pub fn getPort(self: *const Self) i32 {
+        return self.impl.port;
+    }
+
+    pub fn setHost(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+        allocator.free(self.impl.host);
+        self.impl.host = tmp;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
-    }
-    pub fn setSenial(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.senial);
-        self.impl.senial = tmp;
-    }
-
-    pub fn getSenial(self: *const Self) []const u8 {
-        return self.impl.senial;
+    pub fn getHost(self: *const Self) []const u8 {
+        return self.impl.host;
     }
     pub fn writeToText(
         self: *Self,
@@ -1122,7 +1263,7 @@ pub const SenialInfo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try SenialInfoImpl.legiElTeksto(
+            .impl = try EndPointConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -1136,7 +1277,7 @@ pub const SenialInfo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try SenialInfoImpl.legiElDosiero(
+            .impl = try EndPointConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -1174,7 +1315,7 @@ pub const SenialInfo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try SenialInfoImpl.deseriigiElBin(
+            .impl = try EndPointConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -1188,7 +1329,7 @@ pub const SenialInfo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try SenialInfoImpl.deseriigiElDosiero(
+            .impl = try EndPointConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
@@ -1197,14 +1338,14 @@ pub const SenialInfo = struct {
     }
 };
 
-pub const TextoInfo = struct {
-    impl: TextoInfoImpl,
+pub const UnixSocketStarConfig = struct {
+    impl: UnixSocketStarConfigImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try TextoInfoImpl.initDefault(allocator),
+            .impl = try UnixSocketStarConfigImpl.initDefault(allocator),
         };
     }
 
@@ -1212,31 +1353,50 @@ pub const TextoInfo = struct {
         self.impl.deinit(allocator);
     }
 
-    pub fn setNombre(
+    pub fn setReceiveBuffer(self: *Self, value: i32) void {
+        self.impl.receive_buffer = value;
+    }
+
+    pub fn getReceiveBuffer(self: *const Self) ?i32 {
+        return self.impl.receive_buffer;
+    }
+
+    pub fn hasReceiveBuffer(self: *const Self) bool {
+        return self.impl.receive_buffer != null;
+    }
+
+    pub fn clearReceiveBuffer(self: *Self) void {
+        self.impl.receive_buffer = null;
+    }
+
+    pub fn setSendBuffer(self: *Self, value: i32) void {
+        self.impl.send_buffer = value;
+    }
+
+    pub fn getSendBuffer(self: *const Self) ?i32 {
+        return self.impl.send_buffer;
+    }
+
+    pub fn hasSendBuffer(self: *const Self) bool {
+        return self.impl.send_buffer != null;
+    }
+
+    pub fn clearSendBuffer(self: *Self) void {
+        self.impl.send_buffer = null;
+    }
+
+    pub fn setLocalSocketPath(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+        allocator.free(self.impl.local_socket_path);
+        self.impl.local_socket_path = tmp;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
-    }
-    pub fn setTexto(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.texto);
-        self.impl.texto = tmp;
-    }
-
-    pub fn getTexto(self: *const Self) []const u8 {
-        return self.impl.texto;
+    pub fn getLocalSocketPath(self: *const Self) []const u8 {
+        return self.impl.local_socket_path;
     }
     pub fn writeToText(
         self: *Self,
@@ -1268,7 +1428,7 @@ pub const TextoInfo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try TextoInfoImpl.legiElTeksto(
+            .impl = try UnixSocketStarConfigImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -1282,7 +1442,7 @@ pub const TextoInfo = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try TextoInfoImpl.legiElDosiero(
+            .impl = try UnixSocketStarConfigImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -1320,7 +1480,7 @@ pub const TextoInfo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try TextoInfoImpl.deseriigiElBin(
+            .impl = try UnixSocketStarConfigImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -1334,7 +1494,286 @@ pub const TextoInfo = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try TextoInfoImpl.deseriigiElDosiero(
+            .impl = try UnixSocketStarConfigImpl.deseriigiElDosiero(
+                allocator,
+                path,
+                format,
+            ),
+        };
+    }
+};
+
+pub const CustomTransportConfig = struct {
+    impl: CustomTransportConfigImpl,
+
+    const Self = @This();
+
+    pub fn initDefault(allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try CustomTransportConfigImpl.initDefault(allocator),
+        };
+    }
+
+    pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
+        self.impl.deinit(allocator);
+    }
+
+    pub fn setSubType(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        value: []const u8,
+    ) !void {
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.sub_type);
+        self.impl.sub_type = tmp;
+    }
+
+    pub fn getSubType(self: *const Self) []const u8 {
+        return self.impl.sub_type;
+    }
+    pub fn setConfig(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        value: []const u8,
+    ) !void {
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.config);
+        self.impl.config = tmp;
+    }
+
+    pub fn getConfig(self: *const Self) []const u8 {
+        return self.impl.config;
+    }
+    pub fn setPlugInLib(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        value: []const u8,
+    ) !void {
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.plug_in_lib);
+        self.impl.plug_in_lib = tmp;
+    }
+
+    pub fn getPlugInLib(self: *const Self) []const u8 {
+        return self.impl.plug_in_lib;
+    }
+    pub fn writeToText(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        format: TekstaFormato,
+    ) ![]const u8 {
+        return try self.impl.skribiAlTeksto(
+            allocator,
+            format,
+        );
+    }
+
+    pub fn writeToFile(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: TekstaFormato,
+    ) !void {
+        try self.impl.skribiAlDosiero(
+            allocator,
+            path,
+            format,
+        );
+    }
+
+    pub fn readFromText(
+        allocator: std.mem.Allocator,
+        input: []const u8,
+        format: TekstaFormato,
+    ) !Self {
+        return .{
+            .impl = try CustomTransportConfigImpl.legiElTeksto(
+                allocator,
+                input,
+                format,
+            ),
+        };
+    }
+
+    pub fn readFromFile(
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: TekstaFormato,
+    ) !Self {
+        return .{
+            .impl = try CustomTransportConfigImpl.legiElDosiero(
+                allocator,
+                path,
+                format,
+            ),
+        };
+    }
+
+    pub fn serializeToBin(
+        self: *const Self,
+        allocator: std.mem.Allocator,
+        format: BinaraFormato,
+    ) ![]const u8 {
+        return try self.impl.seriigiAlBin(
+            allocator,
+            format,
+        );
+    }
+
+    pub fn serializeToFile(
+        self: *const Self,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: BinaraFormato,
+    ) !void {
+        try self.impl.seriigiAlDosiero(
+            allocator,
+            path,
+            format,
+        );
+    }
+
+    pub fn deserializeFromBin(
+        allocator: std.mem.Allocator,
+        input: []const u8,
+        format: BinaraFormato,
+    ) !Self {
+        return .{
+            .impl = try CustomTransportConfigImpl.deseriigiElBin(
+                allocator,
+                input,
+                format,
+            ),
+        };
+    }
+
+    pub fn deserializeFromFile(
+        allocator: std.mem.Allocator,
+        path: [:0]const u8,
+        format: BinaraFormato,
+    ) !Self {
+        return .{
+            .impl = try CustomTransportConfigImpl.deseriigiElDosiero(
+                allocator,
+                path,
+                format,
+            ),
+        };
+    }
+};
+
+pub const CrossConnectorConfig = struct {
+    impl: CrossConnectorConfigImpl,
+
+    const Self = @This();
+
+    pub fn initDefault(allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try CrossConnectorConfigImpl.initDefault(allocator),
+        };
+    }
+
+    pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
+        self.impl.deinit(allocator);
+    }
+
+    pub fn writeToText(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        format: TekstaFormato,
+    ) ![]const u8 {
+        return try self.impl.skribiAlTeksto(
+            allocator,
+            format,
+        );
+    }
+
+    pub fn writeToFile(
+        self: *Self,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: TekstaFormato,
+    ) !void {
+        try self.impl.skribiAlDosiero(
+            allocator,
+            path,
+            format,
+        );
+    }
+
+    pub fn readFromText(
+        allocator: std.mem.Allocator,
+        input: []const u8,
+        format: TekstaFormato,
+    ) !Self {
+        return .{
+            .impl = try CrossConnectorConfigImpl.legiElTeksto(
+                allocator,
+                input,
+                format,
+            ),
+        };
+    }
+
+    pub fn readFromFile(
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: TekstaFormato,
+    ) !Self {
+        return .{
+            .impl = try CrossConnectorConfigImpl.legiElDosiero(
+                allocator,
+                path,
+                format,
+            ),
+        };
+    }
+
+    pub fn serializeToBin(
+        self: *const Self,
+        allocator: std.mem.Allocator,
+        format: BinaraFormato,
+    ) ![]const u8 {
+        return try self.impl.seriigiAlBin(
+            allocator,
+            format,
+        );
+    }
+
+    pub fn serializeToFile(
+        self: *const Self,
+        allocator: std.mem.Allocator,
+        path: []const u8,
+        format: BinaraFormato,
+    ) !void {
+        try self.impl.seriigiAlDosiero(
+            allocator,
+            path,
+            format,
+        );
+    }
+
+    pub fn deserializeFromBin(
+        allocator: std.mem.Allocator,
+        input: []const u8,
+        format: BinaraFormato,
+    ) !Self {
+        return .{
+            .impl = try CrossConnectorConfigImpl.deseriigiElBin(
+                allocator,
+                input,
+                format,
+            ),
+        };
+    }
+
+    pub fn deserializeFromFile(
+        allocator: std.mem.Allocator,
+        path: [:0]const u8,
+        format: BinaraFormato,
+    ) !Self {
+        return .{
+            .impl = try CrossConnectorConfigImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
