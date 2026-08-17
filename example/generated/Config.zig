@@ -148,12 +148,15 @@ pub const AppConfig = struct {
  
         var tuta_longo: usize = 0;
  
-    for (self.domains) |item| {
+    var domains_i: usize = self.domains.len;
+    while (domains_i > 0) {
+        domains_i -= 1;
+        const item = self.domains[domains_i];
         const domains_longa = try item.seriigi( allocator, buffer );
         tuta_longo += domains_longa;
         tuta_longo += try buffer.encodeVarint(domains_longa);
         tuta_longo += try buffer.encodeVarint(34);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
     if( self.trace_level ) |val| {
         if( val != 0 )  {
@@ -401,19 +404,25 @@ pub const DomainConfig = struct {
  
         var tuta_longo: usize = 0;
  
-    for (self.cross_connectors) |item| {
+    var cross_connectors_i: usize = self.cross_connectors.len;
+    while (cross_connectors_i > 0) {
+        cross_connectors_i -= 1;
+        const item = self.cross_connectors[cross_connectors_i];
         const cross_connectors_longa = try item.seriigi( allocator, buffer );
         tuta_longo += cross_connectors_longa;
         tuta_longo += try buffer.encodeVarint(cross_connectors_longa);
         tuta_longo += try buffer.encodeVarint(82);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
-    for (self.transports) |item| {
+    var transports_i: usize = self.transports.len;
+    while (transports_i > 0) {
+        transports_i -= 1;
+        const item = self.transports[transports_i];
         const transports_longa = try item.seriigi( allocator, buffer );
         tuta_longo += transports_longa;
         tuta_longo += try buffer.encodeVarint(transports_longa);
         tuta_longo += try buffer.encodeVarint(74);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
     if( self.dispatch_batch_time_ms ) |val| {
         if( val != 0 )  {
@@ -1418,12 +1427,15 @@ pub const UDPStarConfig = struct {
         }
     }  //2 opt - def - no varlong
 
-    for (self.end_point) |item| {
+    var end_point_i: usize = self.end_point.len;
+    while (end_point_i > 0) {
+        end_point_i -= 1;
+        const item = self.end_point[end_point_i];
         const end_point_longa = try item.seriigi( allocator, buffer );
         tuta_longo += end_point_longa;
         tuta_longo += try buffer.encodeVarint(end_point_longa);
         tuta_longo += try buffer.encodeVarint(26);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         tuta_longo += try buffer.encodeInt32( self.port );
         tuta_longo += try buffer.encodeVarint(16);
@@ -1741,12 +1753,15 @@ pub const UnixSocketStarConfig = struct {
         }
     }  //2 opt - def - no varlong
 
-    for (self.remote_socket_paths) |item| {
+    var remote_socket_paths_i: usize = self.remote_socket_paths.len;
+    while (remote_socket_paths_i > 0) {
+        remote_socket_paths_i -= 1;
+        const item = self.remote_socket_paths[remote_socket_paths_i];
         const remote_socket_paths_longa = try buffer.encodeString( item );
         tuta_longo += remote_socket_paths_longa;
         tuta_longo += try buffer.encodeVarint(remote_socket_paths_longa);
         tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         const local_socket_path_longa = try buffer.encodeString( self.local_socket_path );
         tuta_longo += local_socket_path_longa;
@@ -2041,12 +2056,15 @@ pub const CrossConnectorConfig = struct {
         _ = allocator;
         var tuta_longo: usize = 0;
  
-    for (self.transports) |item| {
+    var transports_i: usize = self.transports.len;
+    while (transports_i > 0) {
+        transports_i -= 1;
+        const item = self.transports[transports_i];
         const transports_longa = try buffer.encodeString( item );
         tuta_longo += transports_longa;
         tuta_longo += try buffer.encodeVarint(transports_longa);
         tuta_longo += try buffer.encodeVarint(10);
-    }  // 11  rept - no def - varlong 
+    }  // 11  rept - no def - varlong
 
         return tuta_longo;
     }

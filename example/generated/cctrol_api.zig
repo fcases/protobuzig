@@ -149,6 +149,7 @@ pub const CCtrol = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -282,6 +283,7 @@ pub const EstRemCtrol = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -439,6 +441,7 @@ pub const EstMeteo = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -672,6 +675,7 @@ pub const SnrTrafico = struct {
     pub fn getSeccion(self: *const Self) []const u8 {
         return self.impl.seccion;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -805,6 +809,7 @@ pub const PanelInfoV = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -946,6 +951,7 @@ pub const PanelBase = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1079,6 +1085,7 @@ pub const SenialInfo = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn setSenial(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1092,6 +1099,7 @@ pub const SenialInfo = struct {
     pub fn getSenial(self: *const Self) []const u8 {
         return self.impl.senial;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1225,6 +1233,7 @@ pub const TextoInfo = struct {
     pub fn getNombre(self: *const Self) []const u8 {
         return self.impl.nombre;
     }
+
     pub fn setTexto(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1238,6 +1247,7 @@ pub const TextoInfo = struct {
     pub fn getTexto(self: *const Self) []const u8 {
         return self.impl.texto;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,

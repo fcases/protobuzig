@@ -87,6 +87,22 @@ pub fn estasRequiredStringOrBytes(field: prs.Field) bool {
     return estasStringOrBytes(field.field_type_enum);
 }
 
+pub fn estasOptionalStringOrBytes(field: prs.Field) bool {
+    if (field.label_enum != .LABEL_OPTIONAL) {
+        return false;
+    }
+
+    return estasStringOrBytes(field.field_type_enum);
+}
+
+pub fn estasRepeatedStringOrBytes(field: prs.Field) bool {
+    if (field.label_enum != .LABEL_REPEATED) {
+        return false;
+    }
+
+    return estasStringOrBytes(field.field_type_enum);
+}
+
 pub fn estasMessage(field_type_enum: prs.Tipoj) bool {
     return field_type_enum == .TYPE_MESSAGE;
 }

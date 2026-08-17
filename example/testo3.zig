@@ -59,8 +59,115 @@ pub fn main() !void {
 
     try testOptionales(allocator);
     try testRepeatedScalar(allocator);
+    try testRepeatedString(allocator);
 
     std.debug.print("testo3: OK\n", .{});
+}
+
+fn testRepeatedString(allocator: std.mem.Allocator) !void {
+    var cfg = try ConfigApi.UnixSocketStarConfig.initDefault(allocator);
+    defer cfg.deinit(allocator);
+
+    try cfg.setLocalSocketPath(allocator, "/tmp/local.sock");
+
+    try cfg.appendRemoteSocketPaths(allocator, "/tmp/remote-a.sock");
+    try cfg.appendRemoteSocketPaths(allocator, "/tmp/remote-b.sock");
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        cfg.getRemoteSocketPathsCount(),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg.getRemoteSocketPathsAt(0),
+            "/tmp/remote-a.sock",
+        ),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg.getRemoteSocketPathsAt(1),
+            "/tmp/remote-b.sock",
+        ),
+    );
+
+    const bin = try cfg.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin);
+
+    var cfg2 = try ConfigApi.UnixSocketStarConfig.deserializeFromBin(
+        allocator,
+        bin,
+        .BF_PROTOBUF,
+    );
+    defer cfg2.deinit(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        cfg2.getRemoteSocketPathsCount(),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg2.getRemoteSocketPathsAt(0),
+            "/tmp/remote-a.sock",
+        ),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg2.getRemoteSocketPathsAt(1),
+            "/tmp/remote-b.sock",
+        ),
+    );
+
+    try cfg2.setRemoteSocketPaths(
+        allocator,
+        &[_][]const u8{
+            "/tmp/set-a.sock",
+            "/tmp/set-b.sock",
+        },
+    );
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        cfg2.getRemoteSocketPathsCount(),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg2.getRemoteSocketPathsAt(0),
+            "/tmp/set-a.sock",
+        ),
+    );
+
+    try std.testing.expect(
+        std.mem.eql(
+            u8,
+            try cfg2.getRemoteSocketPathsAt(1),
+            "/tmp/set-b.sock",
+        ),
+    );
+
+    try cfg2.clearRemoteSocketPaths(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 0),
+        cfg2.getRemoteSocketPathsCount(),
+    );
+
+    std.debug.print(
+        "testo3: repeated string UnixSocketStarConfig.remote_socket_paths OK\n",
+        .{},
+    );
 }
 
 fn testRepeatedScalar(allocator: std.mem.Allocator) !void {

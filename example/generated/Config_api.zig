@@ -413,6 +413,32 @@ pub const DomainConfig = struct {
         self.impl.dispatch_batch_time_ms = null;
     }
 
+    pub fn setKeyFile(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        if (self.impl.key_file) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.key_file = tmp;
+    }
+
+    pub fn getKeyFile(self: *const Self) ?[]const u8 {
+        return self.impl.key_file;
+    }
+
+    pub fn hasKeyFile(self: *const Self) bool {
+        return self.impl.key_file != null;
+    }
+
+    pub fn clearKeyFile(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.key_file) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.key_file = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -570,6 +596,7 @@ pub const TransportConfig = struct {
     pub fn getName(self: *const Self) []const u8 {
         return self.impl.name;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -759,6 +786,33 @@ pub const MCastConfig = struct {
     pub fn getMcastAddress(self: *const Self) []const u8 {
         return self.impl.mcast_address;
     }
+
+    pub fn setLocalAddress(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = tmp;
+    }
+
+    pub fn getLocalAddress(self: *const Self) ?[]const u8 {
+        return self.impl.local_address;
+    }
+
+    pub fn hasLocalAddress(self: *const Self) bool {
+        return self.impl.local_address != null;
+    }
+
+    pub fn clearLocalAddress(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -932,6 +986,33 @@ pub const BCastConfig = struct {
     pub fn getBcastAddress(self: *const Self) []const u8 {
         return self.impl.bcast_address;
     }
+
+    pub fn setLocalAddress(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = tmp;
+    }
+
+    pub fn getLocalAddress(self: *const Self) ?[]const u8 {
+        return self.impl.local_address;
+    }
+
+    pub fn hasLocalAddress(self: *const Self) bool {
+        return self.impl.local_address != null;
+    }
+
+    pub fn clearLocalAddress(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1092,6 +1173,32 @@ pub const UDPStarConfig = struct {
         self.impl.send_buffer = null;
     }
 
+    pub fn setLocalAddress(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = tmp;
+    }
+
+    pub fn getLocalAddress(self: *const Self) ?[]const u8 {
+        return self.impl.local_address;
+    }
+
+    pub fn hasLocalAddress(self: *const Self) bool {
+        return self.impl.local_address != null;
+    }
+
+    pub fn clearLocalAddress(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.local_address) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.local_address = null;
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1233,6 +1340,7 @@ pub const EndPointConfig = struct {
     pub fn getHost(self: *const Self) []const u8 {
         return self.impl.host;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1398,6 +1506,65 @@ pub const UnixSocketStarConfig = struct {
     pub fn getLocalSocketPath(self: *const Self) []const u8 {
         return self.impl.local_socket_path;
     }
+
+    pub fn getRemoteSocketPathsCount(self: *const Self) usize {
+        return self.impl.remote_socket_paths.len;
+    }
+
+    pub fn getRemoteSocketPathsAt(self: *const Self, index: usize) ![]const u8 {
+        if (index >= self.impl.remote_socket_paths.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return self.impl.remote_socket_paths[index];
+    }
+
+    pub fn appendRemoteSocketPaths(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp_item = try allocator.dupe(u8, value);
+        errdefer allocator.free(tmp_item);
+
+        const old_len = self.impl.remote_socket_paths.len;
+        self.impl.remote_socket_paths = try allocator.realloc(
+            self.impl.remote_socket_paths,
+            old_len + 1,
+        );
+
+        self.impl.remote_socket_paths[old_len] = tmp_item;
+    }
+
+    pub fn setRemoteSocketPaths(self: *Self, allocator: std.mem.Allocator, values: []const []const u8) !void {
+        var tmp_list: std.ArrayList([]const u8) = .empty;
+        errdefer {
+            for (tmp_list.items) |item| {
+                allocator.free(item);
+            }
+            tmp_list.deinit(allocator);
+        }
+
+        for (values) |value| {
+            const tmp_item = try allocator.dupe(u8, value);
+            errdefer allocator.free(tmp_item);
+            try tmp_list.append(allocator, tmp_item);
+        }
+
+        const tmp = try tmp_list.toOwnedSlice(allocator);
+
+        for (self.impl.remote_socket_paths) |item| {
+            allocator.free(item);
+        }
+        allocator.free(self.impl.remote_socket_paths);
+
+        self.impl.remote_socket_paths = tmp;
+    }
+
+    pub fn clearRemoteSocketPaths(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.remote_socket_paths) |item| {
+            allocator.free(item);
+        }
+        allocator.free(self.impl.remote_socket_paths);
+        self.impl.remote_socket_paths = try allocator.alloc([]const u8, 0);
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1531,6 +1698,7 @@ pub const CustomTransportConfig = struct {
     pub fn getSubType(self: *const Self) []const u8 {
         return self.impl.sub_type;
     }
+
     pub fn setConfig(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1544,6 +1712,7 @@ pub const CustomTransportConfig = struct {
     pub fn getConfig(self: *const Self) []const u8 {
         return self.impl.config;
     }
+
     pub fn setPlugInLib(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1557,6 +1726,7 @@ pub const CustomTransportConfig = struct {
     pub fn getPlugInLib(self: *const Self) []const u8 {
         return self.impl.plug_in_lib;
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1675,6 +1845,64 @@ pub const CrossConnectorConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn getTransportsCount(self: *const Self) usize {
+        return self.impl.transports.len;
+    }
+
+    pub fn getTransportsAt(self: *const Self, index: usize) ![]const u8 {
+        if (index >= self.impl.transports.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return self.impl.transports[index];
+    }
+
+    pub fn appendTransports(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp_item = try allocator.dupe(u8, value);
+        errdefer allocator.free(tmp_item);
+
+        const old_len = self.impl.transports.len;
+        self.impl.transports = try allocator.realloc(
+            self.impl.transports,
+            old_len + 1,
+        );
+
+        self.impl.transports[old_len] = tmp_item;
+    }
+
+    pub fn setTransports(self: *Self, allocator: std.mem.Allocator, values: []const []const u8) !void {
+        var tmp_list: std.ArrayList([]const u8) = .empty;
+        errdefer {
+            for (tmp_list.items) |item| {
+                allocator.free(item);
+            }
+            tmp_list.deinit(allocator);
+        }
+
+        for (values) |value| {
+            const tmp_item = try allocator.dupe(u8, value);
+            errdefer allocator.free(tmp_item);
+            try tmp_list.append(allocator, tmp_item);
+        }
+
+        const tmp = try tmp_list.toOwnedSlice(allocator);
+
+        for (self.impl.transports) |item| {
+            allocator.free(item);
+        }
+        allocator.free(self.impl.transports);
+
+        self.impl.transports = tmp;
+    }
+
+    pub fn clearTransports(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.transports) |item| {
+            allocator.free(item);
+        }
+        allocator.free(self.impl.transports);
+        self.impl.transports = try allocator.alloc([]const u8, 0);
     }
 
     pub fn writeToText(

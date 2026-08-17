@@ -544,6 +544,18 @@ fn skribiUnuWrapperStruct(
         msg,
     );
 
+    try skribiOptionalStringOrBytesAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
+    try skribiRepeatedStringOrBytesAccessors(
+        allocator,
+        buf,
+        msg,
+    );
+
     try skribiWrapperStructFin(
         allocator,
         buf,
@@ -980,11 +992,219 @@ fn skribiRequiredStringOrBytesAccessors(
             \\        return self.impl.{s};
             \\    }}
             \\
+            \\
         , .{
             set_name,
             field.name,
             field.name,
             get_name,
+            field.name,
+        });
+    }
+}
+
+fn skribiOptionalStringOrBytesAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasOptionalStringOrBytes(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        const has_name = try api_auks.skribiHasNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(has_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {{
+            \\        const tmp = try allocator.dupe(u8, value);
+            \\
+            \\        if (self.impl.{s}) |old| {{
+            \\            allocator.free(old);
+            \\        }}
+            \\
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) ?[]const u8 {{
+            \\        return self.impl.{s};
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) bool {{
+            \\        return self.impl.{s} != null;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator) void {{
+            \\        if (self.impl.{s}) |old| {{
+            \\            allocator.free(old);
+            \\        }}
+            \\
+            \\        self.impl.{s} = null;
+            \\    }}
+            \\
+            \\
+        , .{
+            set_name,
+            field.name,
+            field.name,
+
+            get_name,
+            field.name,
+
+            has_name,
+            field.name,
+
+            clear_name,
+            field.name,
+            field.name,
+        });
+    }
+}
+
+fn skribiRepeatedStringOrBytesAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRepeatedStringOrBytes(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const append_name = try api_auks.skribiAppendNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(append_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        const count_name = try api_auks.skribiCountNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(count_name);
+
+        const at_name = try api_auks.skribiAtNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(at_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *const Self) usize {{
+            \\        return self.impl.{s}.len;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self, index: usize) ![]const u8 {{
+            \\        if (index >= self.impl.{s}.len) {{
+            \\            return error.IndexOutOfBounds;
+            \\        }}
+            \\
+            \\        return self.impl.{s}[index];
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {{
+            \\        const tmp_item = try allocator.dupe(u8, value);
+            \\        errdefer allocator.free(tmp_item);
+            \\
+            \\        const old_len = self.impl.{s}.len;
+            \\        self.impl.{s} = try allocator.realloc(
+            \\            self.impl.{s},
+            \\            old_len + 1,
+            \\        );
+            \\
+            \\        self.impl.{s}[old_len] = tmp_item;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, values: []const []const u8) !void {{
+            \\        var tmp_list: std.ArrayList([]const u8) = .empty;
+            \\        errdefer {{
+            \\            for (tmp_list.items) |item| {{
+            \\                allocator.free(item);
+            \\            }}
+            \\            tmp_list.deinit(allocator);
+            \\        }}
+            \\
+            \\        for (values) |value| {{
+            \\            const tmp_item = try allocator.dupe(u8, value);
+            \\            errdefer allocator.free(tmp_item);
+            \\            try tmp_list.append(allocator, tmp_item);
+            \\        }}
+            \\
+            \\        const tmp = try tmp_list.toOwnedSlice(allocator);
+            \\
+            \\        for (self.impl.{s}) |item| {{
+            \\            allocator.free(item);
+            \\        }}
+            \\        allocator.free(self.impl.{s});
+            \\
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator) !void {{
+            \\        for (self.impl.{s}) |item| {{
+            \\            allocator.free(item);
+            \\        }}
+            \\        allocator.free(self.impl.{s});
+            \\        self.impl.{s} = try allocator.alloc([]const u8, 0);
+            \\    }}
+            \\
+            \\
+        , .{
+            count_name,
+            field.name,
+
+            at_name,
+            field.name,
+            field.name,
+
+            append_name,
+            field.name,
+            field.name,
+            field.name,
+            field.name,
+
+            set_name,
+            field.name,
+            field.name,
+            field.name,
+
+            clear_name,
+            field.name,
+            field.name,
             field.name,
         });
     }
