@@ -1192,6 +1192,13 @@ fn skribiGeneralajnFunkciojn() !void {
     try verkisto.print(
         \\fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: BinaraFormato) !T {{
         \\    var parsed: []const u8 = undefined;
+        \\    var parsed_owned: ?[]u8 = null;
+        \\    defer {{
+        \\        if (parsed_owned) |buf| {{
+        \\            allocator.free(buf);
+        \\        }}
+        \\    }}
+        \\
         \\    switch (b_formato) {{
         \\        .BF_PROTOBUF => {{
         \\            parsed = input;
@@ -1200,6 +1207,8 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            const dec=std.base64.standard.Decoder;
         \\            const base64_decoded_longo = try dec.calcSizeForSlice(input);
         \\            const base64_decoded = try allocator.alloc(u8, base64_decoded_longo);
+        \\
+        \\            parsed_owned = base64_decoded;
         \\
         \\            dec.decode(base64_decoded,input) catch |err| {{
         \\                std.debug.print("eraro dum deseriigo: {{}}\n", .{{err}});
@@ -2512,37 +2521,56 @@ fn skribiOptionalNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, 
     });
 }
 
-fn skribiOptionalDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
-    var default_value_string = default;
+fn skribiOptionalDefaultNoVarLong(
+    indent: []const u8,
+    field_name: []const u8,
+    field_type: tpj,
+    field_number: u32,
+    wire_type: u3,
+    default: []const u8,
+) !void {
+    _ = default;
 
-    if (field_type == .TYPE_ENUM) {
-        if (!equal(u8, default, "null"))
-            default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
-        else
-            default_value_string = "null";
-    }
-
-    try verkisto.print(
-        \\{s}    if( self.{s} ) |val| {{
-        \\{s}        if( val != {s} )  {{
-        \\{s}            tuta_longo += try 
-    , .{
-        indent, field_name, // if (non-null )
-        indent, default_value_string, // if !default )
+    try skribiOptionalNoDefaultNoVarLong(
         indent,
-    });
-    auks.printEncodeMethod(verkisto, field_type, "val", "");
-    try verkisto.print(
-        \\{s}            tuta_longo += try buffer.encodeVarint({d});
-        \\{s}        }}
-        \\{s}    }}  //2 opt - def - no varlong
-        \\
-        \\
-    , .{
-        indent, (@as(u32, field_number) << 3) | wire_type, // if (non-null )
-        indent, indent,
-    });
+        field_name,
+        field_type,
+        field_number,
+        wire_type,
+    );
 }
+
+// fn skribiOptionalDefaultNoVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+//     var default_value_string = default;
+
+//     if (field_type == .TYPE_ENUM) {
+//         if (!equal(u8, default, "null"))
+//             default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
+//         else
+//             default_value_string = "null";
+//     }
+
+//     try verkisto.print(
+//         \\{s}    if( self.{s} ) |val| {{
+//         \\{s}        if( val != {s} )  {{
+//         \\{s}            tuta_longo += try
+//     , .{
+//         indent, field_name, // if (non-null )
+//         indent, default_value_string, // if !default )
+//         indent,
+//     });
+//     auks.printEncodeMethod(verkisto, field_type, "val", "");
+//     try verkisto.print(
+//         \\{s}            tuta_longo += try buffer.encodeVarint({d});
+//         \\{s}        }}
+//         \\{s}    }}  //2 opt - def - no varlong
+//         \\
+//         \\
+//     , .{
+//         indent, (@as(u32, field_number) << 3) | wire_type, // if (non-null )
+//         indent, indent,
+//     });
+// }
 
 fn skribiOptionalNoDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3) !void {
     try verkisto.print(
@@ -2569,39 +2597,58 @@ fn skribiOptionalNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
     });
 }
 
-fn skribiOptionalDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
-    if (field_type != .TYPE_STRING) {
-        skribiOptionalNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
-        return;
-    }
+fn skribiOptionalDefaultVarLong(
+    indent: []const u8,
+    field_name: []const u8,
+    field_type: tpj,
+    field_number: u32,
+    wire_type: u3,
+    default: []const u8,
+) !void {
+    _ = default;
 
-    try verkisto.print(
-        \\{s}    if ( self.{s} ) |val| {{
-        \\{s}        if ( ! equal(u8, val, {s}) ) {{
-        \\{s}            const st_longa = try 
-    , .{
-        indent, field_name, // if (non-null )
-        indent, default,
+    try skribiOptionalNoDefaultVarLong(
         indent,
-    });
-    auks.printEncodeMethod(verkisto, field_type, "val", "");
-    try verkisto.print(
-        \\{s}            tuta_longo += st_longa;
-        \\{s}            tuta_longo += try buffer.encodeVarint(st_longa);
-        \\{s}            tuta_longo += try buffer.encodeVarint({d});
-        \\{s}        }}  
-        \\{s}    }}  //4  opt - def - varlong
-        \\
-        \\
-    , .{
-        indent,
-        indent,
-        indent,
-        (@as(u32, field_number) << 3) | wire_type,
-        indent,
-        indent,
-    });
+        field_name,
+        field_type,
+        field_number,
+        wire_type,
+    );
 }
+
+// fn skribiOptionalDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
+//     if (field_type != .TYPE_STRING) {
+//         skribiOptionalNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
+//         return;
+//     }
+
+//     try verkisto.print(
+//         \\{s}    if ( self.{s} ) |val| {{
+//         \\{s}        if ( ! equal(u8, val, {s}) ) {{
+//         \\{s}            const st_longa = try
+//     , .{
+//         indent, field_name, // if (non-null )
+//         indent, default,
+//         indent,
+//     });
+//     auks.printEncodeMethod(verkisto, field_type, "val", "");
+//     try verkisto.print(
+//         \\{s}            tuta_longo += st_longa;
+//         \\{s}            tuta_longo += try buffer.encodeVarint(st_longa);
+//         \\{s}            tuta_longo += try buffer.encodeVarint({d});
+//         \\{s}        }}
+//         \\{s}    }}  //4  opt - def - varlong
+//         \\
+//         \\
+//     , .{
+//         indent,
+//         indent,
+//         indent,
+//         (@as(u32, field_number) << 3) | wire_type,
+//         indent,
+//         indent,
+//     });
+// }
 
 /////////////////////////////////////
 /// skribiSeriigi: Required Funkcioj

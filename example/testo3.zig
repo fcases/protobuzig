@@ -60,8 +60,91 @@ pub fn main() !void {
     try testOptionales(allocator);
     try testRepeatedScalar(allocator);
     try testRepeatedString(allocator);
+    try testOptionalDefaultPresencia(allocator);
 
     std.debug.print("testo3: OK\n", .{});
+}
+
+fn testOptionalDefaultPresencia(
+    allocator: std.mem.Allocator,
+) !void {
+    var cfg = try ConfigApi.AppConfig.initDefault(allocator);
+    defer cfg.deinit(allocator);
+
+    // optional con default explicito:
+    // initDefault() materializa el default como valor presente.
+    try std.testing.expect(cfg.hasActivateTrace());
+    try std.testing.expectEqual(
+        @as(?bool, false),
+        cfg.getActivateTrace(),
+    );
+
+    // Lo seteamos de nuevo al mismo valor default para validar que
+    // optional presente con valor default se serializa igualmente.
+    cfg.setActivateTrace(false);
+
+    try std.testing.expect(cfg.hasActivateTrace());
+    try std.testing.expectEqual(
+        @as(?bool, false),
+        cfg.getActivateTrace(),
+    );
+
+    const bin = try cfg.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin);
+
+    var cfg2 = try ConfigApi.AppConfig.deserializeFromBin(
+        allocator,
+        bin,
+        .BF_PROTOBUF,
+    );
+    defer cfg2.deinit(allocator);
+
+    try std.testing.expect(cfg2.hasActivateTrace());
+    try std.testing.expectEqual(
+        @as(?bool, false),
+        cfg2.getActivateTrace(),
+    );
+
+    const bin_b64 = try cfg.serializeToBin(
+        allocator,
+        .BF_BASE64,
+    );
+    defer allocator.free(bin_b64);
+
+    std.debug.print(
+        "testo3: AppConfig activate_trace=false BF_BASE64 = {s}\n",
+        .{bin_b64},
+    );
+
+    var cfg3 = try ConfigApi.AppConfig.deserializeFromBin(
+        allocator,
+        bin_b64,
+        .BF_BASE64,
+    );
+    defer cfg3.deinit(allocator);
+
+    try std.testing.expect(cfg3.hasActivateTrace());
+    try std.testing.expectEqual(
+        @as(?bool, false),
+        cfg3.getActivateTrace(),
+    );
+
+    // clearX() si debe llevarlo a null.
+    cfg3.clearActivateTrace();
+
+    try std.testing.expect(!cfg3.hasActivateTrace());
+    try std.testing.expectEqual(
+        @as(?bool, null),
+        cfg3.getActivateTrace(),
+    );
+
+    std.debug.print(
+        "testo3: optional default AppConfig.activate_trace OK\n",
+        .{},
+    );
 }
 
 fn testRepeatedString(allocator: std.mem.Allocator) !void {

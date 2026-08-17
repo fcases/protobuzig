@@ -1502,6 +1502,13 @@ fn deseriigiTipon(allocator: all.Allocator, comptime T: type, input: []const u8)
 
 fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []const u8, b_formato: BinaraFormato) !T {
     var parsed: []const u8 = undefined;
+    var parsed_owned: ?[]u8 = null;
+    defer {
+        if (parsed_owned) |buf| {
+            allocator.free(buf);
+        }
+    }
+
     switch (b_formato) {
         .BF_PROTOBUF => {
             parsed = input;
@@ -1510,6 +1517,8 @@ fn deseriigiTiponElBin(allocator: all.Allocator, comptime T: type, input: []cons
             const dec=std.base64.standard.Decoder;
             const base64_decoded_longo = try dec.calcSizeForSlice(input);
             const base64_decoded = try allocator.alloc(u8, base64_decoded_longo);
+
+            parsed_owned = base64_decoded;
 
             dec.decode(base64_decoded,input) catch |err| {
                 std.debug.print("eraro dum deseriigo: {}\n", .{err});
