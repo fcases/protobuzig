@@ -64,8 +64,226 @@ pub fn main() !void {
     try testCloneEstMeteo(allocator);
     try testRepeatedMessage(allocator);
     try testOneofPanelBase(allocator);
+    try testOneofProtobufTextRoundTrip(allocator);
 
     std.debug.print("testo3: OK\n", .{});
+}
+
+fn roundTripPanelPbText(
+    allocator: std.mem.Allocator,
+    panel: *Api.PanelBase,
+    label: []const u8,
+) !Api.PanelBase {
+    const text1 = try panel.writeToText(
+        allocator,
+        .TF_PROTOBUF,
+    );
+    defer allocator.free(text1);
+
+    std.debug.print(
+        "PanelP {s} antes:\n{s}",
+        .{
+            label,
+            text1,
+        },
+    );
+
+    var panel2 = try Api.PanelBase.readFromText(
+        allocator,
+        text1,
+        .TF_PROTOBUF,
+    );
+    errdefer panel2.deinit(allocator);
+
+    const text2 = try panel2.writeToText(
+        allocator,
+        .TF_PROTOBUF,
+    );
+    defer allocator.free(text2);
+
+    std.debug.print(
+        "PanelP {s} despues:\n{s}",
+        .{
+            label,
+            text2,
+        },
+    );
+
+    return panel2;
+}
+
+fn testOneofProtobufTextRoundTrip(allocator: std.mem.Allocator) !void {
+    var panel = try Api.PanelBase.initDefault(allocator);
+    defer panel.deinit(allocator);
+
+    try panel.setNombre(allocator, "panel-pbtext-oneof-1");
+
+    // oneof enum: tp
+    panel.setTipo(.NUMERO);
+    panel.setDatosTp(allocator, .NUMERO);
+
+    {
+        var panel2 = try roundTripPanelPbText(
+            allocator,
+            &panel,
+            "tp",
+        );
+        defer panel2.deinit(allocator);
+
+        try std.testing.expect(panel2.hasDatos());
+        try std.testing.expect(panel2.hasDatosTp());
+        try std.testing.expect(!panel2.hasDatosNumero());
+        try std.testing.expect(!panel2.hasDatosTextoRaw());
+        try std.testing.expect(!panel2.hasDatosBlob());
+        try std.testing.expect(!panel2.hasDatosTexto());
+
+        try std.testing.expectEqual(
+            Api.TipoPanel.NUMERO,
+            try panel2.getDatosTp(),
+        );
+    }
+
+    // oneof scalar: numero
+    panel.setTipo(.NUMERO);
+    panel.setDatosNumero(allocator, 1234);
+
+    {
+        var panel2 = try roundTripPanelPbText(
+            allocator,
+            &panel,
+            "numero",
+        );
+        defer panel2.deinit(allocator);
+
+        try std.testing.expect(panel2.hasDatos());
+        try std.testing.expect(panel2.hasDatosNumero());
+        try std.testing.expect(!panel2.hasDatosTp());
+        try std.testing.expect(!panel2.hasDatosTextoRaw());
+        try std.testing.expect(!panel2.hasDatosBlob());
+        try std.testing.expect(!panel2.hasDatosTexto());
+
+        try std.testing.expectEqual(
+            @as(u32, 1234),
+            try panel2.getDatosNumero(),
+        );
+    }
+
+    // oneof string: texto_raw
+    panel.setTipo(.TEXTO);
+    try panel.setDatosTextoRaw(
+        allocator,
+        "texto_raw_pbtext",
+    );
+
+    {
+        var panel2 = try roundTripPanelPbText(
+            allocator,
+            &panel,
+            "texto_raw",
+        );
+        defer panel2.deinit(allocator);
+
+        try std.testing.expect(panel2.hasDatos());
+        try std.testing.expect(panel2.hasDatosTextoRaw());
+        try std.testing.expect(!panel2.hasDatosTp());
+        try std.testing.expect(!panel2.hasDatosNumero());
+        try std.testing.expect(!panel2.hasDatosBlob());
+        try std.testing.expect(!panel2.hasDatosTexto());
+
+        try std.testing.expect(std.mem.eql(
+            u8,
+            try panel2.getDatosTextoRaw(),
+            "texto_raw_pbtext",
+        ));
+    }
+
+    // oneof bytes: blob
+    panel.setTipo(.TEXTO);
+    try panel.setDatosBlob(
+        allocator,
+        &[_]u8{
+            1,
+            2,
+            3,
+            4,
+        },
+    );
+
+    {
+        var panel2 = try roundTripPanelPbText(
+            allocator,
+            &panel,
+            "blob",
+        );
+        defer panel2.deinit(allocator);
+
+        try std.testing.expect(panel2.hasDatos());
+        try std.testing.expect(panel2.hasDatosBlob());
+        try std.testing.expect(!panel2.hasDatosTp());
+        try std.testing.expect(!panel2.hasDatosNumero());
+        try std.testing.expect(!panel2.hasDatosTextoRaw());
+        try std.testing.expect(!panel2.hasDatosTexto());
+
+        try std.testing.expect(std.mem.eql(
+            u8,
+            try panel2.getDatosBlob(),
+            &[_]u8{
+                1,
+                2,
+                3,
+                4,
+            },
+        ));
+    }
+
+    // oneof message: texto
+    var texto = try Api.TextoInfo.initDefault(allocator);
+    defer texto.deinit(allocator);
+
+    try texto.setNombre(allocator, "texto-1");
+    try texto.setTexto(allocator, "hola_oneof_pbtext");
+
+    panel.setTipo(.TEXTO);
+    try panel.setDatosTexto(
+        allocator,
+        &texto,
+    );
+
+    {
+        var panel2 = try roundTripPanelPbText(
+            allocator,
+            &panel,
+            "texto_message",
+        );
+        defer panel2.deinit(allocator);
+
+        try std.testing.expect(panel2.hasDatos());
+        try std.testing.expect(panel2.hasDatosTexto());
+        try std.testing.expect(!panel2.hasDatosTp());
+        try std.testing.expect(!panel2.hasDatosNumero());
+        try std.testing.expect(!panel2.hasDatosTextoRaw());
+        try std.testing.expect(!panel2.hasDatosBlob());
+
+        var texto2 = try panel2.getDatosTexto(allocator);
+        defer texto2.deinit(allocator);
+
+        try std.testing.expect(std.mem.eql(
+            u8,
+            texto2.getNombre(),
+            "texto-1",
+        ));
+
+        try std.testing.expect(std.mem.eql(
+            u8,
+            texto2.getTexto(),
+            "hola_oneof_pbtext",
+        ));
+    }
+
+    std.debug.print(
+        "testo3: oneof Protobuf Text roundtrip PanelBase.datos OK\n",
+        .{},
+    );
 }
 
 fn testOneofPanelBase(allocator: std.mem.Allocator) !void {
@@ -165,7 +383,6 @@ fn testOneofPanelBase(allocator: std.mem.Allocator) !void {
     try std.testing.expect(!panel2.hasDatosSenial());
     try std.testing.expect(!panel2.hasDatosTexto());
 
-
     // // //
     panel.setTipo(.NUMERO);
     panel.setDatosNumero(allocator, 1234);
@@ -202,7 +419,6 @@ fn testOneofPanelBase(allocator: std.mem.Allocator) !void {
         @as(u32, 1234),
         try panel_numero.getDatosNumero(),
     );
-
 
     /////////////////
     try panel.setDatosTextoRaw(allocator, "texto raw oneof");
@@ -264,12 +480,38 @@ fn testOneofPanelBase(allocator: std.mem.Allocator) !void {
         Api.TipoPanel.NUMERO,
         try panel_tp.getDatosTp(),
     );
-    
+
+    /////////
+    const textPanel = try panel.writeToText(
+        allocator,
+        .TF_PROTOBUF,
+    );
+    defer allocator.free(textPanel);
+
+    std.debug.print(
+        "PanelP:\n{s}",
+        .{textPanel},
+    );
+
+    var panelP2 = try Api.PanelBase.readFromText(
+        allocator,
+        textPanel,
+        .TF_PROTOBUF,
+    );
+    defer panelP2.deinit(allocator);
+
+    const textPanel2 = try panelP2.writeToText(allocator, .TF_PROTOBUF);
+    defer allocator.free(textPanel2);
+    std.debug.print(
+        "PanelP:\n{s}",
+        .{textPanel2},
+    );
+
     /////////////////
     std.debug.print(
         "testo3: oneof PanelBase.datos OK\n",
         .{},
-    );   
+    );
 }
 
 fn testRepeatedMessage(allocator: std.mem.Allocator) !void {

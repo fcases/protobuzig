@@ -224,6 +224,7 @@ pub const CCtrol = struct {
         allocator.free(self.impl.remotas);
         self.impl.remotas = try allocator.alloc(EstRemCtrolImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -410,6 +411,7 @@ pub const EstRemCtrol = struct {
         allocator.free(self.impl.meteos);
         self.impl.meteos = try allocator.alloc(EstMeteoImpl, 0);
     }
+
     pub fn getDatosTrCount(self: *const Self) usize {
         return self.impl.datos_tr.len;
     }
@@ -452,6 +454,7 @@ pub const EstRemCtrol = struct {
         allocator.free(self.impl.datos_tr);
         self.impl.datos_tr = try allocator.alloc(SnrTraficoImpl, 0);
     }
+
     pub fn getPanelesCount(self: *const Self) usize {
         return self.impl.paneles.len;
     }
@@ -494,6 +497,7 @@ pub const EstRemCtrol = struct {
         allocator.free(self.impl.paneles);
         self.impl.paneles = try allocator.alloc(PanelInfoVImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1092,6 +1096,7 @@ pub const PanelInfoV = struct {
         allocator.free(self.impl.elementos);
         self.impl.elementos = try allocator.alloc(PanelBaseImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
