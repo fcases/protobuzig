@@ -109,6 +109,28 @@ const CustomTransportConfigImpl = Config_impl.CustomTransportConfig;
 const CrossConnectorConfigImpl = Config_impl.CrossConnectorConfig;
 
 // ============================================================================
+// HELPERS PRIVADOS DE COPIA PROFUNDA
+// ============================================================================
+//
+// cloneImpl() realiza una copia profunda usando el camino binario generado.
+//
+// Estrategia inicial:
+//
+//   clone = seriigiAlBin(.BF_PROTOBUF) + deseriigiElBin(.BF_PROTOBUF)
+//
+// Esta version prioriza simplicidad y seguridad de ownership.
+// Si seriigi/deseriigi tiene un bug, debe corregirse en ProtobuZig,
+// porque afecta tambien al uso normal de mensajes en K6Bus.
+//
+
+fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {
+    const bytes = try src.seriigiAlBin(allocator, .BF_PROTOBUF);
+    defer allocator.free(bytes);
+
+    return try T.deseriigiElBin(allocator, bytes, .BF_PROTOBUF);
+}
+
+// ============================================================================
 // WRAPPERS PUBLICOS
 // ============================================================================
 //
@@ -139,6 +161,16 @@ pub const AppConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                AppConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setVersion(self: *Self, value: u32) void {
@@ -189,6 +221,48 @@ pub const AppConfig = struct {
         self.impl.trace_level = null;
     }
 
+    pub fn getDomainsCount(self: *const Self) usize {
+        return self.impl.domains.len;
+    }
+
+    pub fn getDomainsAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !DomainConfig {
+        if (index >= self.impl.domains.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                DomainConfigImpl,
+                allocator,
+                &self.impl.domains[index],
+            ),
+        };
+    }
+
+    pub fn appendDomains(self: *Self, allocator: std.mem.Allocator, value: *const DomainConfig) !void {
+        const tmp_item = try cloneImpl(
+            DomainConfigImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.domains.len;
+        self.impl.domains = try allocator.realloc(
+            self.impl.domains,
+            old_len + 1,
+        );
+
+        self.impl.domains[old_len] = tmp_item;
+    }
+
+    pub fn clearDomains(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.domains) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.domains);
+        self.impl.domains = try allocator.alloc(DomainConfigImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -307,6 +381,16 @@ pub const DomainConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                DomainConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setId(self: *Self, value: u32) void {
@@ -439,6 +523,90 @@ pub const DomainConfig = struct {
         self.impl.key_file = null;
     }
 
+    pub fn getTransportsCount(self: *const Self) usize {
+        return self.impl.transports.len;
+    }
+
+    pub fn getTransportsAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !TransportConfig {
+        if (index >= self.impl.transports.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                TransportConfigImpl,
+                allocator,
+                &self.impl.transports[index],
+            ),
+        };
+    }
+
+    pub fn appendTransports(self: *Self, allocator: std.mem.Allocator, value: *const TransportConfig) !void {
+        const tmp_item = try cloneImpl(
+            TransportConfigImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.transports.len;
+        self.impl.transports = try allocator.realloc(
+            self.impl.transports,
+            old_len + 1,
+        );
+
+        self.impl.transports[old_len] = tmp_item;
+    }
+
+    pub fn clearTransports(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.transports) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.transports);
+        self.impl.transports = try allocator.alloc(TransportConfigImpl, 0);
+    }
+    pub fn getCrossConnectorsCount(self: *const Self) usize {
+        return self.impl.cross_connectors.len;
+    }
+
+    pub fn getCrossConnectorsAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !CrossConnectorConfig {
+        if (index >= self.impl.cross_connectors.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                CrossConnectorConfigImpl,
+                allocator,
+                &self.impl.cross_connectors[index],
+            ),
+        };
+    }
+
+    pub fn appendCrossConnectors(self: *Self, allocator: std.mem.Allocator, value: *const CrossConnectorConfig) !void {
+        const tmp_item = try cloneImpl(
+            CrossConnectorConfigImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.cross_connectors.len;
+        self.impl.cross_connectors = try allocator.realloc(
+            self.impl.cross_connectors,
+            old_len + 1,
+        );
+
+        self.impl.cross_connectors[old_len] = tmp_item;
+    }
+
+    pub fn clearCrossConnectors(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.cross_connectors) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.cross_connectors);
+        self.impl.cross_connectors = try allocator.alloc(CrossConnectorConfigImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -557,6 +725,16 @@ pub const TransportConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                TransportConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setKind(self: *Self, value: TransportKind) void {
@@ -715,6 +893,16 @@ pub const MCastConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                MCastConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setPort(self: *Self, value: i32) void {
@@ -933,6 +1121,16 @@ pub const BCastConfig = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                BCastConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setPort(self: *Self, value: i32) void {
         self.impl.port = value;
     }
@@ -1133,6 +1331,16 @@ pub const UDPStarConfig = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                UDPStarConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setPort(self: *Self, value: i32) void {
         self.impl.port = value;
     }
@@ -1199,6 +1407,48 @@ pub const UDPStarConfig = struct {
         self.impl.local_address = null;
     }
 
+    pub fn getEndPointCount(self: *const Self) usize {
+        return self.impl.end_point.len;
+    }
+
+    pub fn getEndPointAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !EndPointConfig {
+        if (index >= self.impl.end_point.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                EndPointConfigImpl,
+                allocator,
+                &self.impl.end_point[index],
+            ),
+        };
+    }
+
+    pub fn appendEndPoint(self: *Self, allocator: std.mem.Allocator, value: *const EndPointConfig) !void {
+        const tmp_item = try cloneImpl(
+            EndPointConfigImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.end_point.len;
+        self.impl.end_point = try allocator.realloc(
+            self.impl.end_point,
+            old_len + 1,
+        );
+
+        self.impl.end_point[old_len] = tmp_item;
+    }
+
+    pub fn clearEndPoint(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.end_point) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.end_point);
+        self.impl.end_point = try allocator.alloc(EndPointConfigImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1317,6 +1567,16 @@ pub const EndPointConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                EndPointConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setPort(self: *Self, value: i32) void {
@@ -1459,6 +1719,16 @@ pub const UnixSocketStarConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                UnixSocketStarConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setReceiveBuffer(self: *Self, value: i32) void {
@@ -1685,6 +1955,16 @@ pub const CustomTransportConfig = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                CustomTransportConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setSubType(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1845,6 +2125,16 @@ pub const CrossConnectorConfig = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                CrossConnectorConfigImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn getTransportsCount(self: *const Self) usize {

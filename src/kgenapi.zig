@@ -422,6 +422,11 @@ fn skribiApiWrappers(
         ast_proto_dosiero,
     );
 
+    try skribiCloneImplHelper(
+        allocator,
+        buf,
+    );
+
     try skribiWrapperStructs(
         allocator,
         buf,
@@ -469,6 +474,34 @@ fn skribiImplAliases(
     , .{});
 }
 
+fn skribiCloneImplHelper(allocator: std.mem.Allocator, buf: *std.ArrayList(u8)) !void {
+    try buf.print(allocator,
+        \\// ============================================================================
+        \\// HELPERS PRIVADOS DE COPIA PROFUNDA
+        \\// ============================================================================
+        \\//
+        \\// cloneImpl() realiza una copia profunda usando el camino binario generado.
+        \\//
+        \\// Estrategia inicial:
+        \\//
+        \\//   clone = seriigiAlBin(.BF_PROTOBUF) + deseriigiElBin(.BF_PROTOBUF)
+        \\//
+        \\// Esta version prioriza simplicidad y seguridad de ownership.
+        \\// Si seriigi/deseriigi tiene un bug, debe corregirse en ProtobuZig,
+        \\// porque afecta tambien al uso normal de mensajes en K6Bus.
+        \\//
+        \\
+        \\fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {{
+        \\    const bytes = try src.seriigiAlBin(allocator, .BF_PROTOBUF);
+        \\    defer allocator.free(bytes);
+        \\
+        \\    return try T.deseriigiElBin(allocator, bytes, .BF_PROTOBUF);
+        \\}}
+        \\
+        \\
+    , .{});
+}
+
 fn skribiWrapperStructs(
     allocator: std.mem.Allocator,
     buf: *std.ArrayList(u8),
@@ -509,65 +542,25 @@ fn skribiWrapperStructs(
     , .{});
 }
 
-fn skribiUnuWrapperStruct(
-    allocator: std.mem.Allocator,
-    buf: *std.ArrayList(u8),
-    msg: prs.Message,
-) !void {
-    try skribiWrapperStructKomenco(
-        allocator,
-        buf,
-        msg,
-    );
+fn skribiUnuWrapperStruct(allocator: std.mem.Allocator, buf: *std.ArrayList(u8), msg: prs.Message) !void {
+    try skribiWrapperStructKomenco(allocator, buf, msg);
 
-    try skribiRequiredScalarOrEnumAccessors(
-        allocator,
-        buf,
-        msg,
-    );
+    try skribiRequiredScalarOrEnumAccessors(allocator, buf, msg);
+    try skribiOptionalScalarOrEnumAccessors(allocator, buf, msg);
+    try skribiRepeatedScalarOrEnumAccessors(allocator, buf, msg);
 
-    try skribiOptionalScalarOrEnumAccessors(
-        allocator,
-        buf,
-        msg,
-    );
+    try skribiRequiredStringOrBytesAccessors(allocator, buf, msg);
+    try skribiOptionalStringOrBytesAccessors(allocator, buf, msg);
+    try skribiRepeatedStringOrBytesAccessors(allocator, buf, msg);
 
-    try skribiRepeatedScalarOrEnumAccessors(
-        allocator,
-        buf,
-        msg,
-    );
+    try skribiRequiredMessageAccessors(allocator, buf, msg);
+    try skribiOptionalMessageAccessors(allocator, buf, msg);
+    try skribiRepeatedMessageAccessors(allocator, buf, msg);
 
-    try skribiRequiredStringOrBytesAccessors(
-        allocator,
-        buf,
-        msg,
-    );
-
-    try skribiOptionalStringOrBytesAccessors(
-        allocator,
-        buf,
-        msg,
-    );
-
-    try skribiRepeatedStringOrBytesAccessors(
-        allocator,
-        buf,
-        msg,
-    );
-
-    try skribiWrapperStructFin(
-        allocator,
-        buf,
-        msg,
-    );
+    try skribiWrapperStructFin(allocator, buf, msg);
 }
 
-fn skribiWrapperStructKomenco(
-    allocator: std.mem.Allocator,
-    buf: *std.ArrayList(u8),
-    msg: prs.Message,
-) !void {
+fn skribiWrapperStructKomenco(allocator: std.mem.Allocator, buf: *std.ArrayList(u8), msg: prs.Message) !void {
     try buf.print(allocator,
         \\pub const {s} = struct {{
         \\    impl: {s}Impl,
@@ -584,19 +577,26 @@ fn skribiWrapperStructKomenco(
         \\        self.impl.deinit(allocator);
         \\    }}
         \\
+        \\    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {{
+        \\        return .{{
+        \\            .impl = try cloneImpl(
+        \\                {s}Impl,
+        \\                allocator,
+        \\                &self.impl,
+        \\            ),
+        \\        }};
+        \\    }}
+        \\
         \\
     , .{
+        msg.name,
         msg.name,
         msg.name,
         msg.name,
     });
 }
 
-fn skribiWrapperStructFin(
-    allocator: std.mem.Allocator,
-    buf: *std.ArrayList(u8),
-    msg: prs.Message,
-) !void {
+fn skribiWrapperStructFin(allocator: std.mem.Allocator, buf: *std.ArrayList(u8), msg: prs.Message) !void {
     try buf.print(allocator,
         \\    pub fn writeToText(
         \\        self: *Self,
@@ -1206,6 +1206,280 @@ fn skribiRepeatedStringOrBytesAccessors(
             field.name,
             field.name,
             field.name,
+        });
+    }
+}
+
+fn skribiRequiredMessageAccessors(allocator: std.mem.Allocator, buf: *std.ArrayList(u8), msg: prs.Message) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRequiredMessage(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        const wrapper_type_name = field.field_type;
+
+        const impl_type_name = try std.fmt.allocPrint(
+            allocator,
+            "{s}Impl",
+            .{field.field_type},
+        );
+        defer allocator.free(impl_type_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: *const {s}) !void {{
+            \\        const tmp = try cloneImpl({s}, allocator, &value.impl);
+            \\
+            \\        self.impl.{s}.deinit(allocator);
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self, allocator: std.mem.Allocator) !{s} {{
+            \\        return .{{
+            \\            .impl = try cloneImpl({s}, allocator, &self.impl.{s}),
+            \\        }};
+            \\    }}
+            \\
+            \\
+        , .{
+            set_name,
+            wrapper_type_name,
+            impl_type_name,
+            field.name,
+            field.name,
+
+            get_name,
+            wrapper_type_name,
+            impl_type_name,
+            field.name,
+        });
+    }
+}
+
+fn skribiOptionalMessageAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasOptionalMessage(field)) {
+            continue;
+        }
+
+        const set_name = try api_auks.skribiSetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(set_name);
+
+        const get_name = try api_auks.skribiGetNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(get_name);
+
+        const has_name = try api_auks.skribiHasNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(has_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        const wrapper_type_name = field.field_type;
+
+        const impl_type_name = try std.fmt.allocPrint(
+            allocator,
+            "{s}Impl",
+            .{field.field_type},
+        );
+        defer allocator.free(impl_type_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: *const {s}) !void {{
+            \\        const tmp = try cloneImpl({s}, allocator, &value.impl);
+            \\
+            \\        if (self.impl.{s}) |*old| {{
+            \\            old.deinit(allocator);
+            \\        }}
+            \\
+            \\        self.impl.{s} = tmp;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self) bool {{
+            \\        return self.impl.{s} != null;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self, allocator: std.mem.Allocator) !{s} {{
+            \\        if (self.impl.{s}) |*value| {{
+            \\            return .{{
+            \\                .impl = try cloneImpl(
+            \\                    {s},
+            \\                    allocator,
+            \\                    value,
+            \\                ),
+            \\            }};
+            \\        }}
+            \\
+            \\        return error.MissingField;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator) void {{
+            \\        if (self.impl.{s}) |*old| {{
+            \\            old.deinit(allocator);
+            \\        }}
+            \\
+            \\        self.impl.{s} = null;
+            \\    }}
+            \\
+            \\
+        , .{
+            set_name,
+            wrapper_type_name,
+            impl_type_name,
+            field.name,
+            field.name,
+
+            has_name,
+            field.name,
+
+            get_name,
+            wrapper_type_name,
+            field.name,
+            impl_type_name,
+
+            clear_name,
+            field.name,
+            field.name,
+        });
+    }
+}
+
+fn skribiRepeatedMessageAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.fields) |field| {
+        if (!api_auks.estasRepeatedMessage(field)) {
+            continue;
+        }
+
+        const append_name = try api_auks.skribiAppendNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(append_name);
+
+        const clear_name = try api_auks.skribiClearNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(clear_name);
+
+        const count_name = try api_auks.skribiCountNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(count_name);
+
+        const at_name = try api_auks.skribiAtNomon(
+            allocator,
+            field.name,
+        );
+        defer allocator.free(at_name);
+
+        const wrapper_type_name = field.field_type;
+
+        const impl_type_name = try std.fmt.allocPrint(
+            allocator,
+            "{s}Impl",
+            .{field.field_type},
+        );
+        defer allocator.free(impl_type_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *const Self) usize {{
+            \\        return self.impl.{s}.len;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *const Self, allocator: std.mem.Allocator, index: usize) !{s} {{
+            \\        if (index >= self.impl.{s}.len) {{
+            \\            return error.IndexOutOfBounds;
+            \\        }}
+            \\
+            \\        return .{{
+            \\            .impl = try cloneImpl(
+            \\                {s},
+            \\                allocator,
+            \\                &self.impl.{s}[index],
+            \\            ),
+            \\        }};
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: *const {s}) !void {{
+            \\        const tmp_item = try cloneImpl(
+            \\            {s},
+            \\            allocator,
+            \\            &value.impl,
+            \\        );
+            \\        errdefer tmp_item.deinit(allocator);
+            \\
+            \\        const old_len = self.impl.{s}.len;
+            \\        self.impl.{s} = try allocator.realloc(
+            \\            self.impl.{s},
+            \\            old_len + 1,
+            \\        );
+            \\
+            \\        self.impl.{s}[old_len] = tmp_item;
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator) !void {{
+            \\        for (self.impl.{s}) |*item| {{
+            \\            item.deinit(allocator);
+            \\        }}
+            \\        allocator.free(self.impl.{s});
+            \\        self.impl.{s} = try allocator.alloc({s}, 0);
+            \\    }}
+            \\
+        , .{
+            count_name,
+            field.name,
+
+            at_name,
+            wrapper_type_name,
+            field.name,
+            impl_type_name,
+            field.name,
+
+            append_name,
+            wrapper_type_name,
+            impl_type_name,
+            field.name,
+            field.name,
+            field.name,
+            field.name,
+
+            clear_name,
+            field.name,
+            field.name,
+            field.name,
+            impl_type_name,
         });
     }
 }

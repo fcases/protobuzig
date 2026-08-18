@@ -107,6 +107,29 @@ pub fn estasMessage(field_type_enum: prs.Tipoj) bool {
     return field_type_enum == .TYPE_MESSAGE;
 }
 
+pub fn estasRequiredMessage(field: prs.Field) bool {
+    if (field.label_enum != .LABEL_REQUIRED) {
+        return false;
+    }
+    return estasMessage(field.field_type_enum);
+}
+
+pub fn estasOptionalMessage(field: prs.Field) bool {
+    if (field.label_enum != .LABEL_OPTIONAL) {
+        return false;
+    }
+
+    return estasMessage(field.field_type_enum);
+}
+
+pub fn estasRepeatedMessage(field: prs.Field) bool {
+    if (field.label_enum != .LABEL_REPEATED) {
+        return false;
+    }
+
+    return estasMessage(field.field_type_enum);
+}
+
 // ============================================================================
 // NOMBRES DE METODOS
 // ============================================================================

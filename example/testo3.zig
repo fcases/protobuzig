@@ -61,13 +61,180 @@ pub fn main() !void {
     try testRepeatedScalar(allocator);
     try testRepeatedString(allocator);
     try testOptionalDefaultPresencia(allocator);
+    try testCloneEstMeteo(allocator);
+    try testRepeatedMessage(allocator);
 
     std.debug.print("testo3: OK\n", .{});
 }
 
-fn testOptionalDefaultPresencia(
-    allocator: std.mem.Allocator,
-) !void {
+fn testRepeatedMessage(allocator: std.mem.Allocator) !void {
+    var remota = try Api.EstRemCtrol.initDefault(allocator);
+    defer remota.deinit(allocator);
+
+    try remota.setNombre(allocator, "remota-api-1");
+
+    var meteo = try Api.EstMeteo.initDefault(allocator);
+    defer meteo.deinit(allocator);
+
+    try meteo.setNombre(allocator, "meteo-message-1");
+    meteo.setTemp(17);
+    meteo.setVViento(7.5);
+    meteo.setDirViento(45.0);
+
+    try remota.appendMeteos(allocator, &meteo);
+
+    var meteo_b = try Api.EstMeteo.initDefault(allocator);
+    defer meteo_b.deinit(allocator);
+
+    try meteo_b.setNombre(allocator, "meteo-message-2");
+    meteo_b.setTemp(18);
+    meteo_b.setVViento(8.5);
+    meteo_b.setDirViento(90.0);
+
+    try remota.appendMeteos(allocator, &meteo_b);
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        remota.getMeteosCount(),
+    );
+
+    var meteo2 = try remota.getMeteosAt(allocator, 0);
+    defer meteo2.deinit(allocator);
+
+    try expectEstMeteo(
+        meteo2,
+        "meteo-message-1",
+        17,
+        7.5,
+        45.0,
+    );
+
+    var meteo_b2 = try remota.getMeteosAt(allocator, 1);
+    defer meteo_b2.deinit(allocator);
+
+    try expectEstMeteo(
+        meteo_b2,
+        "meteo-message-2",
+        18,
+        8.5,
+        90.0,
+    );
+
+    // Modificamos el original para comprobar que appendMeteos hizo copia profunda.
+    try meteo.setNombre(allocator, "meteo-original-modificada");
+    meteo.setTemp(99);
+    meteo.setVViento(99.5);
+    meteo.setDirViento(270.0);
+
+    var meteo3 = try remota.getMeteosAt(allocator, 0);
+    defer meteo3.deinit(allocator);
+
+    try expectEstMeteo(
+        meteo3,
+        "meteo-message-1",
+        17,
+        7.5,
+        45.0,
+    );
+
+    const bin = try remota.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin);
+
+    var remota2 = try Api.EstRemCtrol.deserializeFromBin(
+        allocator,
+        bin,
+        .BF_PROTOBUF,
+    );
+    defer remota2.deinit(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        remota2.getMeteosCount(),
+    );
+
+    var meteo4 = try remota2.getMeteosAt(allocator, 0);
+    defer meteo4.deinit(allocator);
+
+    try expectEstMeteo(
+        meteo4,
+        "meteo-message-1",
+        17,
+        7.5,
+        45.0,
+    );
+
+    var meteo5 = try remota2.getMeteosAt(allocator, 1);
+    defer meteo5.deinit(allocator);
+
+    try expectEstMeteo(
+        meteo5,
+        "meteo-message-2",
+        18,
+        8.5,
+        90.0,
+    );
+
+    try remota2.clearMeteos(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 0),
+        remota2.getMeteosCount(),
+    );
+
+    std.debug.print(
+        "testo3: repeated message EstRemCtrol.meteos OK\n",
+        .{},
+    );
+}
+
+fn testCloneEstMeteo(allocator: std.mem.Allocator) !void {
+    var meteo = try Api.EstMeteo.initDefault(allocator);
+    defer meteo.deinit(allocator);
+
+    try meteo.setNombre(allocator, "meteo-clone-1");
+    meteo.setTemp(31);
+    meteo.setVViento(22.5);
+    meteo.setDirViento(90.0);
+
+    var copia = try meteo.clone(allocator);
+    defer copia.deinit(allocator);
+
+    try expectEstMeteo(
+        copia,
+        "meteo-clone-1",
+        31,
+        22.5,
+        90.0,
+    );
+
+    try meteo.setNombre(allocator, "meteo-original-modificada");
+    meteo.setTemp(99);
+    meteo.setVViento(1.5);
+    meteo.setDirViento(270.0);
+
+    try expectEstMeteo(
+        copia,
+        "meteo-clone-1",
+        31,
+        22.5,
+        90.0,
+    );
+
+    std.debug.print(
+        "testo3: clone EstMeteo OK nombre={s} temp={d} viento={d:.2} dir={d:.2}\n",
+        .{
+            copia.getNombre(),
+            copia.getTemp(),
+            copia.getVViento(),
+            copia.getDirViento(),
+        },
+    );
+}
+
+fn testOptionalDefaultPresencia(allocator: std.mem.Allocator) !void {
     var cfg = try ConfigApi.AppConfig.initDefault(allocator);
     defer cfg.deinit(allocator);
 

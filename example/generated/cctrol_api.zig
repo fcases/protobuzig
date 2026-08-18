@@ -104,6 +104,28 @@ const SenialInfoImpl = cctrol_impl.SenialInfo;
 const TextoInfoImpl = cctrol_impl.TextoInfo;
 
 // ============================================================================
+// HELPERS PRIVADOS DE COPIA PROFUNDA
+// ============================================================================
+//
+// cloneImpl() realiza una copia profunda usando el camino binario generado.
+//
+// Estrategia inicial:
+//
+//   clone = seriigiAlBin(.BF_PROTOBUF) + deseriigiElBin(.BF_PROTOBUF)
+//
+// Esta version prioriza simplicidad y seguridad de ownership.
+// Si seriigi/deseriigi tiene un bug, debe corregirse en ProtobuZig,
+// porque afecta tambien al uso normal de mensajes en K6Bus.
+//
+
+fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {
+    const bytes = try src.seriigiAlBin(allocator, .BF_PROTOBUF);
+    defer allocator.free(bytes);
+
+    return try T.deseriigiElBin(allocator, bytes, .BF_PROTOBUF);
+}
+
+// ============================================================================
 // WRAPPERS PUBLICOS
 // ============================================================================
 //
@@ -136,6 +158,16 @@ pub const CCtrol = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                CCtrolImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setNombre(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -150,6 +182,48 @@ pub const CCtrol = struct {
         return self.impl.nombre;
     }
 
+    pub fn getRemotasCount(self: *const Self) usize {
+        return self.impl.remotas.len;
+    }
+
+    pub fn getRemotasAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !EstRemCtrol {
+        if (index >= self.impl.remotas.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                EstRemCtrolImpl,
+                allocator,
+                &self.impl.remotas[index],
+            ),
+        };
+    }
+
+    pub fn appendRemotas(self: *Self, allocator: std.mem.Allocator, value: *const EstRemCtrol) !void {
+        const tmp_item = try cloneImpl(
+            EstRemCtrolImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.remotas.len;
+        self.impl.remotas = try allocator.realloc(
+            self.impl.remotas,
+            old_len + 1,
+        );
+
+        self.impl.remotas[old_len] = tmp_item;
+    }
+
+    pub fn clearRemotas(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.remotas) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.remotas);
+        self.impl.remotas = try allocator.alloc(EstRemCtrolImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -270,6 +344,16 @@ pub const EstRemCtrol = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                EstRemCtrolImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setNombre(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -284,6 +368,132 @@ pub const EstRemCtrol = struct {
         return self.impl.nombre;
     }
 
+    pub fn getMeteosCount(self: *const Self) usize {
+        return self.impl.meteos.len;
+    }
+
+    pub fn getMeteosAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !EstMeteo {
+        if (index >= self.impl.meteos.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                EstMeteoImpl,
+                allocator,
+                &self.impl.meteos[index],
+            ),
+        };
+    }
+
+    pub fn appendMeteos(self: *Self, allocator: std.mem.Allocator, value: *const EstMeteo) !void {
+        const tmp_item = try cloneImpl(
+            EstMeteoImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.meteos.len;
+        self.impl.meteos = try allocator.realloc(
+            self.impl.meteos,
+            old_len + 1,
+        );
+
+        self.impl.meteos[old_len] = tmp_item;
+    }
+
+    pub fn clearMeteos(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.meteos) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.meteos);
+        self.impl.meteos = try allocator.alloc(EstMeteoImpl, 0);
+    }
+    pub fn getDatosTrCount(self: *const Self) usize {
+        return self.impl.datos_tr.len;
+    }
+
+    pub fn getDatosTrAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !SnrTrafico {
+        if (index >= self.impl.datos_tr.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                SnrTraficoImpl,
+                allocator,
+                &self.impl.datos_tr[index],
+            ),
+        };
+    }
+
+    pub fn appendDatosTr(self: *Self, allocator: std.mem.Allocator, value: *const SnrTrafico) !void {
+        const tmp_item = try cloneImpl(
+            SnrTraficoImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.datos_tr.len;
+        self.impl.datos_tr = try allocator.realloc(
+            self.impl.datos_tr,
+            old_len + 1,
+        );
+
+        self.impl.datos_tr[old_len] = tmp_item;
+    }
+
+    pub fn clearDatosTr(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.datos_tr) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.datos_tr);
+        self.impl.datos_tr = try allocator.alloc(SnrTraficoImpl, 0);
+    }
+    pub fn getPanelesCount(self: *const Self) usize {
+        return self.impl.paneles.len;
+    }
+
+    pub fn getPanelesAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !PanelInfoV {
+        if (index >= self.impl.paneles.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                PanelInfoVImpl,
+                allocator,
+                &self.impl.paneles[index],
+            ),
+        };
+    }
+
+    pub fn appendPaneles(self: *Self, allocator: std.mem.Allocator, value: *const PanelInfoV) !void {
+        const tmp_item = try cloneImpl(
+            PanelInfoVImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.paneles.len;
+        self.impl.paneles = try allocator.realloc(
+            self.impl.paneles,
+            old_len + 1,
+        );
+
+        self.impl.paneles[old_len] = tmp_item;
+    }
+
+    pub fn clearPaneles(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.paneles) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.paneles);
+        self.impl.paneles = try allocator.alloc(PanelInfoVImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -402,6 +612,16 @@ pub const EstMeteo = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                EstMeteoImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setTemp(self: *Self, value: u32) void {
@@ -560,6 +780,16 @@ pub const SnrTrafico = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                SnrTraficoImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setCarriles(self: *Self, value: u32) void {
@@ -796,6 +1026,16 @@ pub const PanelInfoV = struct {
         self.impl.deinit(allocator);
     }
 
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                PanelInfoVImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
+    }
+
     pub fn setNombre(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -810,6 +1050,48 @@ pub const PanelInfoV = struct {
         return self.impl.nombre;
     }
 
+    pub fn getElementosCount(self: *const Self) usize {
+        return self.impl.elementos.len;
+    }
+
+    pub fn getElementosAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !PanelBase {
+        if (index >= self.impl.elementos.len) {
+            return error.IndexOutOfBounds;
+        }
+
+        return .{
+            .impl = try cloneImpl(
+                PanelBaseImpl,
+                allocator,
+                &self.impl.elementos[index],
+            ),
+        };
+    }
+
+    pub fn appendElementos(self: *Self, allocator: std.mem.Allocator, value: *const PanelBase) !void {
+        const tmp_item = try cloneImpl(
+            PanelBaseImpl,
+            allocator,
+            &value.impl,
+        );
+        errdefer tmp_item.deinit(allocator);
+
+        const old_len = self.impl.elementos.len;
+        self.impl.elementos = try allocator.realloc(
+            self.impl.elementos,
+            old_len + 1,
+        );
+
+        self.impl.elementos[old_len] = tmp_item;
+    }
+
+    pub fn clearElementos(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.elementos) |*item| {
+            item.deinit(allocator);
+        }
+        allocator.free(self.impl.elementos);
+        self.impl.elementos = try allocator.alloc(PanelBaseImpl, 0);
+    }
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -928,6 +1210,16 @@ pub const PanelBase = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                PanelBaseImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setTipo(self: *Self, value: TipoPanel) void {
@@ -1070,6 +1362,16 @@ pub const SenialInfo = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                SenialInfoImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setNombre(
@@ -1218,6 +1520,16 @@ pub const TextoInfo = struct {
 
     pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
         self.impl.deinit(allocator);
+    }
+
+    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
+        return .{
+            .impl = try cloneImpl(
+                TextoInfoImpl,
+                allocator,
+                &self.impl,
+            ),
+        };
     }
 
     pub fn setNombre(
