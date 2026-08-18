@@ -1462,6 +1462,7 @@ fn skribiRepeatedMessageAccessors(
             \\        self.impl.{s} = try allocator.alloc({s}, 0);
             \\    }}
             \\
+            \\
         , .{
             count_name,
             field.name,

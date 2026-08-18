@@ -263,6 +263,7 @@ pub const AppConfig = struct {
         allocator.free(self.impl.domains);
         self.impl.domains = try allocator.alloc(DomainConfigImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -565,6 +566,7 @@ pub const DomainConfig = struct {
         allocator.free(self.impl.transports);
         self.impl.transports = try allocator.alloc(TransportConfigImpl, 0);
     }
+
     pub fn getCrossConnectorsCount(self: *const Self) usize {
         return self.impl.cross_connectors.len;
     }
@@ -607,6 +609,7 @@ pub const DomainConfig = struct {
         allocator.free(self.impl.cross_connectors);
         self.impl.cross_connectors = try allocator.alloc(CrossConnectorConfigImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
@@ -1634,6 +1637,7 @@ pub const UDPStarConfig = struct {
         allocator.free(self.impl.end_point);
         self.impl.end_point = try allocator.alloc(EndPointConfigImpl, 0);
     }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
