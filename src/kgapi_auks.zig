@@ -133,7 +133,6 @@ pub fn estasRepeatedMessage(field: prs.Field) bool {
 // ============================================================================
 // NOMBRES DE METODOS
 // ============================================================================
-
 pub fn skribiSetNomon(
     allocator: std.mem.Allocator,
     field_name: []const u8,
@@ -223,10 +222,68 @@ pub fn skribiAtNomon(
     );
 }
 
+pub fn skribiOneofClearNomon(allocator: std.mem.Allocator, oneof_name: []const u8) ![]const u8 {
+    return try skribiMetodoNomon(allocator, "clear", oneof_name);
+}
+
+pub fn skribiOneofHasNomon(allocator: std.mem.Allocator, oneof_name: []const u8) ![]const u8 {
+    return try skribiMetodoNomon(allocator, "has", oneof_name);
+}
+
+pub fn skribiOneofFieldSetNomon(allocator: std.mem.Allocator, oneof_name: []const u8, field_name: []const u8) ![]const u8 {
+    const oneof_pascal = try skribiPascalNomon(allocator, oneof_name);
+    defer allocator.free(oneof_pascal);
+
+    const field_pascal = try skribiPascalNomon(allocator, field_name);
+    defer allocator.free(field_pascal);
+
+    return try std.fmt.allocPrint(
+        allocator,
+        "set{s}{s}",
+        .{
+            oneof_pascal,
+            field_pascal,
+        },
+    );
+}
+
+pub fn skribiOneofFieldGetNomon(allocator: std.mem.Allocator, oneof_name: []const u8, field_name: []const u8) ![]const u8 {
+    const oneof_pascal = try skribiPascalNomon(allocator, oneof_name);
+    defer allocator.free(oneof_pascal);
+
+    const field_pascal = try skribiPascalNomon(allocator, field_name);
+    defer allocator.free(field_pascal);
+
+    return try std.fmt.allocPrint(
+        allocator,
+        "get{s}{s}",
+        .{
+            oneof_pascal,
+            field_pascal,
+        },
+    );
+}
+
+pub fn skribiOneofFieldHasNomon(allocator: std.mem.Allocator, oneof_name: []const u8, field_name: []const u8) ![]const u8 {
+    const oneof_pascal = try skribiPascalNomon(allocator, oneof_name);
+    defer allocator.free(oneof_pascal);
+
+    const field_pascal = try skribiPascalNomon(allocator, field_name);
+    defer allocator.free(field_pascal);
+
+    return try std.fmt.allocPrint(
+        allocator,
+        "has{s}{s}",
+        .{
+            oneof_pascal,
+            field_pascal,
+        },
+    );
+}
+
 // ============================================================================
 // UTILIDADES DE NOMBRE
 // ============================================================================
-
 pub fn skribiMetodoNomon(
     allocator: std.mem.Allocator,
     prefix: []const u8,

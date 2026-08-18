@@ -1244,6 +1244,177 @@ pub const PanelBase = struct {
         return self.impl.nombre;
     }
 
+    pub fn hasDatos(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .none => false,
+            else => true,
+        };
+    }
+
+    pub fn clearDatos(self: *Self, allocator: std.mem.Allocator) void {
+        switch (self.impl.datos) {
+            .none => {},
+            .senial => |*value| {
+                value.deinit(allocator);
+            },
+            .texto => |*value| {
+                value.deinit(allocator);
+            },
+            .numero => {},
+            .texto_raw => |value| {
+                allocator.free(value);
+            },
+            .blob => |value| {
+                allocator.free(value);
+            },
+            .tp => {},
+        }
+
+        self.impl.datos = .none;
+    }
+
+    pub fn setDatosSenial(self: *Self, allocator: std.mem.Allocator, value: *const SenialInfo) !void {
+        const tmp = try cloneImpl(
+            SenialInfoImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .senial = tmp };
+    }
+
+    pub fn hasDatosSenial(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .senial => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosSenial(self: *const Self, allocator: std.mem.Allocator) !SenialInfo {
+        return switch (self.impl.datos) {
+            .senial => |*value| .{
+                .impl = try cloneImpl(
+                    SenialInfoImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setDatosTexto(self: *Self, allocator: std.mem.Allocator, value: *const TextoInfo) !void {
+        const tmp = try cloneImpl(
+            TextoInfoImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .texto = tmp };
+    }
+
+    pub fn hasDatosTexto(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .texto => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosTexto(self: *const Self, allocator: std.mem.Allocator) !TextoInfo {
+        return switch (self.impl.datos) {
+            .texto => |*value| .{
+                .impl = try cloneImpl(
+                    TextoInfoImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setDatosNumero(self: *Self, allocator: std.mem.Allocator, value: u32) void {
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .numero = value };
+    }
+
+    pub fn hasDatosNumero(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .numero => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosNumero(self: *const Self) !u32 {
+        return switch (self.impl.datos) {
+            .numero => |value| value,
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setDatosTp(self: *Self, allocator: std.mem.Allocator, value: TipoPanel) void {
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .tp = value };
+    }
+
+    pub fn hasDatosTp(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .tp => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosTp(self: *const Self) !TipoPanel {
+        return switch (self.impl.datos) {
+            .tp => |value| value,
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setDatosTextoRaw(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .texto_raw = tmp };
+    }
+
+    pub fn hasDatosTextoRaw(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .texto_raw => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosTextoRaw(self: *const Self) ![]const u8 {
+        return switch (self.impl.datos) {
+            .texto_raw => |value| value,
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setDatosBlob(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        self.clearDatos(allocator);
+        self.impl.datos = .{ .blob = tmp };
+    }
+
+    pub fn hasDatosBlob(self: *const Self) bool {
+        return switch (self.impl.datos) {
+            .blob => true,
+            else => false,
+        };
+    }
+
+    pub fn getDatosBlob(self: *const Self) ![]const u8 {
+        return switch (self.impl.datos) {
+            .blob => |value| value,
+            else => error.WrongOneofField,
+        };
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,

@@ -63,8 +63,213 @@ pub fn main() !void {
     try testOptionalDefaultPresencia(allocator);
     try testCloneEstMeteo(allocator);
     try testRepeatedMessage(allocator);
+    try testOneofPanelBase(allocator);
 
     std.debug.print("testo3: OK\n", .{});
+}
+
+fn testOneofPanelBase(allocator: std.mem.Allocator) !void {
+    var panel = try Api.PanelBase.initDefault(allocator);
+    defer panel.deinit(allocator);
+
+    try panel.setNombre(allocator, "panel-oneof-1");
+    panel.setTipo(.TEXTO);
+
+    try std.testing.expect(!panel.hasDatos());
+    try std.testing.expect(!panel.hasDatosSenial());
+    try std.testing.expect(!panel.hasDatosTexto());
+
+    var senial = try Api.SenialInfo.initDefault(allocator);
+    defer senial.deinit(allocator);
+
+    try senial.setNombre(allocator, "senial-1");
+    try senial.setSenial(allocator, "prohibido prohibir");
+
+    try panel.setDatosSenial(allocator, &senial);
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(panel.hasDatosSenial());
+    try std.testing.expect(!panel.hasDatosTexto());
+
+    var senial2 = try panel.getDatosSenial(allocator);
+    defer senial2.deinit(allocator);
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        senial2.getNombre(),
+        "senial-1",
+    ));
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        senial2.getSenial(),
+        "prohibido prohibir",
+    ));
+
+    var texto = try Api.TextoInfo.initDefault(allocator);
+    defer texto.deinit(allocator);
+
+    try texto.setNombre(allocator, "texto-1");
+    try texto.setTexto(allocator, "hola oneof");
+
+    try panel.setDatosTexto(allocator, &texto);
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(!panel.hasDatosSenial());
+    try std.testing.expect(panel.hasDatosTexto());
+
+    var texto2 = try panel.getDatosTexto(allocator);
+    defer texto2.deinit(allocator);
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        texto2.getNombre(),
+        "texto-1",
+    ));
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        texto2.getTexto(),
+        "hola oneof",
+    ));
+
+    const bin = try panel.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin);
+
+    var panel2 = try Api.PanelBase.deserializeFromBin(
+        allocator,
+        bin,
+        .BF_PROTOBUF,
+    );
+    defer panel2.deinit(allocator);
+
+    try std.testing.expect(panel2.hasDatos());
+    try std.testing.expect(!panel2.hasDatosSenial());
+    try std.testing.expect(panel2.hasDatosTexto());
+
+    var texto3 = try panel2.getDatosTexto(allocator);
+    defer texto3.deinit(allocator);
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        texto3.getTexto(),
+        "hola oneof",
+    ));
+
+    panel2.clearDatos(allocator);
+
+    try std.testing.expect(!panel2.hasDatos());
+    try std.testing.expect(!panel2.hasDatosSenial());
+    try std.testing.expect(!panel2.hasDatosTexto());
+
+
+    // // //
+    panel.setTipo(.NUMERO);
+    panel.setDatosNumero(allocator, 1234);
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(!panel.hasDatosSenial());
+    try std.testing.expect(!panel.hasDatosTexto());
+    try std.testing.expect(panel.hasDatosNumero());
+
+    try std.testing.expectEqual(
+        @as(u32, 1234),
+        try panel.getDatosNumero(),
+    );
+
+    const bin_numero = try panel.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin_numero);
+
+    var panel_numero = try Api.PanelBase.deserializeFromBin(
+        allocator,
+        bin_numero,
+        .BF_PROTOBUF,
+    );
+    defer panel_numero.deinit(allocator);
+
+    try std.testing.expect(panel_numero.hasDatos());
+    try std.testing.expect(!panel_numero.hasDatosSenial());
+    try std.testing.expect(!panel_numero.hasDatosTexto());
+    try std.testing.expect(panel_numero.hasDatosNumero());
+
+    try std.testing.expectEqual(
+        @as(u32, 1234),
+        try panel_numero.getDatosNumero(),
+    );
+
+
+    /////////////////
+    try panel.setDatosTextoRaw(allocator, "texto raw oneof");
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(!panel.hasDatosSenial());
+    try std.testing.expect(!panel.hasDatosTexto());
+    try std.testing.expect(!panel.hasDatosNumero());
+    try std.testing.expect(panel.hasDatosTextoRaw());
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        try panel.getDatosTextoRaw(),
+        "texto raw oneof",
+    ));
+
+    try panel.setDatosBlob(
+        allocator,
+        &[_]u8{ 1, 2, 3, 4 },
+    );
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(panel.hasDatosBlob());
+    try std.testing.expect(!panel.hasDatosTextoRaw());
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        try panel.getDatosBlob(),
+        &[_]u8{ 1, 2, 3, 4 },
+    ));
+
+    panel.setDatosTp(allocator, .NUMERO);
+
+    try std.testing.expect(panel.hasDatos());
+    try std.testing.expect(panel.hasDatosTp());
+    try std.testing.expect(!panel.hasDatosBlob());
+
+    try std.testing.expectEqual(
+        Api.TipoPanel.NUMERO,
+        try panel.getDatosTp(),
+    );
+
+    const bin_tp = try panel.serializeToBin(
+        allocator,
+        .BF_PROTOBUF,
+    );
+    defer allocator.free(bin_tp);
+
+    var panel_tp = try Api.PanelBase.deserializeFromBin(
+        allocator,
+        bin_tp,
+        .BF_PROTOBUF,
+    );
+    defer panel_tp.deinit(allocator);
+
+    try std.testing.expect(panel_tp.hasDatosTp());
+
+    try std.testing.expectEqual(
+        Api.TipoPanel.NUMERO,
+        try panel_tp.getDatosTp(),
+    );
+    
+    /////////////////
+    std.debug.print(
+        "testo3: oneof PanelBase.datos OK\n",
+        .{},
+    );   
 }
 
 fn testRepeatedMessage(allocator: std.mem.Allocator) !void {

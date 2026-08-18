@@ -16,6 +16,7 @@ pub const cctrol = struct {
 pub const TipoPanel = enum(u64) {
    SENIAL = 0,
    TEXTO = 1,
+   NUMERO = 2,
 };
 
 pub const CCtrol = struct {
@@ -914,6 +915,10 @@ pub const PanelBase = struct {
         none: void,
         senial: SenialInfo,
         texto: TextoInfo,
+        numero: u32,
+        texto_raw: []const u8,
+        blob: []const u8,
+        tp: TipoPanel,
     };
 
     nombre: []const u8,
@@ -933,6 +938,10 @@ pub const PanelBase = struct {
             .none => {},
             .senial => |*v| v.deinit(allocator),
             .texto => |*v| v.deinit(allocator),
+            .numero => {},
+            .texto_raw => |v| allocator.free(v),
+            .blob => |v| allocator.free(v),
+            .tp => {},
         }
     }
 
@@ -980,6 +989,18 @@ pub const PanelBase = struct {
 
                 try bufro.print(allocator, "{s}texto {{\n{s}{s}}}\n", .{ ind, texto_text, ind });
             },
+            .numero => |val| {
+                try bufro.print(allocator, "{s}numero: {any}\n", .{ ind, val });
+            },
+            .texto_raw => |val| {
+                try bufro.print(allocator, "{s}texto_raw: \"{s}\"\n", .{ ind, val });
+            },
+            .blob => |val| {
+                try bufro.print(allocator, "{s}blob: \"{s}\"\n", .{ ind, val });
+            },
+            .tp => |val| {
+                try bufro.print(allocator, "{s}tp: {s}\n", .{ ind, @tagName(val) });
+            },
         }
 
 
@@ -1018,6 +1039,30 @@ pub const PanelBase = struct {
                 mia_Mesagho.datos = .{ .texto = datos_texto_val };
                 continue;
             }
+            if( equal(u8, tok, "numero" ) ) {
+                const datos_numero_val = std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .numero = datos_numero_val };
+                continue;
+            }
+            if( equal(u8, tok, "texto_raw" ) ) {
+                const datos_texto_raw_val = try allocator.dupe(u8, val);
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .texto_raw = datos_texto_raw_val };
+                continue;
+            }
+            if( equal(u8, tok, "blob" ) ) {
+                const datos_blob_val = try allocator.dupe(u8, val);
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .blob = datos_blob_val };
+                continue;
+            }
+            if( equal(u8, tok, "tp" ) ) {
+                const datos_tp_val = parseEnumValue(TipoPanel, val) catch (std.meta.intToEnum(TipoPanel, 0) catch unreachable);
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .tp = datos_tp_val };
+                continue;
+            }
         }
 
         return mia_Mesagho;
@@ -1048,6 +1093,22 @@ pub const PanelBase = struct {
                 tuta_longo += datos_texto_longa;
                 tuta_longo += try buffer.encodeVarint(datos_texto_longa);
                 tuta_longo += try buffer.encodeVarint((@as(u32, 21) << 3) | 2);
+            },
+            .numero => |val| {
+                tuta_longo += try buffer.encodeUint32( val );
+                tuta_longo += try buffer.encodeVarint((@as(u32, 22) << 3) | 0);
+            },
+            .texto_raw => |val| {
+                tuta_longo += try buffer.encodeString( val );
+                tuta_longo += try buffer.encodeVarint((@as(u32, 23) << 3) | 2);
+            },
+            .blob => |val| {
+                tuta_longo += try buffer.encodeBytes( val );
+                tuta_longo += try buffer.encodeVarint((@as(u32, 24) << 3) | 2);
+            },
+            .tp => |val| {
+                tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
+                tuta_longo += try buffer.encodeVarint((@as(u32, 25) << 3) | 0);
             },
         }
 
@@ -1109,6 +1170,30 @@ pub const PanelBase = struct {
     
                 mia_Mesagho.deinitDatos(allocator);
                 mia_Mesagho.datos = .{ .texto = datos_texto_val };
+            }
+            else if ( field_number == 22 and wire_type == 0 )
+            {
+                const datos_numero_val = try buffer.decodeUint32();
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .numero = datos_numero_val };
+            }
+            else if ( field_number == 23 and wire_type == 2 )
+            {
+                const datos_texto_raw_val = try buffer.decodeString(try buffer.decodeVarint());
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .texto_raw = datos_texto_raw_val };
+            }
+            else if ( field_number == 24 and wire_type == 2 )
+            {
+                const datos_blob_val = try buffer.decodeBytes(try buffer.decodeVarint());
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .blob = datos_blob_val };
+            }
+            else if ( field_number == 25 and wire_type == 0 )
+            {
+                const datos_tp_val = try std.meta.intToEnum(TipoPanel, try buffer.decodeVarint());
+                mia_Mesagho.deinitDatos(allocator);
+                mia_Mesagho.datos = .{ .tp = datos_tp_val };
             }
             else if ( field_number == 1 and wire_type == 2 ) 
             {

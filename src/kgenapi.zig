@@ -557,6 +557,11 @@ fn skribiUnuWrapperStruct(allocator: std.mem.Allocator, buf: *std.ArrayList(u8),
     try skribiOptionalMessageAccessors(allocator, buf, msg);
     try skribiRepeatedMessageAccessors(allocator, buf, msg);
 
+    try skribiOneofClearAndHasAccessors(allocator, buf, msg);
+    try skribiOneofMessageFieldAccessors(allocator, buf, msg);
+    try skribiOneofScalarOrEnumFieldAccessors(allocator, buf, msg);
+    try skribiOneofStringOrBytesFieldAccessors(allocator, buf, msg);
+
     try skribiWrapperStructFin(allocator, buf, msg);
 }
 
@@ -1481,6 +1486,353 @@ fn skribiRepeatedMessageAccessors(
             field.name,
             impl_type_name,
         });
+    }
+}
+
+fn skribiOneofClearAndHasAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.oneofs) |oneof_decl| {
+        const clear_name = try api_auks.skribiOneofClearNomon(
+            allocator,
+            oneof_decl.name,
+        );
+        defer allocator.free(clear_name);
+
+        const has_name = try api_auks.skribiOneofHasNomon(
+            allocator,
+            oneof_decl.name,
+        );
+        defer allocator.free(has_name);
+
+        try buf.print(allocator,
+            \\    pub fn {s}(self: *const Self) bool {{
+            \\        return switch (self.impl.{s}) {{
+            \\            .none => false,
+            \\            else => true,
+            \\        }};
+            \\    }}
+            \\
+            \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator) void {{
+            \\        switch (self.impl.{s}) {{
+            \\            .none => {{}},
+            \\
+        , .{
+            has_name,
+            oneof_decl.name,
+            clear_name,
+            oneof_decl.name,
+        });
+
+        for (oneof_decl.fields) |field| {
+            switch (field.field_type_enum) {
+                .TYPE_MESSAGE => {
+                    try buf.print(allocator,
+                        \\            .{s} => |*value| {{
+                        \\                value.deinit(allocator);
+                        \\            }},
+                        \\
+                    , .{
+                        field.name,
+                    });
+                },
+
+                .TYPE_STRING,
+                .TYPE_BYTES,
+                => {
+                    try buf.print(allocator,
+                        \\            .{s} => |value| {{
+                        \\                allocator.free(value);
+                        \\            }},
+                        \\
+                    , .{
+                        field.name,
+                    });
+                },
+
+                else => {
+                    try buf.print(allocator,
+                        \\            .{s} => {{}},
+                        \\
+                    , .{
+                        field.name,
+                    });
+                },
+            }
+        }
+
+        try buf.print(allocator,
+            \\        }}
+            \\
+            \\        self.impl.{s} = .none;
+            \\    }}
+            \\
+            \\
+        , .{
+            oneof_decl.name,
+        });
+    }
+}
+
+fn skribiOneofMessageFieldAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.oneofs) |oneof_decl| {
+        const clear_name = try api_auks.skribiOneofClearNomon(
+            allocator,
+            oneof_decl.name,
+        );
+        defer allocator.free(clear_name);
+
+        for (oneof_decl.fields) |field| {
+            if (field.field_type_enum != .TYPE_MESSAGE) {
+                continue;
+            }
+
+            const set_name = try api_auks.skribiOneofFieldSetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(set_name);
+
+            const get_name = try api_auks.skribiOneofFieldGetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(get_name);
+
+            const has_name = try api_auks.skribiOneofFieldHasNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(has_name);
+
+            const wrapper_type_name = field.field_type;
+
+            const impl_type_name = try std.fmt.allocPrint(
+                allocator,
+                "{s}Impl",
+                .{field.field_type},
+            );
+            defer allocator.free(impl_type_name);
+
+            try buf.print(allocator,
+                \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: *const {s}) !void {{
+                \\        const tmp = try cloneImpl(
+                \\            {s},
+                \\            allocator,
+                \\            &value.impl,
+                \\        );
+                \\
+                \\        self.{s}(allocator);
+                \\        self.impl.{s} = .{{ .{s} = tmp }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self) bool {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => true,
+                \\            else => false,
+                \\        }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self, allocator: std.mem.Allocator) !{s} {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => |*value| .{{
+                \\                .impl = try cloneImpl(
+                \\                    {s},
+                \\                    allocator,
+                \\                    value,
+                \\                ),
+                \\            }},
+                \\            else => error.WrongOneofField,
+                \\        }};
+                \\    }}
+                \\
+                \\
+            , .{
+                set_name,
+                wrapper_type_name,
+                impl_type_name,
+                clear_name,
+                oneof_decl.name,
+                field.name,
+
+                has_name,
+                oneof_decl.name,
+                field.name,
+
+                get_name,
+                wrapper_type_name,
+                oneof_decl.name,
+                field.name,
+                impl_type_name,
+            });
+        }
+    }
+}
+
+fn skribiOneofScalarOrEnumFieldAccessors(
+    allocator: std.mem.Allocator,
+    buf: *std.ArrayList(u8),
+    msg: prs.Message,
+) !void {
+    for (msg.oneofs) |oneof_decl| {
+        const clear_name = try api_auks.skribiOneofClearNomon(
+            allocator,
+            oneof_decl.name,
+        );
+        defer allocator.free(clear_name);
+
+        for (oneof_decl.fields) |field| {
+            if (!api_auks.estasScalarOrEnum(field.field_type_enum)) {
+                continue;
+            }
+
+            const set_name = try api_auks.skribiOneofFieldSetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(set_name);
+
+            const get_name = try api_auks.skribiOneofFieldGetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(get_name);
+
+            const has_name = try api_auks.skribiOneofFieldHasNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(has_name);
+
+            const zig_type = kgen_auks.mapiProtoTiponAlZig(
+                field.field_type,
+            );
+
+            try buf.print(allocator,
+                \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: {s}) void {{
+                \\        self.{s}(allocator);
+                \\        self.impl.{s} = .{{ .{s} = value }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self) bool {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => true,
+                \\            else => false,
+                \\        }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self) !{s} {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => |value| value,
+                \\            else => error.WrongOneofField,
+                \\        }};
+                \\    }}
+                \\
+                \\
+            , .{
+                set_name,
+                zig_type,
+                clear_name,
+                oneof_decl.name,
+                field.name,
+
+                has_name,
+                oneof_decl.name,
+                field.name,
+
+                get_name,
+                zig_type,
+                oneof_decl.name,
+                field.name,
+            });
+        }
+    }
+}
+
+fn skribiOneofStringOrBytesFieldAccessors(allocator: std.mem.Allocator, buf: *std.ArrayList(u8), msg: prs.Message) !void {
+    for (msg.oneofs) |oneof_decl| {
+        const clear_name = try api_auks.skribiOneofClearNomon(
+            allocator,
+            oneof_decl.name,
+        );
+        defer allocator.free(clear_name);
+
+        for (oneof_decl.fields) |field| {
+            if (!api_auks.estasStringOrBytes(field.field_type_enum)) {
+                continue;
+            }
+
+            const set_name = try api_auks.skribiOneofFieldSetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(set_name);
+
+            const get_name = try api_auks.skribiOneofFieldGetNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(get_name);
+
+            const has_name = try api_auks.skribiOneofFieldHasNomon(
+                allocator,
+                oneof_decl.name,
+                field.name,
+            );
+            defer allocator.free(has_name);
+
+            try buf.print(allocator,
+                \\    pub fn {s}(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {{
+                \\        const tmp = try allocator.dupe(u8, value);
+                \\
+                \\        self.{s}(allocator);
+                \\        self.impl.{s} = .{{ .{s} = tmp }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self) bool {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => true,
+                \\            else => false,
+                \\        }};
+                \\    }}
+                \\
+                \\    pub fn {s}(self: *const Self) ![]const u8 {{
+                \\        return switch (self.impl.{s}) {{
+                \\            .{s} => |value| value,
+                \\            else => error.WrongOneofField,
+                \\        }};
+                \\    }}
+                \\
+                \\
+            , .{
+                set_name,
+                clear_name,
+                oneof_decl.name,
+                field.name,
+
+                has_name,
+                oneof_decl.name,
+                field.name,
+
+                get_name,
+                oneof_decl.name,
+                field.name,
+            });
+        }
     }
 }
 

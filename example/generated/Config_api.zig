@@ -775,6 +775,191 @@ pub const TransportConfig = struct {
         return self.impl.name;
     }
 
+    pub fn hasParams(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .none => false,
+            else => true,
+        };
+    }
+
+    pub fn clearParams(self: *Self, allocator: std.mem.Allocator) void {
+        switch (self.impl.params) {
+            .none => {},
+            .mcast => |*value| {
+                value.deinit(allocator);
+            },
+            .bcast => |*value| {
+                value.deinit(allocator);
+            },
+            .udpstar => |*value| {
+                value.deinit(allocator);
+            },
+            .usoxstar => |*value| {
+                value.deinit(allocator);
+            },
+            .custom => |*value| {
+                value.deinit(allocator);
+            },
+        }
+
+        self.impl.params = .none;
+    }
+
+    pub fn setParamsMcast(self: *Self, allocator: std.mem.Allocator, value: *const MCastConfig) !void {
+        const tmp = try cloneImpl(
+            MCastConfigImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearParams(allocator);
+        self.impl.params = .{ .mcast = tmp };
+    }
+
+    pub fn hasParamsMcast(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .mcast => true,
+            else => false,
+        };
+    }
+
+    pub fn getParamsMcast(self: *const Self, allocator: std.mem.Allocator) !MCastConfig {
+        return switch (self.impl.params) {
+            .mcast => |*value| .{
+                .impl = try cloneImpl(
+                    MCastConfigImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setParamsBcast(self: *Self, allocator: std.mem.Allocator, value: *const BCastConfig) !void {
+        const tmp = try cloneImpl(
+            BCastConfigImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearParams(allocator);
+        self.impl.params = .{ .bcast = tmp };
+    }
+
+    pub fn hasParamsBcast(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .bcast => true,
+            else => false,
+        };
+    }
+
+    pub fn getParamsBcast(self: *const Self, allocator: std.mem.Allocator) !BCastConfig {
+        return switch (self.impl.params) {
+            .bcast => |*value| .{
+                .impl = try cloneImpl(
+                    BCastConfigImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setParamsUdpstar(self: *Self, allocator: std.mem.Allocator, value: *const UDPStarConfig) !void {
+        const tmp = try cloneImpl(
+            UDPStarConfigImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearParams(allocator);
+        self.impl.params = .{ .udpstar = tmp };
+    }
+
+    pub fn hasParamsUdpstar(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .udpstar => true,
+            else => false,
+        };
+    }
+
+    pub fn getParamsUdpstar(self: *const Self, allocator: std.mem.Allocator) !UDPStarConfig {
+        return switch (self.impl.params) {
+            .udpstar => |*value| .{
+                .impl = try cloneImpl(
+                    UDPStarConfigImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setParamsUsoxstar(self: *Self, allocator: std.mem.Allocator, value: *const UnixSocketStarConfig) !void {
+        const tmp = try cloneImpl(
+            UnixSocketStarConfigImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearParams(allocator);
+        self.impl.params = .{ .usoxstar = tmp };
+    }
+
+    pub fn hasParamsUsoxstar(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .usoxstar => true,
+            else => false,
+        };
+    }
+
+    pub fn getParamsUsoxstar(self: *const Self, allocator: std.mem.Allocator) !UnixSocketStarConfig {
+        return switch (self.impl.params) {
+            .usoxstar => |*value| .{
+                .impl = try cloneImpl(
+                    UnixSocketStarConfigImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
+    pub fn setParamsCustom(self: *Self, allocator: std.mem.Allocator, value: *const CustomTransportConfig) !void {
+        const tmp = try cloneImpl(
+            CustomTransportConfigImpl,
+            allocator,
+            &value.impl,
+        );
+
+        self.clearParams(allocator);
+        self.impl.params = .{ .custom = tmp };
+    }
+
+    pub fn hasParamsCustom(self: *const Self) bool {
+        return switch (self.impl.params) {
+            .custom => true,
+            else => false,
+        };
+    }
+
+    pub fn getParamsCustom(self: *const Self, allocator: std.mem.Allocator) !CustomTransportConfig {
+        return switch (self.impl.params) {
+            .custom => |*value| .{
+                .impl = try cloneImpl(
+                    CustomTransportConfigImpl,
+                    allocator,
+                    value,
+                ),
+            },
+            else => error.WrongOneofField,
+        };
+    }
+
     pub fn writeToText(
         self: *Self,
         allocator: std.mem.Allocator,
