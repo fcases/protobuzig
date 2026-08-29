@@ -8,7 +8,8 @@ const encdec = @import("encdec.zig");
 const EncodeBuffer = encdec.EncodeBuffer;
 const DecodeBuffer = encdec.DecodeBuffer;
 
-const TokenIterType = std.mem.TokenIterator(u8, .any);
+//const TokenIterType = std.mem.TokenIterator(u8, .any);
+const TokenIterType = CustomTokenizer;
 
 pub const cctrol = struct {
 
@@ -74,19 +75,30 @@ pub const CCtrol = struct {
         var mia_Mesagho = try CCtrol.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var remotas_list: std.ArrayList(EstRemCtrol) = .empty; 
+        var remotas_list: std.ArrayList(EstRemCtrol) = .empty;
+        errdefer {
+            for (remotas_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            remotas_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "remotas" ) ) { 
+            if( equal(u8, tok, "remotas" ) ) {
                 const sub_msg = try EstRemCtrol.legiElProtobufTeksto(allocator, it); 
-                try remotas_list.append(allocator, sub_msg); 
+                remotas_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
         }
@@ -111,15 +123,15 @@ pub const CCtrol = struct {
  
         var tuta_longo: usize = 0;
  
-    var remotas_i: usize = self.remotas.len;
-    while (remotas_i > 0) {
-        remotas_i -= 1;
-        const item = self.remotas[remotas_i];
-        const remotas_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += remotas_longa;
-        tuta_longo += try buffer.encodeVarint(remotas_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong
+        var remotas_i: usize = self.remotas.len;
+        while (remotas_i > 0) {
+            remotas_i -= 1;
+            const item = self.remotas[remotas_i];
+            const remotas_longa = try item.seriigi( allocator, buffer );
+            tuta_longo += remotas_longa;
+            tuta_longo += try buffer.encodeVarint(remotas_longa);
+            tuta_longo += try buffer.encodeVarint(18);
+        }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -162,7 +174,12 @@ pub const CCtrol = struct {
                 mia_Mesagho.nombre = tmp_nombre;
             }
             else if ( field_number == 2 and wire_type == 2 ) 
-                { try remotas_list.append( allocator, try EstRemCtrol.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            { 
+                try remotas_list.append( 
+                    allocator, 
+                    try EstRemCtrol.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+                );
+            }
         }
 
         const tmp_remotas = try remotas_list.toOwnedSlice(allocator);
@@ -259,29 +276,60 @@ pub const EstRemCtrol = struct {
         var mia_Mesagho = try EstRemCtrol.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var meteos_list: std.ArrayList(EstMeteo) = .empty;         var datos_tr_list: std.ArrayList(SnrTrafico) = .empty;         var paneles_list: std.ArrayList(PanelInfoV) = .empty; 
+        var meteos_list: std.ArrayList(EstMeteo) = .empty;
+        errdefer {
+            for (meteos_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            meteos_list.deinit(allocator);
+        }
+        var datos_tr_list: std.ArrayList(SnrTrafico) = .empty;
+        errdefer {
+            for (datos_tr_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            datos_tr_list.deinit(allocator);
+        }
+        var paneles_list: std.ArrayList(PanelInfoV) = .empty;
+        errdefer {
+            for (paneles_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            paneles_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "meteos" ) ) { 
+            if( equal(u8, tok, "meteos" ) ) {
                 const sub_msg = try EstMeteo.legiElProtobufTeksto(allocator, it); 
-                try meteos_list.append(allocator, sub_msg); 
+                meteos_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
-            if( equal(u8, tok, "datos_tr" ) ) { 
+            if( equal(u8, tok, "datos_tr" ) ) {
                 const sub_msg = try SnrTrafico.legiElProtobufTeksto(allocator, it); 
-                try datos_tr_list.append(allocator, sub_msg); 
+                datos_tr_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
-            if( equal(u8, tok, "paneles" ) ) { 
+            if( equal(u8, tok, "paneles" ) ) {
                 const sub_msg = try PanelInfoV.legiElProtobufTeksto(allocator, it); 
-                try paneles_list.append(allocator, sub_msg); 
+                paneles_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
         }
@@ -316,35 +364,35 @@ pub const EstRemCtrol = struct {
  
         var tuta_longo: usize = 0;
  
-    var paneles_i: usize = self.paneles.len;
-    while (paneles_i > 0) {
-        paneles_i -= 1;
-        const item = self.paneles[paneles_i];
-        const paneles_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += paneles_longa;
-        tuta_longo += try buffer.encodeVarint(paneles_longa);
-        tuta_longo += try buffer.encodeVarint(34);
-    }  // 11  rept - no def - varlong
+        var paneles_i: usize = self.paneles.len;
+        while (paneles_i > 0) {
+            paneles_i -= 1;
+            const item = self.paneles[paneles_i];
+            const paneles_longa = try item.seriigi( allocator, buffer );
+            tuta_longo += paneles_longa;
+            tuta_longo += try buffer.encodeVarint(paneles_longa);
+            tuta_longo += try buffer.encodeVarint(34);
+        }  // 11  rept - no def - varlong
 
-    var datos_tr_i: usize = self.datos_tr.len;
-    while (datos_tr_i > 0) {
-        datos_tr_i -= 1;
-        const item = self.datos_tr[datos_tr_i];
-        const datos_tr_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += datos_tr_longa;
-        tuta_longo += try buffer.encodeVarint(datos_tr_longa);
-        tuta_longo += try buffer.encodeVarint(26);
-    }  // 11  rept - no def - varlong
+        var datos_tr_i: usize = self.datos_tr.len;
+        while (datos_tr_i > 0) {
+            datos_tr_i -= 1;
+            const item = self.datos_tr[datos_tr_i];
+            const datos_tr_longa = try item.seriigi( allocator, buffer );
+            tuta_longo += datos_tr_longa;
+            tuta_longo += try buffer.encodeVarint(datos_tr_longa);
+            tuta_longo += try buffer.encodeVarint(26);
+        }  // 11  rept - no def - varlong
 
-    var meteos_i: usize = self.meteos.len;
-    while (meteos_i > 0) {
-        meteos_i -= 1;
-        const item = self.meteos[meteos_i];
-        const meteos_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += meteos_longa;
-        tuta_longo += try buffer.encodeVarint(meteos_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong
+        var meteos_i: usize = self.meteos.len;
+        while (meteos_i > 0) {
+            meteos_i -= 1;
+            const item = self.meteos[meteos_i];
+            const meteos_longa = try item.seriigi( allocator, buffer );
+            tuta_longo += meteos_longa;
+            tuta_longo += try buffer.encodeVarint(meteos_longa);
+            tuta_longo += try buffer.encodeVarint(18);
+        }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -389,11 +437,26 @@ pub const EstRemCtrol = struct {
                 mia_Mesagho.nombre = tmp_nombre;
             }
             else if ( field_number == 2 and wire_type == 2 ) 
-                { try meteos_list.append( allocator, try EstMeteo.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            { 
+                try meteos_list.append( 
+                    allocator, 
+                    try EstMeteo.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+                );
+            }
             else if ( field_number == 3 and wire_type == 2 ) 
-                { try datos_tr_list.append( allocator, try SnrTrafico.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            { 
+                try datos_tr_list.append( 
+                    allocator, 
+                    try SnrTrafico.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+                );
+            }
             else if ( field_number == 4 and wire_type == 2 ) 
-                { try paneles_list.append( allocator, try PanelInfoV.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            { 
+                try paneles_list.append( 
+                    allocator, 
+                    try PanelInfoV.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+                );
+            }
         }
 
         const tmp_meteos = try meteos_list.toOwnedSlice(allocator);
@@ -474,20 +537,21 @@ pub const EstMeteo = struct {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "temp" ) ) { 
+            if( equal(u8, tok, "temp" ) ) {
                 mia_Mesagho.temp =  std.fmt.parseInt(u32,val,10) catch 0;
                 continue;
             }
-            if( equal(u8, tok, "v_viento" ) ) { 
+            if( equal(u8, tok, "v_viento" ) ) {
                 mia_Mesagho.v_viento =  std.fmt.parseFloat(f32,val) catch 0.0;
                 continue;
             }
-            if( equal(u8, tok, "dir_viento" ) ) { 
+            if( equal(u8, tok, "dir_viento" ) ) {
                 mia_Mesagho.dir_viento =  std.fmt.parseFloat(f32,val) catch 0.0;
                 continue;
             }
@@ -629,25 +693,30 @@ pub const SnrTrafico = struct {
         var mia_Mesagho = try SnrTrafico.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var vel_media_list: std.ArrayList(f32) = .empty;         var vehiculos_min_list: std.ArrayList(f32) = .empty; 
+        var vel_media_list: std.ArrayList(f32) = .empty;
+        errdefer vel_media_list.deinit(allocator);
+        var vehiculos_min_list: std.ArrayList(f32) = .empty;
+        errdefer vehiculos_min_list.deinit(allocator);
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "seccion" ) ) { 
+            if( equal(u8, tok, "seccion" ) ) {
+                const tmp_seccion = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.seccion);
-                mia_Mesagho.seccion = try allocator.dupe(u8, val);
+                mia_Mesagho.seccion = tmp_seccion;
                 continue;
             }
-            if( equal(u8, tok, "carriles" ) ) { 
+            if( equal(u8, tok, "carriles" ) ) {
                 mia_Mesagho.carriles =  std.fmt.parseInt(u32,val,10) catch 0;
                 continue;
             }
-            if( equal(u8, tok, "vel_media" ) ) { 
+            if( equal(u8, tok, "vel_media" ) ) {
                 try vel_media_list.append(allocator, std.fmt.parseFloat(f32,val) catch 0.0);
                 continue;
             }
-            if( equal(u8, tok, "vehiculos_min" ) ) { 
+            if( equal(u8, tok, "vehiculos_min" ) ) {
                 try vehiculos_min_list.append(allocator, std.fmt.parseFloat(f32,val) catch 0.0);
                 continue;
             }
@@ -737,9 +806,19 @@ pub const SnrTrafico = struct {
             else if ( field_number == 2 and wire_type == 0 ) 
                 mia_Mesagho.carriles = try buffer.decodeUint32()
             else if ( field_number == 3 and wire_type == 5 ) 
-                { try vel_media_list.append( allocator, try buffer.decodeFloat() ); }
+            { 
+                try vel_media_list.append( 
+                    allocator, 
+                    try buffer.decodeFloat()
+                );
+            }
             else if ( field_number == 4 and wire_type == 5 ) 
-                { try vehiculos_min_list.append( allocator, try buffer.decodeFloat() ); }
+            { 
+                try vehiculos_min_list.append( 
+                    allocator, 
+                    try buffer.decodeFloat()
+                );
+            }
         }
 
         const tmp_vel_media = try vel_media_list.toOwnedSlice(allocator);
@@ -808,19 +887,30 @@ pub const PanelInfoV = struct {
         var mia_Mesagho = try PanelInfoV.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var elementos_list: std.ArrayList(PanelBase) = .empty; 
+        var elementos_list: std.ArrayList(PanelBase) = .empty;
+        errdefer {
+            for (elementos_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            elementos_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "elementos" ) ) { 
+            if( equal(u8, tok, "elementos" ) ) {
                 const sub_msg = try PanelBase.legiElProtobufTeksto(allocator, it); 
-                try elementos_list.append(allocator, sub_msg); 
+                elementos_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
         }
@@ -845,15 +935,15 @@ pub const PanelInfoV = struct {
  
         var tuta_longo: usize = 0;
  
-    var elementos_i: usize = self.elementos.len;
-    while (elementos_i > 0) {
-        elementos_i -= 1;
-        const item = self.elementos[elementos_i];
-        const elementos_longa = try item.seriigi( allocator, buffer );
-        tuta_longo += elementos_longa;
-        tuta_longo += try buffer.encodeVarint(elementos_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-    }  // 11  rept - no def - varlong
+        var elementos_i: usize = self.elementos.len;
+        while (elementos_i > 0) {
+            elementos_i -= 1;
+            const item = self.elementos[elementos_i];
+            const elementos_longa = try item.seriigi( allocator, buffer );
+            tuta_longo += elementos_longa;
+            tuta_longo += try buffer.encodeVarint(elementos_longa);
+            tuta_longo += try buffer.encodeVarint(18);
+        }  // 11  rept - no def - varlong
 
         const nombre_longa = try buffer.encodeString( self.nombre );
         tuta_longo += nombre_longa;
@@ -896,7 +986,12 @@ pub const PanelInfoV = struct {
                 mia_Mesagho.nombre = tmp_nombre;
             }
             else if ( field_number == 2 and wire_type == 2 ) 
-                { try elementos_list.append( allocator, try PanelBase.deseriigi(allocator, buffer, try buffer.decodeVarint() ) ); }
+            { 
+                try elementos_list.append( 
+                    allocator, 
+                    try PanelBase.deseriigi(allocator, buffer, try buffer.decodeVarint() )
+                );
+            }
         }
 
         const tmp_elementos = try elementos_list.toOwnedSlice(allocator);
@@ -1016,12 +1111,13 @@ pub const PanelBase = struct {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "tipo" ) ) { 
+            if( equal(u8, tok, "tipo" ) ) {
                 mia_Mesagho.tipo = parseEnumValue(TipoPanel, val) catch (std.meta.intToEnum(TipoPanel, 0) catch unreachable);
                 continue;
             }
@@ -1260,14 +1356,16 @@ pub const SenialInfo = struct {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "senial" ) ) { 
+            if( equal(u8, tok, "senial" ) ) {
+                const tmp_senial = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.senial);
-                mia_Mesagho.senial = try allocator.dupe(u8, val);
+                mia_Mesagho.senial = tmp_senial;
                 continue;
             }
         }
@@ -1396,14 +1494,16 @@ pub const TextoInfo = struct {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "nombre" ) ) { 
+            if( equal(u8, tok, "nombre" ) ) {
+                const tmp_nombre = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.nombre);
-                mia_Mesagho.nombre = try allocator.dupe(u8, val);
+                mia_Mesagho.nombre = tmp_nombre;
                 continue;
             }
-            if( equal(u8, tok, "texto" ) ) { 
+            if( equal(u8, tok, "texto" ) ) {
+                const tmp_texto = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.texto);
-                mia_Mesagho.texto = try allocator.dupe(u8, val);
+                mia_Mesagho.texto = tmp_texto;
                 continue;
             }
         }
@@ -1768,7 +1868,8 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
             };
         },
         .TF_PROTOBUF => {
-            var it: TokenIterType = std.mem.tokenizeAny(u8, input, ":\", \n\r\t");
+//            var it: TokenIterType = std.mem.tokenizeAny(u8, input, ":\", \n\r\t");
+            var it: TokenIterType = TokenIterType.init( input);
             parsed = T.legiElProtobufTeksto(allocator, &it) catch |err| {
                 std.debug.print("eraro dun deseriigo: {}\n", .{err});
                 return err;
@@ -1796,3 +1897,193 @@ pub fn legiTiponElDosiero(allocator: all.Allocator, comptime T: type, path: []co
 
     return legiTiponElTeksto(allocator, T, enhavo[0..dosiera_long :0], t_formato);
 }
+
+/// Tokenizador sencillo para Protobuf Text.
+/// - Devuelve slices prestados del buffer original.
+/// - Los literales entre comillas se devuelven sin las comillas.
+/// - No interpreta todavia escapes como \\n, \\x01 o \\001.
+/// - Reconoce { } < > [ ] como tokens independientes.
+/// - Ignora espacios, :, ',', ';' y comentarios iniciados por #.
+pub const CustomTokenizer = struct {
+    buffer: []const u8,
+    index: usize,
+    const Self = @This();
+
+    pub fn init(buffer: []const u8) Self {
+        return .{ .buffer = buffer, .index = 0, };
+    }
+
+    pub fn peek(self: Self) ?[]const u8 {
+        var copy = self;
+        return copy.next();
+    }
+
+    /// El slice devuelto apunta directamente al buffer original.
+    pub fn next(self: *Self) ?[]const u8 {
+        self.skipIgnored();
+        if (self.index >= self.buffer.len) { return null; }
+
+        const current = self.buffer[self.index];
+        if (current == '"' or current == '\'') { return self.readQuotedToken(); }
+        if (isStructuralToken(current)) {
+            const start = self.index;
+            self.index += 1;
+            return self.buffer[start..self.index];
+        }
+        return self.readBareToken();
+    }
+
+    fn skipIgnored(self: *Self) void {
+        while (self.index < self.buffer.len) {
+            const current = self.buffer[self.index];
+
+            if (isDelimiter(current)) {
+                self.index += 1;
+                continue;
+            }
+            if (current == '#') {
+                self.skipComment();
+                continue;
+            }
+            break;
+        }
+    }
+    fn skipComment(self: *Self) void {
+        while (
+            self.index < self.buffer.len and
+            self.buffer[self.index] != '\n'
+        ) {  self.index += 1; }
+    }
+
+    fn readQuotedToken(self: *Self) ?[]const u8 {
+        const quote = self.buffer[self.index];
+
+        self.index += 1;
+        const content_start = self.index;
+
+        while (self.index < self.buffer.len) {
+            const current = self.buffer[self.index];
+
+            if (current == '\\') {
+                self.index += 1;
+                if (self.index < self.buffer.len) { self.index += 1; }
+                continue;
+            }
+            if (current == quote) {
+                const content_end = self.index;
+                self.index += 1;
+                return self.buffer[content_start..content_end];
+            }
+            if (current == '\n' or current == '\r') { return null; }
+            self.index += 1;
+        }
+        return null;
+    }
+
+    fn readBareToken(self: *Self) ?[]const u8 {
+        const start = self.index;
+
+        while (self.index < self.buffer.len) {
+            const current = self.buffer[self.index];
+
+            if (
+                isDelimiter(current) or
+                isStructuralToken(current) or
+                current == '"' or
+                current == '\'' or
+                current == '#'
+            ) { break; }
+            self.index += 1;
+        }
+        if (self.index == start) { return null; }
+
+        return self.buffer[start..self.index];
+    }
+
+    fn isDelimiter(c: u8) bool {
+        return switch (c) {
+            ' ', '\t', '\n', '\r', ':', ',', ';' => true,
+            else => false,
+        };
+    }
+
+    fn isStructuralToken(c: u8) bool {
+        return switch (c) {
+            '{', '}', '<', '>', '[', ']' => true,
+            else => false,
+        };
+    }
+};
+
+fn unescapePbTextToken(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(allocator);
+    var index: usize = 0;
+    while (index < input.len) {
+        const current = input[index];
+        if (current != '\\') {
+            try result.append(allocator, current);
+            index += 1;
+            continue;
+        }
+        index += 1;
+        if (index >= input.len) {
+            return error.InvalidPbTextEscape;
+        }
+        const escaped = input[index];
+        index += 1;
+        switch (escaped) {
+            'a' => try result.append(allocator, 0x07),
+            'b' => try result.append(allocator, 0x08),
+            'f' => try result.append(allocator, 0x0c),
+            'n' => try result.append(allocator, '\n'),
+            'r' => try result.append(allocator, '\r'),
+            't' => try result.append(allocator, '\t'),
+            'v' => try result.append(allocator, 0x0b),
+            '\\' => try result.append(allocator, '\\'),
+            '\'' => try result.append(allocator, '\''),
+            '"' => try result.append(allocator, '"'),
+            '0'...'7' => {
+                var value: u16 = escaped - '0';
+                var digits: usize = 1;
+                while (
+                    digits < 3 and
+                    index < input.len and
+                    input[index] >= '0' and
+                    input[index] <= '7'
+                ) {
+                    value = value * 8 + input[index] - '0';
+                    index += 1;
+                    digits += 1;
+                }
+                if (value > 255) { return error.InvalidPbTextEscape; }
+                try result.append(allocator, @intCast(value));
+            },
+            'x', 'X' => {
+                var value: u16 = 0;
+                var digits: usize = 0;
+                while (digits < 2 and index < input.len) {
+                    const digit = hexDigitValue(input[index]) orelse break;
+                    value = value * 16 + digit;
+                    index += 1;
+                    digits += 1;
+                }
+                if (digits == 0) { return error.InvalidPbTextEscape; }
+                try result.append(allocator, @intCast(value));
+            },
+            else => return error.InvalidPbTextEscape,
+        }
+    }
+    return try result.toOwnedSlice(allocator);
+
+}
+
+fn hexDigitValue(c: u8) ?u8 {
+    return switch (c) {
+        '0'...'9' => c - '0', 
+        'a'...'f' => c - 'a' + 10,
+        'A'...'F' => c - 'A' + 10,
+        else => null,
+    };
+}
+

@@ -40,6 +40,7 @@ const std = @import("std");
 //
 // -----------------------------------------------------------------------------
 
+const CctrolRaw = @import("generated/cctrol.zig");
 const Api = @import("generated/cctrol_api.zig");
 const ConfigApi = @import("generated/Config_api.zig");
 
@@ -65,8 +66,70 @@ pub fn main() !void {
     try testRepeatedMessage(allocator);
     try testOneofPanelBase(allocator);
     try testOneofProtobufTextRoundTrip(allocator);
+    try testOptionalString(allocator);
+    try testCustomTokenizer();
+    try testCustomTokenizerNumbers();
 
     std.debug.print("testo3: OK\n", .{});
+}
+
+fn testCustomTokenizerNumbers() !void {
+    const input =
+        "entero: 17 " ++ "decimal: 13.5 " ++ "negativo: -12.75 " ++ "cientifico: 1.25e-4";
+
+    var it = CctrolRaw.CustomTokenizer.init(input);
+
+    try std.testing.expectEqualStrings("entero", it.next().?);
+    try std.testing.expectEqualStrings("17", it.next().?);
+
+    try std.testing.expectEqualStrings("decimal", it.next().?);
+    try std.testing.expectEqualStrings("13.5", it.next().?);
+
+    try std.testing.expectEqualStrings("negativo", it.next().?);
+    try std.testing.expectEqualStrings("-12.75", it.next().?);
+
+    try std.testing.expectEqualStrings("cientifico", it.next().?);
+    try std.testing.expectEqualStrings("1.25e-4", it.next().?);
+
+    try std.testing.expect(it.next() == null);
+
+    std.debug.print(
+        "testo3: CustomTokenizer numbers OK\n",
+        .{},
+    );
+}
+
+fn testCustomTokenizer() !void {
+    const input = "nombre: \"panel con espacios\"";
+    var it = CctrolRaw.CustomTokenizer.init(input);
+
+    try std.testing.expectEqualStrings("nombre", it.next().?);
+    try std.testing.expectEqualStrings("panel con espacios", it.next().?);
+    try std.testing.expect(it.next() == null);
+}
+
+fn testOptionalString(allocator: std.mem.Allocator) !void {
+    var cfg = try ConfigApi.DomainConfig.initDefault(allocator);
+    defer cfg.deinit(allocator);
+
+    try std.testing.expect(!cfg.hasKeyFile());
+
+    try cfg.setKeyFile(allocator, "keys/demo.key");
+    try std.testing.expectEqualStrings(
+        "keys/demo.key",
+        cfg.getKeyFile().?,
+    );
+
+    try cfg.setKeyFile(allocator, "keys/updated.key");
+    try std.testing.expectEqualStrings(
+        "keys/updated.key",
+        cfg.getKeyFile().?,
+    );
+
+    cfg.clearKeyFile(allocator);
+    try std.testing.expect(!cfg.hasKeyFile());
+
+    std.debug.print("testo3: optional string OK\n", .{});
 }
 
 fn roundTripPanelPbText(
@@ -172,7 +235,7 @@ fn testOneofProtobufTextRoundTrip(allocator: std.mem.Allocator) !void {
     panel.setTipo(.TEXTO);
     try panel.setDatosTextoRaw(
         allocator,
-        "texto_raw_pbtext",
+        "texto raw pbtext",
     );
 
     {
@@ -182,6 +245,10 @@ fn testOneofProtobufTextRoundTrip(allocator: std.mem.Allocator) !void {
             "texto_raw",
         );
         defer panel2.deinit(allocator);
+        try std.testing.expectEqualStrings(
+            "texto raw pbtext",
+            try panel2.getDatosTextoRaw(),
+        );
 
         try std.testing.expect(panel2.hasDatos());
         try std.testing.expect(panel2.hasDatosTextoRaw());
@@ -193,7 +260,7 @@ fn testOneofProtobufTextRoundTrip(allocator: std.mem.Allocator) !void {
         try std.testing.expect(std.mem.eql(
             u8,
             try panel2.getDatosTextoRaw(),
-            "texto_raw_pbtext",
+            "texto raw pbtext",
         ));
     }
 
