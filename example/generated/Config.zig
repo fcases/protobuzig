@@ -583,6 +583,7 @@ pub const DomainConfig = struct {
 pub const TransportConfig = struct {
     pub const Params = union(enum) {
         none: void,
+        loop: LoopTransportConfig,
         mcast: MCastConfig,
         bcast: BCastConfig,
         udpstar: UDPStarConfig,
@@ -607,6 +608,7 @@ pub const TransportConfig = struct {
     fn deinitParams(self: *const TransportConfig, allocator: all.Allocator) void {
         switch (self.params) {
             .none => {},
+            .loop => |*v| v.deinit(allocator),
             .mcast => |*v| v.deinit(allocator),
             .bcast => |*v| v.deinit(allocator),
             .udpstar => |*v| v.deinit(allocator),
@@ -645,6 +647,14 @@ pub const TransportConfig = struct {
             try bufro.print(allocator, "{s}encoding: {s}\n", .{ ind, @tagName(val) });
         switch (self.params) {
             .none => {},
+            .loop => |val| {
+                const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+                defer allocator.free(indent);
+                const loop_text = try val.skribiAlProtobufTeksto(allocator, indent);
+                defer allocator.free(loop_text);
+
+                try bufro.print(allocator, "{s}loop {{\n{s}{s}}}\n", .{ ind, loop_text, ind });
+            },
             .mcast => |val| {
                 const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
                 defer allocator.free(indent);
@@ -714,6 +724,13 @@ pub const TransportConfig = struct {
                 mia_Mesagho.encoding = parseEnumValue(Encoding, val) catch (std.meta.intToEnum(Encoding, 0) catch unreachable);
                 continue;
             }
+            if( equal(u8, tok, "loop" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const params_loop_val = try LoopTransportConfig.legiElProtobufTeksto(allocator, it);
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .loop = params_loop_val };
+                continue;
+            }
             if( equal(u8, tok, "mcast" ) ) {
                 if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const params_mcast_val = try MCastConfig.legiElProtobufTeksto(allocator, it);
@@ -768,29 +785,35 @@ pub const TransportConfig = struct {
  
         switch (self.params) {
             .none => {},
+            .loop => |val| {
+                const params_loop_longa = try val.seriigi(allocator, buffer);
+                tuta_longo += params_loop_longa;
+                tuta_longo += try buffer.encodeVarint(params_loop_longa);
+                tuta_longo += try buffer.encodeVarint((@as(u32, 10) << 3) | 2);
+            },
             .mcast => |val| {
                 const params_mcast_longa = try val.seriigi(allocator, buffer);
                 tuta_longo += params_mcast_longa;
                 tuta_longo += try buffer.encodeVarint(params_mcast_longa);
-                tuta_longo += try buffer.encodeVarint((@as(u32, 10) << 3) | 2);
+                tuta_longo += try buffer.encodeVarint((@as(u32, 11) << 3) | 2);
             },
             .bcast => |val| {
                 const params_bcast_longa = try val.seriigi(allocator, buffer);
                 tuta_longo += params_bcast_longa;
                 tuta_longo += try buffer.encodeVarint(params_bcast_longa);
-                tuta_longo += try buffer.encodeVarint((@as(u32, 11) << 3) | 2);
+                tuta_longo += try buffer.encodeVarint((@as(u32, 12) << 3) | 2);
             },
             .udpstar => |val| {
                 const params_udpstar_longa = try val.seriigi(allocator, buffer);
                 tuta_longo += params_udpstar_longa;
                 tuta_longo += try buffer.encodeVarint(params_udpstar_longa);
-                tuta_longo += try buffer.encodeVarint((@as(u32, 12) << 3) | 2);
+                tuta_longo += try buffer.encodeVarint((@as(u32, 13) << 3) | 2);
             },
             .usoxstar => |val| {
                 const params_usoxstar_longa = try val.seriigi(allocator, buffer);
                 tuta_longo += params_usoxstar_longa;
                 tuta_longo += try buffer.encodeVarint(params_usoxstar_longa);
-                tuta_longo += try buffer.encodeVarint((@as(u32, 13) << 3) | 2);
+                tuta_longo += try buffer.encodeVarint((@as(u32, 14) << 3) | 2);
             },
             .custom => |val| {
                 const params_custom_longa = try val.seriigi(allocator, buffer);
@@ -845,6 +868,17 @@ pub const TransportConfig = struct {
 
             if ( field_number == 10 and wire_type == 2 )
             {
+                const params_loop_val = try LoopTransportConfig.deseriigi(
+                    allocator,
+                    buffer,
+                    try buffer.decodeVarint(),
+                );
+    
+                mia_Mesagho.deinitParams(allocator);
+                mia_Mesagho.params = .{ .loop = params_loop_val };
+            }
+            else if ( field_number == 11 and wire_type == 2 )
+            {
                 const params_mcast_val = try MCastConfig.deseriigi(
                     allocator,
                     buffer,
@@ -854,7 +888,7 @@ pub const TransportConfig = struct {
                 mia_Mesagho.deinitParams(allocator);
                 mia_Mesagho.params = .{ .mcast = params_mcast_val };
             }
-            else if ( field_number == 11 and wire_type == 2 )
+            else if ( field_number == 12 and wire_type == 2 )
             {
                 const params_bcast_val = try BCastConfig.deseriigi(
                     allocator,
@@ -865,7 +899,7 @@ pub const TransportConfig = struct {
                 mia_Mesagho.deinitParams(allocator);
                 mia_Mesagho.params = .{ .bcast = params_bcast_val };
             }
-            else if ( field_number == 12 and wire_type == 2 )
+            else if ( field_number == 13 and wire_type == 2 )
             {
                 const params_udpstar_val = try UDPStarConfig.deseriigi(
                     allocator,
@@ -876,7 +910,7 @@ pub const TransportConfig = struct {
                 mia_Mesagho.deinitParams(allocator);
                 mia_Mesagho.params = .{ .udpstar = params_udpstar_val };
             }
-            else if ( field_number == 13 and wire_type == 2 )
+            else if ( field_number == 14 and wire_type == 2 )
             {
                 const params_usoxstar_val = try UnixSocketStarConfig.deseriigi(
                     allocator,
@@ -914,6 +948,118 @@ pub const TransportConfig = struct {
         return mia_Mesagho;
     }
 };    // TransportConfig
+
+pub const LoopTransportConfig = struct {
+    delay_ms: ?u32 = 200 ,
+
+    pub fn initDefault(allocator: all.Allocator) !LoopTransportConfig {
+        _ = allocator;
+        return LoopTransportConfig {
+            .delay_ms = 200,
+        };
+    }
+
+    pub fn deinit(self: *const LoopTransportConfig, allocator: all.Allocator) void {
+        _ = self;
+        _ = allocator;
+    }
+
+    pub fn skribiAlTeksto(self: *LoopTransportConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, LoopTransportConfig, @as(*LoopTransportConfig, self), t_formato);
+    }
+
+    pub fn skribiAlDosiero(self: *LoopTransportConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, LoopTransportConfig, @as(*LoopTransportConfig, self), path, t_formato);
+    }
+
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !LoopTransportConfig {
+        return try legiTiponElTeksto(allocator, LoopTransportConfig, input, t_formato);
+    }
+
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !LoopTransportConfig {
+        return try legiTiponElDosiero(allocator, LoopTransportConfig, path, t_formato);
+    }
+
+    fn skribiAlProtobufTeksto(self: *const LoopTransportConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
+
+        if( self.delay_ms ) |val|  
+            try bufro.print(allocator,"{s}delay_ms: {any}\n",.{ ind, val });
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !LoopTransportConfig {
+        var mia_Mesagho = try LoopTransportConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "delay_ms" ) ) {
+                mia_Mesagho.delay_ms =  std.fmt.parseInt(u32,val,10) catch 0;
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
+    }
+
+    pub fn seriigiAlBin(self: *const LoopTransportConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, LoopTransportConfig, self, b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *const LoopTransportConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, LoopTransportConfig, @as(*LoopTransportConfig, self), path, b_formato);
+    }
+
+    fn seriigi(self: *const LoopTransportConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
+        var tuta_longo: usize = 0;
+ 
+        if( self.delay_ms ) |val| {
+            tuta_longo += try buffer.encodeUint32( val );
+            tuta_longo += try buffer.encodeVarint(8);
+        }   //1 opt - no def - no varlong
+
+        return tuta_longo;
+    }
+
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !LoopTransportConfig {
+        return try deseriigiTiponElBin(allocator, LoopTransportConfig, input, b_formato);
+    }
+
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !LoopTransportConfig {
+        return try deseriigiTiponElDosiero(allocator, LoopTransportConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !LoopTransportConfig {
+        var mia_Mesagho = try LoopTransportConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 0 ) 
+                mia_Mesagho.delay_ms = try buffer.decodeUint32();
+        }
+
+
+        return mia_Mesagho;
+    }
+};    // LoopTransportConfig
 
 pub const MCastConfig = struct {
     local_address: ?[]const u8 = null,

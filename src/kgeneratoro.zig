@@ -3412,9 +3412,10 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     }
     if (!uses_allocator) {
         try verkisto.print(
+            \\{s}    _ = self;
             \\{s}    _ = allocator;
             \\
-        , .{ind});
+        , .{ ind, ind });
     }
 
     // -----------------------------------------
