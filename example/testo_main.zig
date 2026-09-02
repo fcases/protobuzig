@@ -11,7 +11,7 @@ var arena = std.heap.ArenaAllocator.init(fba_allocator);
 pub fn main() !void {
     dbgPresi("Proto Main/Ĉefo\n", .{});
     try fariChiujnTestojn();
-    dbgPresi("skribu amkaŭ \'zig test  proto/main.zig\' por testi ĉiujn testojn\n", .{});
+    dbgPresi("skribu amkaŭ \'zig test example/testo_main.zig\' por testi ĉiujn testojn\n", .{});
 }
 
 fn fariChiujnTestojn() !void {
@@ -175,7 +175,7 @@ fn fariTeston3() !void {
         dbgPresi("{s}\n", .{skribilo});
     }
     {
-        var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App7.pb.cfg", .TF_PROTOBUF) catch unreachable;
+        var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "example/cfg/App7.pb.cfg", .TF_PROTOBUF) catch unreachable;
         var skribilo: []const u8 = undefined;
 
         skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_ZIG_ZON);
@@ -200,7 +200,7 @@ fn fariTeston4() !void {
     // Kvara testo
     /////////////////
 
-    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/App.zon.cfg", .TF_ZIG_ZON) catch unreachable;
+    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "example/cfg/App.zon.cfg", .TF_ZIG_ZON) catch unreachable;
 
     {
         presiMesagho("Testo 4.1:");
@@ -260,7 +260,7 @@ fn fariTeston5() !void {
     // Kvina  testo
     /////////////////
 
-    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "cfg/protocolBus.App.json.cfg", .TF_JSON) catch unreachable;
+    var app_config = pbz.AppConfig.legiElDosiero(mia_asignilo, "example/cfg/protocolBus.App.json.cfg", .TF_JSON) catch unreachable;
     // nun, app_config1 enhavas la legitan objekton.
 
     const skribilo = try app_config.skribiAlTeksto(mia_asignilo, .TF_PROTOBUF);
