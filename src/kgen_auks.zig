@@ -63,6 +63,12 @@ pub fn mapiZigType(protoType: []const u8, label: []const u8, default_value: ?[]c
     var finalBaseTypo: []u8 = undefined;
     if (default_value != null) {
         finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s} = {s} ", .{ opt, rep, baseType, dfv }) catch unreachable;
+    } else if (bRep) {
+        // repeated sin default: slice vacio ESTATICO como default de
+        // declaracion, para que ZON/JSON rellenen el campo ausente en vez de
+        // fallar con MissingField. deinit libera slices con guard de longitud
+        // (if len > 0) para no liberar el literal estatico.
+        finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s} = &.{{}}", .{ rep, baseType }) catch unreachable;
     } else finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s}{s}", .{ opt, rep, baseType, nul }) catch unreachable;
 
     return finalBaseTypo;

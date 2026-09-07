@@ -1006,6 +1006,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
             try skribiOneOfDeinitHelpers(msg, indent);
         }
         try skribiDeInit(msg, indent);
+        try skribiPlenigiDefaultojn(msg, indent);
         // try skribiOwnedStringSetters(msg, indent);
 
         // /////////////
@@ -1410,6 +1411,8 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            return error.UnsupportedFormat;
         \\        }},
         \\    }}
+        \\
+        \\    try parsed.plenigiDefaultojn(allocator);
         \\
         \\    return parsed;
         \\}}
@@ -3485,24 +3488,24 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
                         \\{s}    for (self.{s}) |item| {{
                         \\{s}        item.deinit(allocator);
                         \\{s}    }}
-                        \\{s}    allocator.free(self.{s});
+                        \\{s}    if (self.{s}.len > 0) allocator.free(self.{s});
                         \\
-                    , .{ ind, f.name, ind, ind, ind, f.name });
+                    , .{ ind, f.name, ind, ind, ind, f.name, f.name });
                 },
                 .TYPE_STRING, .TYPE_BYTES => {
                     try verkisto.print(
                         \\{s}    for (self.{s}) |item| {{
                         \\{s}        allocator.free(item);
                         \\{s}    }}
-                        \\{s}    allocator.free(self.{s});
+                        \\{s}    if (self.{s}.len > 0) allocator.free(self.{s});
                         \\
-                    , .{ ind, f.name, ind, ind, ind, f.name });
+                    , .{ ind, f.name, ind, ind, ind, f.name, f.name });
                 },
                 else => {
                     try verkisto.print(
-                        \\{s}    allocator.free(self.{s});
+                        \\{s}    if (self.{s}.len > 0) allocator.free(self.{s});
                         \\
-                    , .{ ind, f.name });
+                    , .{ ind, f.name, f.name });
                 },
             }
             continue;
@@ -3588,6 +3591,139 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     , .{
         ind,
     });
+
+    try verkisto.print("\n", .{});
+}
+
+/// Emite plenigiDefaultojn(): materializa los defaults proto OWNED de los
+/// optional string/bytes que hayan quedado en null tras un parseo ZON/JSON
+/// (std.zon.parse/std.json parten de los defaults de DECLARACION, no de
+/// initDefault), y recursiona en los mensajes anidados (required, optional
+/// presente, repeated y rama activa del oneof) para que el default "siempre
+/// este", igual que en Protobuf Text/binario (que parten de initDefault).
+/// Se emite para TODOS los mensajes (no-op cuando no hay nada que rellenar),
+/// porque legiTiponElTeksto() lo llama de forma generica.
+fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
+    var has_work = false;
+    for (msg.fields) |f| {
+        if (f.field_type_enum == .TYPE_MESSAGE) {
+            has_work = true;
+            break;
+        }
+        if ((f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) and
+            f.label_enum == .LABEL_OPTIONAL and f.default_value != null)
+        {
+            has_work = true;
+            break;
+        }
+    }
+    if (!has_work) {
+        for (msg.oneofs) |oo| {
+            for (oo.fields) |of| {
+                if (of.field_type_enum == .TYPE_MESSAGE) {
+                    has_work = true;
+                    break;
+                }
+            }
+            if (has_work) break;
+        }
+    }
+
+    try verkisto.print(
+        \\{s}pub fn plenigiDefaultojn(self: *{s}, allocator: all.Allocator) !void {{
+        \\
+    , .{ ind, msg.name });
+
+    if (!has_work) {
+        try verkisto.print(
+            \\{s}    _ = self;
+            \\{s}    _ = allocator;
+            \\
+        , .{ ind, ind });
+    } else {
+        // Campos
+        for (msg.fields) |f| {
+            // recursar en mensajes anidados
+            if (f.field_type_enum == .TYPE_MESSAGE) {
+                switch (f.label_enum) {
+                    .LABEL_REQUIRED => {
+                        try verkisto.print(
+                            \\{s}    try self.{s}.plenigiDefaultojn(allocator);
+                            \\
+                        , .{ ind, f.name });
+                    },
+                    .LABEL_OPTIONAL => {
+                        try verkisto.print(
+                            \\{s}    if (self.{s}) |*v| try v.plenigiDefaultojn(allocator);
+                            \\
+                        , .{ ind, f.name });
+                    },
+                    .LABEL_REPEATED => {
+                        try verkisto.print(
+                            \\{s}    for (self.{s}) |*v| try v.plenigiDefaultojn(allocator);
+                            \\
+                        , .{ ind, f.name });
+                    },
+                }
+                continue;
+            }
+
+            // optional string/bytes con default proto owned: si quedo null
+            // (omitido en ZON/JSON), materializar el default.
+            if ((f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) and
+                f.label_enum == .LABEL_OPTIONAL)
+            {
+                if (f.default_value) |def| {
+                    try verkisto.print(
+                        \\{s}    if (self.{s} == null) self.{s} = try allocator.dupe(u8, {s});
+                        \\
+                    , .{ ind, f.name, f.name, def });
+                }
+            }
+        }
+
+        // Oneofs: recursar solo en la rama activa cuando es un mensaje
+        for (msg.oneofs) |oo| {
+            var oo_has_msg = false;
+            for (oo.fields) |of| {
+                if (of.field_type_enum == .TYPE_MESSAGE) {
+                    oo_has_msg = true;
+                    break;
+                }
+            }
+            if (!oo_has_msg) continue;
+
+            try verkisto.print(
+                \\{s}    switch (self.{s}) {{
+                \\{s}        .none => {{}},
+                \\
+            , .{ ind, oo.name, ind });
+
+            for (oo.fields) |of| {
+                if (of.field_type_enum == .TYPE_MESSAGE) {
+                    try verkisto.print(
+                        \\{s}        .{s} => |*v| try v.plenigiDefaultojn(allocator),
+                        \\
+                    , .{ ind, of.name });
+                } else {
+                    try verkisto.print(
+                        \\{s}        .{s} => {{}},
+                        \\
+                    , .{ ind, of.name });
+                }
+            }
+
+            try verkisto.print(
+                \\{s}    }}
+                \\
+            , .{ ind });
+        }
+    }
+
+    try verkisto.print(
+        \\{s}}}
+        \\
+    , .{ ind });
 
     try verkisto.print("\n", .{});
 }
