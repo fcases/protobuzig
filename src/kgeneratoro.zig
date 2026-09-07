@@ -3245,12 +3245,72 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
+    // Temporales con errdefer (L1): cada campo owned se prepara en una
+    // variable local ANTES del literal, con su errdefer, para que si falla
+    // una asignacion posterior no se fuguen las anteriores (dentro de un
+    // literal de struct no puede haber errdefers).
+    // Prefijo "mia_": evita que la local sombree declaraciones del contenedor
+    // (p.ej. un campo llamado "config" dentro del namespace k6bus.config).
+    // Mantener en sync con el bucle de campos de abajo.
+    // -----------------------------------------
+    for (msg.fields) |f| {
+        // repeated
+        if (f.label_enum == .LABEL_REPEATED) {
+            try verkisto.print(
+                \\{s}    const mia_{s} = try allocator.alloc({s}, 0);
+                \\{s}    errdefer allocator.free(mia_{s});
+                \\
+            , .{ ind, f.name, auks.mapiProtoTiponAlZig(f.field_type), ind, f.name });
+            continue;
+        }
+
+        // string/bytes con default explicito (owned)
+        if (f.default_value != null and
+            (f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES))
+        {
+            const def = f.default_value.?;
+            try verkisto.print(
+                \\{s}    const mia_{s} = try allocator.dupe(u8, {s});
+                \\{s}    errdefer allocator.free(mia_{s});
+                \\
+            , .{ ind, f.name, def, ind, f.name });
+            continue;
+        }
+
+        // message required
+        if (f.field_type_enum == .TYPE_MESSAGE and f.label_enum != .LABEL_OPTIONAL) {
+            try verkisto.print(
+                \\{s}    const mia_{s} = try {s}.initDefault(allocator);
+                \\{s}    errdefer mia_{s}.deinit(allocator);
+                \\
+            , .{
+                ind,
+                f.name,
+                auks.mapiProtoTiponAlZig(f.field_type),
+                ind,
+                f.name,
+            });
+            continue;
+        }
+
+        // string/bytes required sin default
+        if ((f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) and
+            f.label_enum != .LABEL_OPTIONAL)
+        {
+            try verkisto.print(
+                \\{s}    const mia_{s} = try allocator.dupe(u8, "");
+                \\{s}    errdefer allocator.free(mia_{s});
+                \\
+            , .{ ind, f.name, ind, f.name });
+        }
+    }
+
+    // -----------------------------------------
     // Generar return
     // -----------------------------------------
     try verkisto.print(
         \\{s}    return {s} {{
         \\
-        // , .{ indent, msg.name });
     , .{ ind, msg.name });
 
     // -----------------------------------------
@@ -3258,14 +3318,13 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     for (msg.fields) |f| {
         // -------------------------
-        // repeated
+        // repeated (usa temporal mia_)
         // -------------------------
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
-                \\{s}        .{s} = try allocator.alloc({s}, 0),
+                \\{s}        .{s} = mia_{s},
                 \\
-            , .{ ind, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
-            // , .{ indent, f.name, auks.mapiProtoTiponAlZig(f.field_type) });
+            , .{ ind, f.name, f.name });
             continue;
         }
 
@@ -3279,14 +3338,14 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                     \\{s}        .{s} = .{s},
                     \\
                 , .{ ind, f.name, def });
-                // string y bytes
+                // string y bytes (usa temporal mia_)
             } else if (f.field_type_enum == .TYPE_STRING or
                 f.field_type_enum == .TYPE_BYTES)
             {
                 try verkisto.print(
-                    \\{s}        .{s} = try allocator.dupe(u8, {s}),
+                    \\{s}        .{s} = mia_{s},
                     \\
-                , .{ ind, f.name, def });
+                , .{ ind, f.name, f.name });
                 // resto de tipos
             } else {
                 try verkisto.print(
@@ -3304,21 +3363,16 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             try verkisto.print(
                 \\{s}        .{s} = null,
                 \\
-                // , .{ indent, f.name });
             , .{ ind, f.name });
             continue;
         }
 
+        // message required (usa temporal mia_)
         if (f.field_type_enum == .TYPE_MESSAGE) {
             try verkisto.print(
-                \\{s}        .{s} = try {s}.initDefault(allocator),
+                \\{s}        .{s} = mia_{s},
                 \\
-            , .{
-                ind,
-                f.name,
-                auks.mapiProtoTiponAlZig(f.field_type),
-            });
-
+            , .{ ind, f.name, f.name });
             continue;
         }
 
@@ -3334,7 +3388,6 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                 f.name,
                 auks.mapiProtoTiponAlZig(f.field_type),
             });
-
             continue;
         }
 
@@ -3344,15 +3397,15 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         if (f.field_type_enum == .TYPE_STRING or
             f.field_type_enum == .TYPE_BYTES)
         {
+            // string/bytes required (usa temporal mia_)
             try verkisto.print(
-                \\{s}        .{s} = try allocator.dupe(u8, ""),
+                \\{s}        .{s} = mia_{s},
                 \\
-            , .{ ind, f.name });
+            , .{ ind, f.name, f.name });
         } else {
             try verkisto.print(
                 \\{s}        .{s} = 0,
                 \\
-                // , .{ indent, f.name });
             , .{ ind, f.name });
         }
     }
