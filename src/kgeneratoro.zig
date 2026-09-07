@@ -2385,13 +2385,43 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
             , .{
                 ind, field.name, auks.mapiProtoTiponAlZig(field.field_type),
             });
+            // errdefer de la lista temporal: si la entrada se corta a mitad
+            // de un repeated (ahora los errores propagan con try), los items
+            // ya parseados no deben fugarse. Espejo del patron de los
+            // parsers de Protobuf Text.
+            switch (field.field_type_enum) {
+                .TYPE_MESSAGE => {
+                    try verkisto.print(
+                        \\{s}    errdefer {{
+                        \\{s}        for ({s}_list.items) |*it| it.deinit(allocator);
+                        \\{s}        {s}_list.deinit(allocator);
+                        \\{s}    }}
+                        \\
+                    , .{ ind, ind, field.name, ind, field.name, ind });
+                },
+                .TYPE_STRING, .TYPE_BYTES => {
+                    try verkisto.print(
+                        \\{s}    errdefer {{
+                        \\{s}        for ({s}_list.items) |it| allocator.free(it);
+                        \\{s}        {s}_list.deinit(allocator);
+                        \\{s}    }}
+                        \\
+                    , .{ ind, ind, field.name, ind, field.name, ind });
+                },
+                else => {
+                    try verkisto.print(
+                        \\{s}    errdefer {s}_list.deinit(allocator);
+                        \\
+                    , .{ ind, field.name });
+                },
+            }
         }
     }
 
     try verkisto.print(
         \\
         \\{s}    while (buffer.read_index < end) {{
-        \\{s}        const key: u64 = buffer.decodeVarint() catch 0 ;    
+        \\{s}        const key: u64 = try buffer.decodeVarint();
         \\{s}        const wire_type = key & 0x7;  
         \\{s}        const field_number = key >> 3;
         \\
