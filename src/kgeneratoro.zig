@@ -1007,7 +1007,6 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
         }
         try skribiDeInit(msg, indent);
         try skribiPlenigiDefaultojn(msg, indent);
-        // try skribiOwnedStringSetters(msg, indent);
 
         // /////////////
         // Skribi kaj Legi funkcion al/el .TF_XXX teksto
@@ -3762,69 +3761,3 @@ fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print("\n", .{});
 }
 
-// Helpers set para string y bytes owned.
-fn skribiSetNomon(allocator: std.mem.Allocator, field_name: []const u8) ![]const u8 {
-    var out: std.ArrayList(u8) = .empty;
-    errdefer out.deinit(allocator);
-
-    try out.appendSlice(allocator, "set");
-
-    var capitalize_next = true;
-
-    for (field_name) |c| {
-        if (c == '_') {
-            capitalize_next = true;
-            continue;
-        }
-
-        if (capitalize_next) {
-            try out.append(allocator, std.ascii.toUpper(c));
-            capitalize_next = false;
-        } else {
-            try out.append(allocator, c);
-        }
-    }
-
-    return try out.toOwnedSlice(allocator);
-}
-
-fn skribiOwnedStringSetters(msg: prs.Message, ind: []const u8) !void {
-    for (msg.fields) |f| {
-        if (f.label_enum != .LABEL_REQUIRED) {
-            continue;
-        }
-
-        if (!(f.field_type_enum == .TYPE_STRING or
-            f.field_type_enum == .TYPE_BYTES))
-        {
-            continue;
-        }
-
-        const setter_name = try skribiSetNomon(
-            auks.shpa,
-            f.name,
-        );
-        // L2: free eliminado - el arena de generacion (arenoFini) libera los
-        // temporales; un free a mitad no-cola seria no-op en el arena.
-
-        try verkisto.print(
-            \\{s}pub fn {s}(
-            \\{s}    self: *{s},
-            \\{s}    allocator: all.Allocator,
-            \\{s}    value: []const u8,
-            \\{s}) !void {{
-            \\{s}    allocator.free(self.{s});
-            \\{s}    self.{s} = try allocator.dupe(u8, value);
-            \\{s}}}
-            \\
-            \\
-        , .{
-            ind,    setter_name,
-            ind,    msg.name,
-            ind,    ind,
-            ind,    ind,
-            f.name, ind,
-            f.name, ind,
-        });
-    }
-}
