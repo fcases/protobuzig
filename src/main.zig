@@ -2,6 +2,7 @@ const std = @import("std");
 const analizilo = @import("analizilo.zig");
 const kgen = @import("kgeneratoro.zig");
 const kgapi = @import("kgenapi.zig");
+const auks = @import("kgen_auks.zig");
 
 const CliOptions = struct {
     proto_dir: []const u8 = ".",
@@ -46,11 +47,20 @@ pub fn main() !void {
     );
     defer analizilo.liberiProtoDosieron(&ast_proto_dosiero);
 
+    // L2: arena de generacion. shpa (kgen_auks) apunta a el durante la
+    // generacion: reservar temporales es un bump (rapido) y arenoFini()
+    // libera TODO de golpe al terminar (cero fugas). arenoReset() reutiliza
+    // los buffers entre la fase raw y la fase API (retain_capacity).
+    auks.arenoInici();
+    defer auks.arenoFini();
+
     try kgen.generiZigKodon(
         proto_path,
         opts.output_dir,
         &ast_proto_dosiero,
     );
+
+    auks.arenoReset();
 
     try kgapi.generiZigAPI(
         proto_path,

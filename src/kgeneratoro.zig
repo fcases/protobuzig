@@ -282,11 +282,12 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
 
     for (oneof_decl.fields) |field| {
         const temp_name = std.fmt.allocPrint(
-            std.heap.page_allocator,
+            auks.shpa,
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
-        defer std.heap.page_allocator.free(temp_name);
+            // L2: free eliminado - el arena de generacion (arenoFini) libera
+            // los temporales; un free a mitad no-cola seria no-op en el arena.
 
         switch (field.field_type_enum) {
             .TYPE_MESSAGE => {
@@ -590,7 +591,7 @@ fn skribiSeriigiOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     for (oneof_decl.fields) |field| {
         const wire_type = auks.getOneOfWireType(field);
         const temp_name = try std.fmt.allocPrint(
-            std.heap.page_allocator,
+            auks.shpa,
             "{s}_{s}_longa",
             .{ oneof_decl.name, field.name },
         );
@@ -702,7 +703,7 @@ fn skribiDeseriigiOneOfBranches(
         const wire_type = auks.getOneOfWireType(field);
 
         const temp_name = std.fmt.allocPrint(
-            std.heap.page_allocator,
+            auks.shpa,
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
@@ -914,7 +915,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
         try verkisto.print("{s}pub const {s} = struct {{\n", .{ ind, msg.name });
 
         const indent =
-            std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+            std.mem.concatWithSentinel(auks.shpa, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
 
         if (msg.internal_enums.len > 0) {
             try skribiEnums(msg.internal_enums, indent);
@@ -956,14 +957,13 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
                     field.default_value;
 
             var allocated_default_for_decl: ?[]const u8 = null;
-            defer if (allocated_default_for_decl) |s| {
-                std.heap.page_allocator.free(s);
-            };
+            // L2: el defer que liberaba s se ha eliminado - el arena de
+            // generacion (arenoFini) libera todos los temporales.
 
             if (default_for_decl != null and field.field_type_enum == .TYPE_ENUM) {
                 allocated_default_for_decl =
                     std.mem.concatWithSentinel(
-                        std.heap.page_allocator,
+                        auks.shpa,
                         u8,
                         &[_][]const u8{ ".", default_for_decl.? },
                         0,
@@ -2462,7 +2462,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                 // packed repeated
                 if (field.packed_value and auks.estasPackable(field_type_enum)) {
                     const typename_len = std.mem.concatWithSentinel(
-                        std.heap.page_allocator,
+                        auks.shpa,
                         u8,
                         &[_][]const u8{ field_name, "_len" },
                         0,
@@ -2591,11 +2591,13 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                     field_type_enum == .TYPE_BYTES)
                 {
                     const tmp_name = try std.fmt.allocPrint(
-                        std.heap.page_allocator,
+                        auks.shpa,
                         "tmp_{s}",
                         .{field.name},
                     );
-                    defer std.heap.page_allocator.free(tmp_name);
+                    // L2: free eliminado - el arena de generacion (arenoFini)
+                    // libera los temporales; un free a mitad no-cola seria
+                    // no-op en el arena.
 
                     try verkisto.print(
                         \\{s}        {{
@@ -2682,11 +2684,13 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                     field_type_enum == .TYPE_BYTES)
                 {
                     const tmp_name = try std.fmt.allocPrint(
-                        std.heap.page_allocator,
+                        auks.shpa,
                         "tmp_{s}",
                         .{field.name},
                     );
-                    defer std.heap.page_allocator.free(tmp_name);
+                    // L2: free eliminado - el arena de generacion (arenoFini)
+                    // libera los temporales; un free a mitad no-cola seria
+                    // no-op en el arena.
 
                     try verkisto.print(
                         \\{s}        {{
@@ -2757,11 +2761,11 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
     for (msg.fields) |field| {
         if (field.label_enum == .LABEL_REPEATED) {
             const tmp_name = try std.fmt.allocPrint(
-                std.heap.page_allocator,
+                auks.shpa,
                 "tmp_{s}",
                 .{field.name},
             );
-            defer std.heap.page_allocator.free(tmp_name);
+            defer auks.shpa.free(tmp_name);
 
             if (field.field_type_enum == .TYPE_MESSAGE) {
                 try verkisto.print(
@@ -3001,7 +3005,7 @@ fn skribiRequiredDefaultNoVarLong(indent: []const u8, field_name: []const u8, fi
 
     if (field_type == .TYPE_ENUM) {
         if (!equal(u8, default, "null"))
-            default_value_string = std.mem.concatWithSentinel(std.heap.page_allocator, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
+            default_value_string = std.mem.concatWithSentinel(auks.shpa, u8, &[_][]const u8{ ".", default }, 0) catch unreachable
         else
             default_value_string = "null";
     }
@@ -3797,10 +3801,11 @@ fn skribiOwnedStringSetters(msg: prs.Message, ind: []const u8) !void {
         }
 
         const setter_name = try skribiSetNomon(
-            std.heap.page_allocator,
+            auks.shpa,
             f.name,
         );
-        defer std.heap.page_allocator.free(setter_name);
+        // L2: free eliminado - el arena de generacion (arenoFini) libera los
+        // temporales; un free a mitad no-cola seria no-op en el arena.
 
         try verkisto.print(
             \\{s}pub fn {s}(

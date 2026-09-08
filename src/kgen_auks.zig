@@ -5,7 +5,41 @@ const equal = std.mem.eql;
 const prs = @import("mecha_prs.zig");
 const tpj = prs.Tipoj;
 
-const shpa = std.heap.page_allocator;
+// ============================================================================
+// L2 (2026-09-07): arena de generacion en vez de page_allocator disperso.
+//
+// Antes cada helper reservaba strings con page_allocator (mmap por string) y
+// la mayoria nunca se liberaba: fugas invisibles en el CLI (el proceso sale)
+// pero reales si el generador se reutiliza en proceso, y lentas (syscall por
+// asignacion). Ahora shpa apunta al allocator de un ArenaAllocator: reservar
+// es un bump (rapido) y arenoFini() libera TODO de golpe al terminar la
+// generacion (cero fugas). Los free sueltos de temporales ya no hacen falta
+// (el arena los libera al final; un free no-cola es no-op).
+// ============================================================================
+var areno_buf: std.heap.ArenaAllocator = undefined;
+
+/// shpa: allocator de los temporales de generacion (arena). Mutable para
+/// poder apuntarlo al arena en arenoInici().
+pub var shpa: std.mem.Allocator = std.heap.page_allocator;
+
+/// Inicia el arena de generacion y apunta shpa a el.
+pub fn arenoInici() void {
+    areno_buf = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    shpa = areno_buf.allocator();
+}
+
+/// Libera TODO lo reservado en el arena y restaura shpa.
+pub fn arenoFini() void {
+    areno_buf.deinit();
+    shpa = std.heap.page_allocator;
+}
+
+/// Rebobina el arena (retain_capacity: reutiliza los buffers, casi cero
+/// llamadas al allocator tras el primer ciclo). Solo cuando nada del arena
+/// siga referenciado (p. ej. entre la generacion raw y la API).
+pub fn arenoReset() void {
+    _ = areno_buf.reset(.retain_capacity);
+}
 
 /////////////////////////////////////
 /// Auksiliaraj Funkcioj
