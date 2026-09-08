@@ -22,7 +22,7 @@
             "command": "zig",
             "args": [
                 "build-exe",
-                "example/testo_main.zig",
+                "internaltests/testo_main.zig",
                 "-femit-bin=zig-out/bin/testo_main",
                 "-fllvm",
             ],
@@ -42,7 +42,7 @@
             "command": "zig",
             "args": [
                 "build-exe",
-                "example/testo2.zig",
+                "internaltests/testo2.zig",
                 "-femit-bin=zig-out/bin/testo2",
                 "-fllvm",
             ],
@@ -62,7 +62,7 @@
             "command": "zig",
             "args": [
                 "build-exe",
-                "example/testo3.zig",
+                "internaltests/testo3.zig",
                 "-femit-bin=zig-out/bin/testo3",
                 "-fllvm",
             ],
@@ -100,7 +100,7 @@
             "command": "cp",
             "args": [
                 "${workspaceFolder}/src/encdec.zig",
-                "${workspaceFolder}/example/generated/encdec.zig",
+                "${workspaceFolder}/internaltests/generated/encdec.zig",
             ],
             "problemMatcher": [],
             "options": {
@@ -116,9 +116,11 @@
             "type": "shell",
             "command": "${workspaceFolder}/zig-out/bin/protobuzig",
             "args": [
+                "--proto_dir",
+                "internaltests/protos",
                 "--output_dir",
-                "example/generated/",
-                "proto/cctrol.proto"
+                "internaltests/generated/",
+                "cctrol.proto"
             ],
             "problemMatcher": [],
             "options": {
@@ -134,9 +136,11 @@
             "type": "shell",
             "command": "${workspaceFolder}/zig-out/bin/protobuzig",
             "args": [
+                "--proto_dir",
+                "internaltests/protos",
                 "--output_dir",
-                "example/generated/",
-                "proto/Config.proto"
+                "internaltests/generated/",
+                "Config.proto"
             ],
             "problemMatcher": [],
             "options": {

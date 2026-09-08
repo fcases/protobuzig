@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug protozk6",
+            "name": "Debug protobuzig",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/zig-out/bin/protobuzig",
-            "args": ["--output_dir", "example/generated/", "proto/cctrol.proto"],
+            "args": ["--proto_dir", "internaltests/protos", "--output_dir", "internaltests/generated/", "cctrol.proto"],
             "cwd": "${workspaceFolder}",
             "env": {},
             "console": "integratedTerminal",

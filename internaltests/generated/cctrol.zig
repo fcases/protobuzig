@@ -22,12 +22,16 @@ pub const TipoPanel = enum(u64) {
 
 pub const CCtrol = struct {
     nombre: []const u8,
-    remotas: []EstRemCtrol,
+    remotas: []EstRemCtrol = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !CCtrol {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
+        const mia_remotas = try allocator.alloc(EstRemCtrol, 0);
+        errdefer allocator.free(mia_remotas);
         return CCtrol {
-            .nombre = try allocator.dupe(u8, ""),
-            .remotas = try allocator.alloc(EstRemCtrol, 0),
+            .nombre = mia_nombre,
+            .remotas = mia_remotas,
         };
     }
 
@@ -36,7 +40,11 @@ pub const CCtrol = struct {
         for (self.remotas) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.remotas);
+        if (self.remotas.len > 0) allocator.free(self.remotas);
+    }
+
+    pub fn plenigiDefaultojn(self: *CCtrol, allocator: all.Allocator) !void {
+        for (self.remotas) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *CCtrol, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -58,7 +66,9 @@ pub const CCtrol = struct {
     fn skribiAlProtobufTeksto(self: *const CCtrol, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
         for(self.remotas) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             defer allocator.free(indent);
@@ -116,7 +126,7 @@ pub const CCtrol = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const CCtrol, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, CCtrol, @as(*CCtrol, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, CCtrol, self, b_formato, path);
     }
 
     fn seriigi(self: *const CCtrol, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -161,9 +171,13 @@ pub const CCtrol = struct {
             end = buffer.buffer.len;
 
         var remotas_list: std.ArrayList(EstRemCtrol) = .empty; 
+        errdefer {
+            for (remotas_list.items) |*it| it.deinit(allocator);
+            remotas_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -195,16 +209,24 @@ pub const CCtrol = struct {
 
 pub const EstRemCtrol = struct {
     nombre: []const u8,
-    meteos: []EstMeteo,
-    datos_tr: []SnrTrafico,
-    paneles: []PanelInfoV,
+    meteos: []EstMeteo = &.{},
+    datos_tr: []SnrTrafico = &.{},
+    paneles: []PanelInfoV = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !EstRemCtrol {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
+        const mia_meteos = try allocator.alloc(EstMeteo, 0);
+        errdefer allocator.free(mia_meteos);
+        const mia_datos_tr = try allocator.alloc(SnrTrafico, 0);
+        errdefer allocator.free(mia_datos_tr);
+        const mia_paneles = try allocator.alloc(PanelInfoV, 0);
+        errdefer allocator.free(mia_paneles);
         return EstRemCtrol {
-            .nombre = try allocator.dupe(u8, ""),
-            .meteos = try allocator.alloc(EstMeteo, 0),
-            .datos_tr = try allocator.alloc(SnrTrafico, 0),
-            .paneles = try allocator.alloc(PanelInfoV, 0),
+            .nombre = mia_nombre,
+            .meteos = mia_meteos,
+            .datos_tr = mia_datos_tr,
+            .paneles = mia_paneles,
         };
     }
 
@@ -213,15 +235,21 @@ pub const EstRemCtrol = struct {
         for (self.meteos) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.meteos);
+        if (self.meteos.len > 0) allocator.free(self.meteos);
         for (self.datos_tr) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.datos_tr);
+        if (self.datos_tr.len > 0) allocator.free(self.datos_tr);
         for (self.paneles) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.paneles);
+        if (self.paneles.len > 0) allocator.free(self.paneles);
+    }
+
+    pub fn plenigiDefaultojn(self: *EstRemCtrol, allocator: all.Allocator) !void {
+        for (self.meteos) |*v| try v.plenigiDefaultojn(allocator);
+        for (self.datos_tr) |*v| try v.plenigiDefaultojn(allocator);
+        for (self.paneles) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *EstRemCtrol, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -243,7 +271,9 @@ pub const EstRemCtrol = struct {
     fn skribiAlProtobufTeksto(self: *const EstRemCtrol, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
         for(self.meteos) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             defer allocator.free(indent);
@@ -357,7 +387,7 @@ pub const EstRemCtrol = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const EstRemCtrol, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, EstRemCtrol, @as(*EstRemCtrol, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, EstRemCtrol, self, b_formato, path);
     }
 
     fn seriigi(self: *const EstRemCtrol, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -422,11 +452,23 @@ pub const EstRemCtrol = struct {
             end = buffer.buffer.len;
 
         var meteos_list: std.ArrayList(EstMeteo) = .empty; 
+        errdefer {
+            for (meteos_list.items) |*it| it.deinit(allocator);
+            meteos_list.deinit(allocator);
+        }
         var datos_tr_list: std.ArrayList(SnrTrafico) = .empty; 
+        errdefer {
+            for (datos_tr_list.items) |*it| it.deinit(allocator);
+            datos_tr_list.deinit(allocator);
+        }
         var paneles_list: std.ArrayList(PanelInfoV) = .empty; 
+        errdefer {
+            for (paneles_list.items) |*it| it.deinit(allocator);
+            paneles_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -489,8 +531,10 @@ pub const EstMeteo = struct {
     dir_viento: f32,
 
     pub fn initDefault(allocator: all.Allocator) !EstMeteo {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
         return EstMeteo {
-            .nombre = try allocator.dupe(u8, ""),
+            .nombre = mia_nombre,
             .temp = 0,
             .v_viento = 0,
             .dir_viento = 0,
@@ -499,6 +543,11 @@ pub const EstMeteo = struct {
 
     pub fn deinit(self: *const EstMeteo, allocator: all.Allocator) void {
         allocator.free(self.nombre);
+    }
+
+    pub fn plenigiDefaultojn(self: *EstMeteo, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *EstMeteo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -520,7 +569,9 @@ pub const EstMeteo = struct {
     fn skribiAlProtobufTeksto(self: *const EstMeteo, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
         try bufro.print(allocator,"{s}temp: {any}\n",.{ind, self.temp });
         try bufro.print(allocator,"{s}v_viento: {any}\n",.{ind, self.v_viento });
         try bufro.print(allocator,"{s}dir_viento: {any}\n",.{ind, self.dir_viento });
@@ -565,7 +616,7 @@ pub const EstMeteo = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const EstMeteo, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, EstMeteo, @as(*EstMeteo, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, EstMeteo, self, b_formato, path);
     }
 
     fn seriigi(self: *const EstMeteo, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -614,7 +665,7 @@ pub const EstMeteo = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -640,22 +691,33 @@ pub const EstMeteo = struct {
 pub const SnrTrafico = struct {
     seccion: []const u8,
     carriles: u32,
-    vel_media: []f32,
-    vehiculos_min: []f32,
+    vel_media: []f32 = &.{},
+    vehiculos_min: []f32 = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !SnrTrafico {
+        const mia_seccion = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_seccion);
+        const mia_vel_media = try allocator.alloc(f32, 0);
+        errdefer allocator.free(mia_vel_media);
+        const mia_vehiculos_min = try allocator.alloc(f32, 0);
+        errdefer allocator.free(mia_vehiculos_min);
         return SnrTrafico {
-            .seccion = try allocator.dupe(u8, ""),
+            .seccion = mia_seccion,
             .carriles = 0,
-            .vel_media = try allocator.alloc(f32, 0),
-            .vehiculos_min = try allocator.alloc(f32, 0),
+            .vel_media = mia_vel_media,
+            .vehiculos_min = mia_vehiculos_min,
         };
     }
 
     pub fn deinit(self: *const SnrTrafico, allocator: all.Allocator) void {
         allocator.free(self.seccion);
-        allocator.free(self.vel_media);
-        allocator.free(self.vehiculos_min);
+        if (self.vel_media.len > 0) allocator.free(self.vel_media);
+        if (self.vehiculos_min.len > 0) allocator.free(self.vehiculos_min);
+    }
+
+    pub fn plenigiDefaultojn(self: *SnrTrafico, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *SnrTrafico, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -677,7 +739,9 @@ pub const SnrTrafico = struct {
     fn skribiAlProtobufTeksto(self: *const SnrTrafico, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}seccion: \"{s}\"\n",.{ind, self.seccion });
+        const seccion_esc = try escapePbTextToken(allocator, self.seccion);
+        defer allocator.free(seccion_esc);
+        try bufro.print(allocator,"{s}seccion: \"{s}\"\n",.{ind, seccion_esc });
         try bufro.print(allocator,"{s}carriles: {any}\n",.{ind, self.carriles });
         for(self.vel_media) |obj| {
             try bufro.print(allocator,"{s}vel_media: {any}\n",.{ind, obj });
@@ -734,7 +798,7 @@ pub const SnrTrafico = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const SnrTrafico, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, SnrTrafico, @as(*SnrTrafico, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, SnrTrafico, self, b_formato, path);
     }
 
     fn seriigi(self: *const SnrTrafico, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -790,10 +854,12 @@ pub const SnrTrafico = struct {
             end = buffer.buffer.len;
 
         var vel_media_list: std.ArrayList(f32) = .empty; 
+        errdefer vel_media_list.deinit(allocator);
         var vehiculos_min_list: std.ArrayList(f32) = .empty; 
+        errdefer vehiculos_min_list.deinit(allocator);
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -834,12 +900,16 @@ pub const SnrTrafico = struct {
 
 pub const PanelInfoV = struct {
     nombre: []const u8,
-    elementos: []PanelBase,
+    elementos: []PanelBase = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !PanelInfoV {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
+        const mia_elementos = try allocator.alloc(PanelBase, 0);
+        errdefer allocator.free(mia_elementos);
         return PanelInfoV {
-            .nombre = try allocator.dupe(u8, ""),
-            .elementos = try allocator.alloc(PanelBase, 0),
+            .nombre = mia_nombre,
+            .elementos = mia_elementos,
         };
     }
 
@@ -848,7 +918,11 @@ pub const PanelInfoV = struct {
         for (self.elementos) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.elementos);
+        if (self.elementos.len > 0) allocator.free(self.elementos);
+    }
+
+    pub fn plenigiDefaultojn(self: *PanelInfoV, allocator: all.Allocator) !void {
+        for (self.elementos) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *PanelInfoV, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -870,7 +944,9 @@ pub const PanelInfoV = struct {
     fn skribiAlProtobufTeksto(self: *const PanelInfoV, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
         for(self.elementos) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             defer allocator.free(indent);
@@ -928,7 +1004,7 @@ pub const PanelInfoV = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const PanelInfoV, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, PanelInfoV, @as(*PanelInfoV, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, PanelInfoV, self, b_formato, path);
     }
 
     fn seriigi(self: *const PanelInfoV, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -973,9 +1049,13 @@ pub const PanelInfoV = struct {
             end = buffer.buffer.len;
 
         var elementos_list: std.ArrayList(PanelBase) = .empty; 
+        errdefer {
+            for (elementos_list.items) |*it| it.deinit(allocator);
+            elementos_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1021,8 +1101,10 @@ pub const PanelBase = struct {
     datos: Datos,
 
     pub fn initDefault(allocator: all.Allocator) !PanelBase {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
         return PanelBase {
-            .nombre = try allocator.dupe(u8, ""),
+            .nombre = mia_nombre,
             .tipo = std.meta.intToEnum(TipoPanel, 0) catch unreachable,
             .datos = .{ .none = {} },
         };
@@ -1045,6 +1127,18 @@ pub const PanelBase = struct {
         self.deinitDatos(allocator);
     }
 
+    pub fn plenigiDefaultojn(self: *PanelBase, allocator: all.Allocator) !void {
+        switch (self.datos) {
+            .none => {},
+            .senial => |*v| try v.plenigiDefaultojn(allocator),
+            .texto => |*v| try v.plenigiDefaultojn(allocator),
+            .numero => {},
+            .texto_raw => {},
+            .blob => {},
+            .tp => {},
+        }
+    }
+
     pub fn skribiAlTeksto(self: *PanelBase, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, PanelBase, @as(*PanelBase, self), t_formato);
     }
@@ -1064,7 +1158,9 @@ pub const PanelBase = struct {
     fn skribiAlProtobufTeksto(self: *const PanelBase, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
         try bufro.print(allocator, "{s}tipo: {s}\n", .{ ind, @tagName(self.tipo) });
         switch (self.datos) {
             .none => {},
@@ -1088,10 +1184,14 @@ pub const PanelBase = struct {
                 try bufro.print(allocator, "{s}numero: {any}\n", .{ ind, val });
             },
             .texto_raw => |val| {
-                try bufro.print(allocator, "{s}texto_raw: \"{s}\"\n", .{ ind, val });
+                const texto_raw_esc = try escapePbTextToken(allocator, val);
+                defer allocator.free(texto_raw_esc);
+                try bufro.print(allocator, "{s}texto_raw: \"{s}\"\n", .{ ind, texto_raw_esc });
             },
             .blob => |val| {
-                try bufro.print(allocator, "{s}blob: \"{s}\"\n", .{ ind, val });
+                const blob_esc = try escapePbTextToken(allocator, val);
+                defer allocator.free(blob_esc);
+                try bufro.print(allocator, "{s}blob: \"{s}\"\n", .{ ind, blob_esc });
             },
             .tp => |val| {
                 try bufro.print(allocator, "{s}tp: {s}\n", .{ ind, @tagName(val) });
@@ -1142,13 +1242,13 @@ pub const PanelBase = struct {
                 continue;
             }
             if( equal(u8, tok, "texto_raw" ) ) {
-                const datos_texto_raw_val = try allocator.dupe(u8, val);
+                const datos_texto_raw_val = try unescapePbTextToken(allocator, val);
                 mia_Mesagho.deinitDatos(allocator);
                 mia_Mesagho.datos = .{ .texto_raw = datos_texto_raw_val };
                 continue;
             }
             if( equal(u8, tok, "blob" ) ) {
-                const datos_blob_val = try allocator.dupe(u8, val);
+                const datos_blob_val = try unescapePbTextToken(allocator, val);
                 mia_Mesagho.deinitDatos(allocator);
                 mia_Mesagho.datos = .{ .blob = datos_blob_val };
                 continue;
@@ -1169,7 +1269,7 @@ pub const PanelBase = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const PanelBase, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, PanelBase, @as(*PanelBase, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, PanelBase, self, b_formato, path);
     }
 
     fn seriigi(self: *const PanelBase, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1241,7 +1341,7 @@ pub const PanelBase = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1311,15 +1411,24 @@ pub const SenialInfo = struct {
     senial: []const u8,
 
     pub fn initDefault(allocator: all.Allocator) !SenialInfo {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
+        const mia_senial = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_senial);
         return SenialInfo {
-            .nombre = try allocator.dupe(u8, ""),
-            .senial = try allocator.dupe(u8, ""),
+            .nombre = mia_nombre,
+            .senial = mia_senial,
         };
     }
 
     pub fn deinit(self: *const SenialInfo, allocator: all.Allocator) void {
         allocator.free(self.nombre);
         allocator.free(self.senial);
+    }
+
+    pub fn plenigiDefaultojn(self: *SenialInfo, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *SenialInfo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1341,8 +1450,12 @@ pub const SenialInfo = struct {
     fn skribiAlProtobufTeksto(self: *const SenialInfo, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
-        try bufro.print(allocator,"{s}senial: \"{s}\"\n",.{ind, self.senial });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
+        const senial_esc = try escapePbTextToken(allocator, self.senial);
+        defer allocator.free(senial_esc);
+        try bufro.print(allocator,"{s}senial: \"{s}\"\n",.{ind, senial_esc });
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -1378,7 +1491,7 @@ pub const SenialInfo = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const SenialInfo, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, SenialInfo, @as(*SenialInfo, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, SenialInfo, self, b_formato, path);
     }
 
     fn seriigi(self: *const SenialInfo, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1421,7 +1534,7 @@ pub const SenialInfo = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1449,15 +1562,24 @@ pub const TextoInfo = struct {
     texto: []const u8,
 
     pub fn initDefault(allocator: all.Allocator) !TextoInfo {
+        const mia_nombre = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_nombre);
+        const mia_texto = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_texto);
         return TextoInfo {
-            .nombre = try allocator.dupe(u8, ""),
-            .texto = try allocator.dupe(u8, ""),
+            .nombre = mia_nombre,
+            .texto = mia_texto,
         };
     }
 
     pub fn deinit(self: *const TextoInfo, allocator: all.Allocator) void {
         allocator.free(self.nombre);
         allocator.free(self.texto);
+    }
+
+    pub fn plenigiDefaultojn(self: *TextoInfo, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *TextoInfo, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1479,8 +1601,12 @@ pub const TextoInfo = struct {
     fn skribiAlProtobufTeksto(self: *const TextoInfo, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, self.nombre });
-        try bufro.print(allocator,"{s}texto: \"{s}\"\n",.{ind, self.texto });
+        const nombre_esc = try escapePbTextToken(allocator, self.nombre);
+        defer allocator.free(nombre_esc);
+        try bufro.print(allocator,"{s}nombre: \"{s}\"\n",.{ind, nombre_esc });
+        const texto_esc = try escapePbTextToken(allocator, self.texto);
+        defer allocator.free(texto_esc);
+        try bufro.print(allocator,"{s}texto: \"{s}\"\n",.{ind, texto_esc });
 
         return bufro.toOwnedSlice(allocator);
     }
@@ -1516,7 +1642,7 @@ pub const TextoInfo = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const TextoInfo, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, TextoInfo, @as(*TextoInfo, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, TextoInfo, self, b_formato, path);
     }
 
     fn seriigi(self: *const TextoInfo, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1559,7 +1685,7 @@ pub const TextoInfo = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1881,6 +2007,8 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
         },
     }
 
+    try parsed.plenigiDefaultojn(allocator);
+
     return parsed;
 }
 
@@ -2085,5 +2213,34 @@ fn hexDigitValue(c: u8) ?u8 {
         'A'...'F' => c - 'A' + 10,
         else => null,
     };
+}
+
+fn escapePbTextToken(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(allocator);
+    const hex_digits = "0123456789abcdef";
+    for (input) |byte| {
+        switch (byte) {
+            '"' => try result.appendSlice(allocator, "\\\""),
+            '\\' => try result.appendSlice(allocator, "\\\\"),
+            '\n' => try result.appendSlice(allocator, "\\n"),
+            '\r' => try result.appendSlice(allocator, "\\r"),
+            '\t' => try result.appendSlice(allocator, "\\t"),
+            0x07 => try result.appendSlice(allocator, "\\a"),
+            0x08 => try result.appendSlice(allocator, "\\b"),
+            0x0b => try result.appendSlice(allocator, "\\v"),
+            0x0c => try result.appendSlice(allocator, "\\f"),
+            else => {
+                if (byte < 0x20 or byte == 0x7f) {
+                    try result.appendSlice(allocator, "\\x");
+                    try result.append(allocator, hex_digits[byte >> 4]);
+                    try result.append(allocator, hex_digits[byte & 0x0f]);
+                } else {
+                    try result.append(allocator, byte);
+                }
+            },
+        }
+    }
+    return try result.toOwnedSlice(allocator);
 }
 
