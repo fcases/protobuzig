@@ -22,6 +22,8 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
     const nuda_enhavo = nudiKomentaijnLinojn(enhavo);
     defer shpa.free(nuda_enhavo);
 
+    try kontroliNesubtenatajnKonstruojn(nuda_enhavo);
+
     const prt_p = prs.protofile_parser;
     const rezulto = try prt_p.parse(shpa, nuda_enhavo);
 
@@ -37,6 +39,51 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
     return pf.*;
 }
 // Me faltan   extensions,
+
+/// Diagnostico limpio de constructos que el generador NO soporta y que antes
+/// se descartaban en silencio (F5, parte):
+/// - syntax = "proto3"  -> error (el generador produce codigo proto2).
+/// - service / rpc / extend (nivel top) -> error.
+/// Los 'extensions 1000 to max;' DENTRO de mensajes (proto2, p. ej. los
+/// fixtures descriptor*.proto) se siguen ignorando: no afectan al wire de
+/// los campos propios del mensaje.
+fn kontroliNesubtenatajnKonstruojn(enhavo: []const u8) !void {
+    var linio: usize = 1;
+    var linioj = std.mem.splitScalar(u8, enhavo, '\n');
+    while (linioj.next()) |linio_enhavo| : (linio += 1) {
+        const nuda = std.mem.trimLeft(u8, linio_enhavo, " \t\r");
+
+        if (std.mem.startsWith(u8, nuda, "syntax")) {
+            if (std.mem.indexOf(u8, linio_enhavo, "proto3") != null) {
+                std.debug.print(
+                    "protobuzig: error: syntax = \"proto3\" no soportado (linea {d}); el generador produce codigo proto2.\n",
+                    .{linio},
+                );
+                return error.UnsupportedProto3Syntax;
+            }
+            continue;
+        }
+
+        for ([_][]const u8{ "service", "rpc", "extend" }) |konstruo| {
+            if (komencePerVorto(nuda, konstruo)) {
+                std.debug.print(
+                    "protobuzig: error: constructo '{s}' no soportado (linea {d}).\n",
+                    .{ konstruo, linio },
+                );
+                return error.UnsupportedProtoConstruct;
+            }
+        }
+    }
+}
+
+/// True si 'teksto' empieza por la palabra 'vorto' (seguida de fin de linea o
+/// de un caracter no-identificador).
+fn komencePerVorto(teksto: []const u8, vorto: []const u8) bool {
+    if (!std.mem.startsWith(u8, teksto, vorto)) return false;
+    if (teksto.len == vorto.len) return true;
+    const sekva = teksto[vorto.len];
+    return !std.ascii.isAlphanumeric(sekva) and sekva != '_';
+}
 
 pub fn liberiProtoDosieron(pf: *prs.ProtoFile) void {
     for (pf.messages) |*msg| {
