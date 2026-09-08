@@ -295,62 +295,62 @@ pub fn estasPackable(field_type: tpj) bool {
     };
 }
 
-pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8) void {
+pub fn printEncodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8)!void {
     return switch (field_type) {
-        .TYPE_MESSAGE => verkisto.print("{s}{s}.seriigi( allocator, buffer );\n", .{ prefix, field_name }) catch {},
-        .TYPE_ENUM => verkisto.print("buffer.encodeVarint( @intFromEnum({s}{s}) );\n", .{ prefix, field_name }) catch {},
-        .TYPE_BOOL => verkisto.print("buffer.encodeBool( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_STRING => verkisto.print("buffer.encodeString( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_INT32 => verkisto.print("buffer.encodeInt32( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_INT64 => verkisto.print("buffer.encodeInt64( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_SINT32 => verkisto.print("buffer.encodeSint32( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_SINT64 => verkisto.print("buffer.encodeSint64( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_SFIXED32 => verkisto.print("buffer.encodeSfixed32( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_SFIXED64 => verkisto.print("buffer.encodeSfixed64( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_UINT32 => verkisto.print("buffer.encodeUint32( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_UINT64 => verkisto.print("buffer.encodeUint64( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_FIXED32 => verkisto.print("buffer.encodeFixed32( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_FIXED64 => verkisto.print("buffer.encodeFixed64( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_FLOAT => verkisto.print("buffer.encodeFloat( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_DOUBLE => verkisto.print("buffer.encodeDouble( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        .TYPE_BYTES => verkisto.print("buffer.encodeBytes( {s}{s} );\n", .{ prefix, field_name }) catch {},
-        else => verkisto.print("buffer.encodeVarint( {s}{s} );\n", .{ prefix, field_name }) catch {},
+        .TYPE_MESSAGE => try verkisto.print("{s}{s}.seriigi( allocator, buffer );\n", .{ prefix, field_name }),
+        .TYPE_ENUM => try verkisto.print("buffer.encodeVarint( @intFromEnum({s}{s}) );\n", .{ prefix, field_name }),
+        .TYPE_BOOL => try verkisto.print("buffer.encodeBool( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_STRING => try verkisto.print("buffer.encodeString( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_INT32 => try verkisto.print("buffer.encodeInt32( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_INT64 => try verkisto.print("buffer.encodeInt64( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_SINT32 => try verkisto.print("buffer.encodeSint32( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_SINT64 => try verkisto.print("buffer.encodeSint64( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_SFIXED32 => try verkisto.print("buffer.encodeSfixed32( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_SFIXED64 => try verkisto.print("buffer.encodeSfixed64( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_UINT32 => try verkisto.print("buffer.encodeUint32( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_UINT64 => try verkisto.print("buffer.encodeUint64( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_FIXED32 => try verkisto.print("buffer.encodeFixed32( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_FIXED64 => try verkisto.print("buffer.encodeFixed64( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_FLOAT => try verkisto.print("buffer.encodeFloat( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_DOUBLE => try verkisto.print("buffer.encodeDouble( {s}{s} );\n", .{ prefix, field_name }),
+        .TYPE_BYTES => try verkisto.print("buffer.encodeBytes( {s}{s} );\n", .{ prefix, field_name }),
+        else => try verkisto.print("buffer.encodeVarint( {s}{s} );\n", .{ prefix, field_name }),
     };
 }
 
-pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8, extra: []const u8) void {
+pub fn printDecodeMethod(verkisto: *std.Io.Writer, field_type: tpj, prefix: []const u8, field_name: []const u8, extra: []const u8)!void {
     return switch (field_type) {
         .TYPE_MESSAGE => {
             if (std.mem.indexOfScalar(u8, prefix, '.')) |_| {
                 const zig_type = mapiProtoTiponAlZig(prefix);
-                verkisto.print(
+                try verkisto.print(
                     "{s}.deseriigiElBin(allocator, try buffer.decodeBytes( {s} ), .BF_PROTOBUF ){s}",
                     .{ zig_type, extra, field_name },
-                ) catch {};
+                );
             } else {
-                verkisto.print(
+                try verkisto.print(
                     "{s}.deseriigi(allocator, buffer, {s} ){s}",
                     .{ prefix, extra, field_name },
-                ) catch {};
+                );
             }
         },
-        .TYPE_ENUM => verkisto.print("std.meta.intToEnum({s}, try buffer.decodeVarint() ) {s}", .{ prefix, field_name }) catch {},
-        .TYPE_BOOL => verkisto.print("buffer.decodeBool(){s}", .{field_name}) catch {},
-        .TYPE_STRING => verkisto.print("buffer.decodeString( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }) catch {},
-        .TYPE_INT32 => verkisto.print("buffer.decodeInt32(){s}", .{field_name}) catch {},
-        .TYPE_INT64 => verkisto.print("buffer.decodeInt64(){s}", .{field_name}) catch {},
-        .TYPE_SINT32 => verkisto.print("buffer.decodeSint32(){s}", .{field_name}) catch {},
-        .TYPE_SINT64 => verkisto.print("buffer.decodeSint64(){s}", .{field_name}) catch {},
-        .TYPE_SFIXED32 => verkisto.print("buffer.decodeSfixed32(){s}", .{field_name}) catch {},
-        .TYPE_SFIXED64 => verkisto.print("buffer.decodeSfixed64(){s}", .{field_name}) catch {},
-        .TYPE_UINT32 => verkisto.print("buffer.decodeUint32(){s}", .{field_name}) catch {},
-        .TYPE_UINT64 => verkisto.print("buffer.decodeUint64(){s}", .{field_name}) catch {},
-        .TYPE_FIXED32 => verkisto.print("buffer.decodeFixed32(){s}", .{field_name}) catch {},
-        .TYPE_FIXED64 => verkisto.print("buffer.decodeFixed64(){s}", .{field_name}) catch {},
-        .TYPE_FLOAT => verkisto.print("buffer.decodeFloat(){s}", .{field_name}) catch {},
-        .TYPE_DOUBLE => verkisto.print("buffer.decodeDouble(){s}", .{field_name}) catch {},
-        .TYPE_BYTES => verkisto.print("buffer.decodeBytes( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }) catch {},
-        else => verkisto.print("buffer.decodeVarint(){s}", .{field_name}) catch {},
+        .TYPE_ENUM => try verkisto.print("std.meta.intToEnum({s}, try buffer.decodeVarint() ) {s}", .{ prefix, field_name }),
+        .TYPE_BOOL => try verkisto.print("buffer.decodeBool(){s}", .{field_name}),
+        .TYPE_STRING => try verkisto.print("buffer.decodeString( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }),
+        .TYPE_INT32 => try verkisto.print("buffer.decodeInt32(){s}", .{field_name}),
+        .TYPE_INT64 => try verkisto.print("buffer.decodeInt64(){s}", .{field_name}),
+        .TYPE_SINT32 => try verkisto.print("buffer.decodeSint32(){s}", .{field_name}),
+        .TYPE_SINT64 => try verkisto.print("buffer.decodeSint64(){s}", .{field_name}),
+        .TYPE_SFIXED32 => try verkisto.print("buffer.decodeSfixed32(){s}", .{field_name}),
+        .TYPE_SFIXED64 => try verkisto.print("buffer.decodeSfixed64(){s}", .{field_name}),
+        .TYPE_UINT32 => try verkisto.print("buffer.decodeUint32(){s}", .{field_name}),
+        .TYPE_UINT64 => try verkisto.print("buffer.decodeUint64(){s}", .{field_name}),
+        .TYPE_FIXED32 => try verkisto.print("buffer.decodeFixed32(){s}", .{field_name}),
+        .TYPE_FIXED64 => try verkisto.print("buffer.decodeFixed64(){s}", .{field_name}),
+        .TYPE_FLOAT => try verkisto.print("buffer.decodeFloat(){s}", .{field_name}),
+        .TYPE_DOUBLE => try verkisto.print("buffer.decodeDouble(){s}", .{field_name}),
+        .TYPE_BYTES => try verkisto.print("buffer.decodeBytes( {s} try buffer.decodeVarint() ){s}", .{ prefix, field_name }),
+        else => try verkisto.print("buffer.decodeVarint(){s}", .{field_name}),
     };
 }
 
@@ -362,17 +362,17 @@ pub fn estasLongaVar(field_type: tpj) bool {
     return false;
 }
 
-pub fn printParseType(verkisto: *std.Io.Writer, field_type: tpj, name: []const u8) void {
+pub fn printParseType(verkisto: *std.Io.Writer, field_type: tpj, name: []const u8)!void {
     return switch (field_type) {
-        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i32,val,10) catch 0;\n", .{name}) catch {},
-        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i64,val,10) catch 0;\n", .{name}) catch {},
-        .TYPE_UINT32, .TYPE_FIXED32 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u32,val,10) catch 0;\n", .{name}) catch {},
-        .TYPE_UINT64, .TYPE_FIXED64 => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u64,val,10) catch 0;\n", .{name}) catch {},
-        .TYPE_FLOAT => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f32,val) catch 0.0;\n", .{name}) catch {},
-        .TYPE_DOUBLE => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0.0;\n", .{name}) catch {},
-        .TYPE_ENUM => verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0;\n", .{name}) catch {},
-        .TYPE_BOOL => verkisto.print("mia_Mesagho.{s} =  if( equal(u8, val,\"true\") ) true else false;\n", .{name}) catch {},
-        .TYPE_STRING, .TYPE_BYTES => verkisto.print("mia_Mesagho.{s} =  allocator.dupe(u8, val) catch \"\";\n", .{name}) catch {},
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i32,val,10) catch 0;\n", .{name}),
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i64,val,10) catch 0;\n", .{name}),
+        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u32,val,10) catch 0;\n", .{name}),
+        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u64,val,10) catch 0;\n", .{name}),
+        .TYPE_FLOAT => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f32,val) catch 0.0;\n", .{name}),
+        .TYPE_DOUBLE => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0.0;\n", .{name}),
+        .TYPE_ENUM => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0;\n", .{name}),
+        .TYPE_BOOL => try verkisto.print("mia_Mesagho.{s} =  if( equal(u8, val,\"true\") ) true else false;\n", .{name}),
+        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("mia_Mesagho.{s} =  allocator.dupe(u8, val) catch \"\";\n", .{name}),
         else => {},
     };
 }
@@ -382,17 +382,17 @@ pub fn printParseValueExpr(
     field_type: tpj,
     field_zig_type: []const u8,
     val_expr: []const u8,
-) void {
+)!void {
     return switch (field_type) {
-        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_UINT32, .TYPE_FIXED32 => verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_UINT64, .TYPE_FIXED64 => verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}) catch {},
-        .TYPE_FLOAT => verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}) catch {},
-        .TYPE_DOUBLE => verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}) catch {},
-        .TYPE_BOOL => verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}) catch {},
-        .TYPE_ENUM => verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }) catch {},
-        .TYPE_STRING, .TYPE_BYTES => verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}) catch {},
-        else => verkisto.print("{s}", .{val_expr}) catch {},
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}),
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}),
+        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}),
+        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}),
+        .TYPE_FLOAT => try verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}),
+        .TYPE_DOUBLE => try verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}),
+        .TYPE_BOOL => try verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}),
+        .TYPE_ENUM => try verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }),
+        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}),
+        else => try verkisto.print("{s}", .{val_expr}),
     };
 }

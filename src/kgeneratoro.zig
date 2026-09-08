@@ -387,7 +387,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     ind, temp_name,
                 });
 
-                auks.printParseValueExpr(
+                try auks.printParseValueExpr(
                     verkisto,
                     field.field_type_enum,
                     field.field_type,
@@ -651,7 +651,7 @@ fn skribiSeriigiOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     ind,
                 });
 
-                auks.printEncodeMethod(
+                try auks.printEncodeMethod(
                     verkisto,
                     field.field_type_enum,
                     "val",
@@ -870,7 +870,7 @@ fn skribiDeseriigiOneOfBranches(
                     temp_name,
                 });
 
-                auks.printDecodeMethod(
+                try auks.printDecodeMethod(
                     verkisto,
                     field_type_enum,
                     "",
@@ -2032,7 +2032,7 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
                             },
                         );
 
-                        auks.printParseValueExpr(
+                        try auks.printParseValueExpr(
                             verkisto,
                             field.field_type_enum,
                             field.field_type,
@@ -2089,7 +2089,7 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
                         });
                     }
                 } else {
-                    auks.printParseType(verkisto, field.field_type_enum, field.name);
+                    try auks.printParseType(verkisto, field.field_type_enum, field.name);
                 }
             }
         }
@@ -2275,54 +2275,54 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
         switch (field.label_enum) {
             .LABEL_OPTIONAL => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiOptionalNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
+                    try skribiOptionalNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type);
                     continue;
                 }
 
                 if (havas_default and !estas_variabla_longo) {
-                    skribiOptionalDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    try skribiOptionalDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value);
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiOptionalNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
+                    try skribiOptionalNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type);
                     continue;
                 }
 
                 if (havas_default and estas_variabla_longo) {
-                    skribiOptionalDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    try skribiOptionalDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value);
                     continue;
                 }
             },
             .LABEL_REQUIRED => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiRequiredNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
+                    try skribiRequiredNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type);
                     continue;
                 }
 
                 if (havas_default and !estas_variabla_longo) {
-                    skribiRequiredDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    try skribiRequiredDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value);
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiRequiredNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type) catch {};
+                    try skribiRequiredNoDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type);
                     continue;
                 }
 
                 if (havas_default and estas_variabla_longo) {
-                    skribiRequiredDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value) catch {};
+                    try skribiRequiredDefaultVarLong(ind, field_name, field_type_enum, field.number, wire_type, default_value);
                     continue;
                 }
             },
             .LABEL_REPEATED => {
                 if (!havas_default and !estas_variabla_longo) {
-                    skribiRepeatedNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, packed_value) catch {};
+                    try skribiRepeatedNoDefaultNoVarLong(ind, field_name, field_type_enum, field.number, wire_type, packed_value);
                     continue;
                 }
 
                 if (!havas_default and estas_variabla_longo) {
-                    skribiRepeatedNoDefaultVarLong(ind, field_name, field_type_enum, field.field_type, field.number, wire_type) catch {};
+                    try skribiRepeatedNoDefaultVarLong(ind, field_name, field_type_enum, field.field_type, field.number, wire_type);
                     continue;
                 }
             },
@@ -2486,7 +2486,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         field_name,
                     });
 
-                    auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
+                    try auks.printDecodeMethod(verkisto, field_type_enum, field_type, "", typename_len);
 
                     try verkisto.print(
                         \\ );
@@ -2540,7 +2540,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                             \\{s}                try 
                         , .{ ind, ind, field_name, ind, ind });
 
-                        auks.printDecodeMethod(
+                        try auks.printDecodeMethod(
                             verkisto,
                             field_type_enum,
                             if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
@@ -2607,7 +2607,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         tmp_name,
                     });
 
-                    auks.printDecodeMethod(
+                    try auks.printDecodeMethod(
                         verkisto,
                         field_type_enum,
                         "",
@@ -2636,7 +2636,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         field.name,
                     });
 
-                    auks.printDecodeMethod(
+                    try auks.printDecodeMethod(
                         verkisto,
                         field_type_enum,
                         if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
@@ -2700,7 +2700,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         tmp_name,
                     });
 
-                    auks.printDecodeMethod(
+                    try auks.printDecodeMethod(
                         verkisto,
                         field_type_enum,
                         "",
@@ -2733,7 +2733,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         field.name,
                     });
 
-                    auks.printDecodeMethod(
+                    try auks.printDecodeMethod(
                         verkisto,
                         field_type_enum,
                         if (field_type_enum == .TYPE_MESSAGE or field_type_enum == .TYPE_ENUM)
@@ -2836,7 +2836,7 @@ fn skribiOptionalNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, 
         indent, field_name, // if (non-null )
         indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try auks.printEncodeMethod(verkisto, field_type, "val", "");
     try verkisto.print(
         \\{s}        tuta_longo += try buffer.encodeVarint({d});
         \\{s}    }}   //1 opt - no def - no varlong
@@ -2907,7 +2907,7 @@ fn skribiOptionalNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
         indent, field_name, // if (non-null )
         indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "val", "");
+    try auks.printEncodeMethod(verkisto, field_type, "val", "");
     try verkisto.print(
         \\{s}        tuta_longo += st_longa;
         \\{s}        tuta_longo += try buffer.encodeVarint(st_longa);
@@ -2987,7 +2987,7 @@ fn skribiRequiredNoDefaultNoVarLong(indent: []const u8, field_name: []const u8, 
     , .{
         indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
         \\{s}    tuta_longo += try buffer.encodeVarint({d});
         \\{s}    //5 req - no def - no varlong
@@ -3016,7 +3016,7 @@ fn skribiRequiredDefaultNoVarLong(indent: []const u8, field_name: []const u8, fi
         indent, field_name, default_value_string, // if !default )
         indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
         \\{s}        tuta_longo += try buffer.encodeVarint({d});
         \\{s}    }}  //6  req - def - no varlong
@@ -3034,7 +3034,7 @@ fn skribiRequiredNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
     , .{
         indent, field_name,
     });
-    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
         \\{s}    tuta_longo += {s}_longa;
         \\{s}    tuta_longo += try buffer.encodeVarint({s}_longa);
@@ -3052,7 +3052,7 @@ fn skribiRequiredNoDefaultVarLong(indent: []const u8, field_name: []const u8, fi
 
 fn skribiRequiredDefaultVarLong(indent: []const u8, field_name: []const u8, field_type: tpj, field_number: u32, wire_type: u3, default: []const u8) !void {
     if (field_type != .TYPE_STRING) {
-        skribiRequiredNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type) catch {};
+        try skribiRequiredNoDefaultVarLong(indent, field_name, field_type, field_number, wire_type);
         return;
     }
 
@@ -3063,7 +3063,7 @@ fn skribiRequiredDefaultVarLong(indent: []const u8, field_name: []const u8, fiel
         indent, field_name, default, // if !def
         indent,
     });
-    auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
+    try auks.printEncodeMethod(verkisto, field_type, "self.", field_name);
     try verkisto.print(
         \\{s}        tuta_longo += st_longa;
         \\{s}        tuta_longo += try buffer.encodeVarint(st_longa);
@@ -3110,7 +3110,7 @@ fn skribiRepeatedNoDefaultNoVarLong(
             indent,     field_name,
         });
 
-        auks.printEncodeMethod(
+        try auks.printEncodeMethod(
             verkisto,
             field_type,
             "",
@@ -3151,7 +3151,7 @@ fn skribiRepeatedNoDefaultNoVarLong(
         field_name, indent,
     });
 
-    auks.printEncodeMethod(
+    try auks.printEncodeMethod(
         verkisto,
         field_type,
         "",
@@ -3221,7 +3221,7 @@ fn skribiRepeatedNoDefaultVarLong(
         field_name, indent,     field_name,
     });
 
-    auks.printEncodeMethod(
+    try auks.printEncodeMethod(
         verkisto,
         field_type,
         "",
