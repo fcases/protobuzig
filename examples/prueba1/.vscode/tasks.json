@@ -1,0 +1,37 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build prueba1",
+            "type": "shell",
+            "command": "zig build",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "check prueba1",
+            "type": "shell",
+            "command": "zig build check",
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "run prueba1",
+            "type": "shell",
+            "command": "zig build run",
+            "problemMatcher": [],
+            "group": "build"
+        },
+        {
+            "label": "test prueba1",
+            "type": "shell",
+            "command": "zig build test",
+            "problemMatcher": [],
+            "group": "build"
+        }
+    ]
+}
