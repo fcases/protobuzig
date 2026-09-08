@@ -26,7 +26,6 @@ Layout (cerrado):
     src/
       main.zig         codigo de usuario: ejemplo modificable (con muestra
                        automatica del primer campo del primer mensaje)
-      root.zig         modulo raiz: re-exporta lo generado (uso libreria Zig)
       tests.zig        un test round-trip (texto + binario) por mensaje
       runtime/         TODO lo generado: X.zig + X_api.zig + encdec.zig
     build.zig          exe demo + pasos check/run/test; sin cfg/
@@ -34,17 +33,18 @@ Layout (cerrado):
     .gitignore         .zig-cache/, zig-out/, demo.*
 
 Los generados se regeneran SIEMPRE dentro de src/runtime; el usuario no los
-toca a mano. El main/root/tests se generan para el primer mensaje del primer
+toca a mano. El main/tests se generan para el primer mensaje del primer
 proto y se extienden a mano (un test por mensaje externo).
 
 -------------------------------------------------------------------------------
 3. Solo-Zig: cero artefactos binarios
 -------------------------------------------------------------------------------
 En el supuesto solo-Zig del conops NO se crea ni se usa ninguna libreria:
-el consumo Zig es a nivel de fuente (@import de runtime/... o del modulo
-root.zig). Un .a/.so solo tiene sentido cuando existe un consumidor no-Zig
-(escenario C). El build.zig del ws solo-Zig no lleva addLibrary; root.zig se
-compila en "check" via addObject (validacion, no artefacto instalable).
+el consumo Zig es a nivel de fuente (@import de runtime/...). No hay
+root.zig ni modulo raiz en el build: main.zig y tests.zig importan
+src/runtime por ruta relativa. Un .a/.so (y un root.zig/paquete como punto
+de entrada) solo tiene sentido cuando existe un consumidor externo no-Zig:
+se reintroducira en el escenario C.
 
 -------------------------------------------------------------------------------
 4. Escenario C futuro: la libreria es la fachada C de la API segura generada

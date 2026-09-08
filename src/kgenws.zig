@@ -9,11 +9,16 @@
 //     protos/            copia del .proto de entrada
 //     src/
 //       main.zig         codigo de usuario: ejemplo modificable
-//       root.zig         modulo raiz: re-exporta lo generado (uso libreria)
 //       tests.zig        un test round-trip por mensaje del contrato
 //       runtime/         TODO lo generado: X.zig + X_api.zig + encdec.zig
-//     build.zig          compila lib + exe demo; pasos check/run/test
+//     build.zig          exe demo + pasos check/run/test
 //     .vscode/           settings/tasks/launch
+//     .gitignore
+//
+// Supuesto solo-Zig: sin libreria ni modulo raiz (root.zig). main y tests
+// importan src/runtime por ruta relativa. Un root.zig/paquete y la libreria
+// .a se reintroduciran cuando exista un consumidor externo (escenario C:
+// fachada sobre la API segura generada X_api.zig).
 //
 // protobuzig vive independiente de K6Bus: el workspace no referencia ningun
 // runtime externo; encdec.zig se incrusta en el binario (@embedFile) y se
@@ -36,21 +41,10 @@ const PLANTILO_BUILD =
     \\    const target = b.standardTargetOptions(.{});
     \\    const optimize = b.standardOptimizeOption(.{});
     \\
-    \\    // Modulo raiz (src/root.zig): re-exporta lo generado en src/runtime.
-    \\    const ws_mod = b.createModule(.{
-    \\        .root_source_file = b.path("src/root.zig"),
-    \\        .target = target,
-    \\        .optimize = optimize,
-    \\    });
-    \\
-    \\    // Sin libreria estatica de momento: no hay consumidor (la fachada C
-    \\    // llegara cuando exista). root.zig se compila en "check" para no
-    \\    // dejarlo pudrirse sin validar.
-    \\    const root_obj = b.addObject(.{
-    \\        .name = "%%WS%%_root",
-    \\        .root_module = ws_mod,
-    \\        .use_llvm = true,
-    \\    });
+    \\    // Sin libreria ni modulo raiz en el supuesto solo-Zig: main y tests
+    \\    // importan src/runtime por ruta relativa. Un root.zig/paquete (y la
+    \\    // libreria .a) se reintroducira cuando exista un consumidor externo
+    \\    // (escenario C: fachada sobre la API segura generada).
     \\
     \\    // Ejecutable de ejemplo (src/main.zig): codigo de usuario.
     \\    const main_mod = b.createModule(.{
@@ -74,9 +68,8 @@ const PLANTILO_BUILD =
     \\    const run_step = b.step("run", "Ejecuta el ejemplo de src/main.zig");
     \\    run_step.dependOn(&run_cmd.step);
     \\
-    \\    // Check: compila root.zig + exe sin ejecutar ni instalar nada extra.
+    \\    // Check: compila el exe sin ejecutar.
     \\    const check_step = b.step("check", "Compila sin ejecutar");
-    \\    check_step.dependOn(&root_obj.step);
     \\    check_step.dependOn(&exe.step);
     \\
     \\    // Test: round-trip por mensaje (src/tests.zig).
@@ -92,22 +85,6 @@ const PLANTILO_BUILD =
     \\    const test_step = b.step("test", "Ejecuta los tests de src/tests.zig");
     \\    test_step.dependOn(&run_tests.step);
     \\}
-    \\
-;
-
-const PLANTILO_ROOT =
-    \\// root.zig: modulo raiz del workspace.
-    \\//
-    \\// Re-exporta lo generado en src/runtime para uso como libreria:
-    \\//
-    \\//     const ws = @import("root.zig");   // o el modulo "ws" del build
-    \\//     var msg = try ws.%%BASE%%.Pkg.Tipo.initDefault(allocator);
-    \\//
-    \\// El codigo generado vive en src/runtime: NO lo modifiques a mano;
-    \\// regeneralo siempre con protobuzig.
-    \\
-    \\pub const %%BASE%% = @import("runtime/%%BASE%%.zig");
-    \\pub const %%BASE%%_api = @import("runtime/%%BASE%%_api.zig");
     \\
 ;
 
@@ -439,12 +416,6 @@ pub fn generiWorkshop(
     try skribiPlantilon(
         try std.fs.path.join(asignilo, &.{ ws, "build.zig" }),
         PLANTILO_BUILD,
-        &paroj_base,
-    );
-
-    try skribiPlantilon(
-        try std.fs.path.join(asignilo, &.{ ws, "src", "root.zig" }),
-        PLANTILO_ROOT,
         &paroj_base,
     );
 
