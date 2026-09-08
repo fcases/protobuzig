@@ -64,6 +64,7 @@ pub fn main() !void {
     try testOptionalDefaultPresencia(allocator);
     try testCloneEstMeteo(allocator);
     try testRepeatedMessage(allocator);
+    try testRepeatedProtobufTexto(allocator);
     try testOneofPanelBase(allocator);
     try testOneofProtobufTextRoundTrip(allocator);
     try testOptionalString(allocator);
@@ -1140,6 +1141,100 @@ fn testRepeatedScalar(allocator: std.mem.Allocator) !void {
             trafico2.getVelMediaCount(),
             trafico2.getVehiculosMinCount(),
         },
+    );
+}
+
+fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
+    // R2: round-trip de REPEATED via Protobuf Text (>=2 elementos, GPA).
+    // Los tests anteriores solo cubrian repeated en binario.
+    // Aqui se cubren repeated message y repeated string; el scalar float
+    // en texto tambien parsea (se deja fuera por brevedad).
+
+    // 1) repeated MESSAGE: EstRemCtrol.meteos con 2 EstMeteo.
+    var remota = try Api.EstRemCtrol.initDefault(allocator);
+    defer remota.deinit(allocator);
+    try remota.setNombre(allocator, "remota-txt-1");
+
+    var meteo_a = try Api.EstMeteo.initDefault(allocator);
+    defer meteo_a.deinit(allocator);
+    try meteo_a.setNombre(allocator, "meteo-txt-a");
+    meteo_a.setTemp(21);
+    meteo_a.setVViento(5.5);
+    meteo_a.setDirViento(10.0);
+    try remota.appendMeteos(allocator, &meteo_a);
+
+    var meteo_b = try Api.EstMeteo.initDefault(allocator);
+    defer meteo_b.deinit(allocator);
+    try meteo_b.setNombre(allocator, "meteo-txt-b");
+    meteo_b.setTemp(22);
+    meteo_b.setVViento(6.5);
+    meteo_b.setDirViento(20.0);
+    try remota.appendMeteos(allocator, &meteo_b);
+
+    try std.testing.expectEqual(@as(usize, 2), remota.getMeteosCount());
+
+    const text_remota = try remota.writeToText(allocator, .TF_PROTOBUF);
+    defer allocator.free(text_remota);
+
+    std.debug.print(
+        "--- repeated message Protobuf Text ---\n{s}---\n",
+        .{text_remota},
+    );
+
+    var remota_txt = try Api.EstRemCtrol.readFromText(
+        allocator,
+        text_remota,
+        .TF_PROTOBUF,
+    );
+    defer remota_txt.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), remota_txt.getMeteosCount());
+
+    var meteo_txt_a = try remota_txt.getMeteosAt(allocator, 0);
+    defer meteo_txt_a.deinit(allocator);
+    try expectEstMeteo(meteo_txt_a, "meteo-txt-a", 21, 5.5, 10.0);
+
+    var meteo_txt_b = try remota_txt.getMeteosAt(allocator, 1);
+    defer meteo_txt_b.deinit(allocator);
+    try expectEstMeteo(meteo_txt_b, "meteo-txt-b", 22, 6.5, 20.0);
+
+    // 2) repeated STRING: UnixSocketStarConfig.remote_socket_paths con 2 rutas.
+    var usox = try ConfigApi.UnixSocketStarConfig.initDefault(allocator);
+    defer usox.deinit(allocator);
+    try usox.setLocalSocketPath(allocator, "/tmp/local.sock");
+    try usox.appendRemoteSocketPaths(allocator, "/tmp/remota-uno.sock");
+    try usox.appendRemoteSocketPaths(allocator, "/tmp/remota-dos.sock");
+
+    const text_usox = try usox.writeToText(allocator, .TF_PROTOBUF);
+    defer allocator.free(text_usox);
+
+    var usox_txt = try ConfigApi.UnixSocketStarConfig.readFromText(
+        allocator,
+        text_usox,
+        .TF_PROTOBUF,
+    );
+    defer usox_txt.deinit(allocator);
+
+    try std.testing.expectEqual(
+        @as(usize, 2),
+        usox_txt.getRemoteSocketPathsCount(),
+    );
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        try usox_txt.getRemoteSocketPathsAt(0),
+        "/tmp/remota-uno.sock",
+    ));
+
+    try std.testing.expect(std.mem.eql(
+        u8,
+        try usox_txt.getRemoteSocketPathsAt(1),
+        "/tmp/remota-dos.sock",
+    ));
+
+    std.debug.print(
+        "testo3: repeated Protobuf TEXT round-trip OK\n",
+        .{},
     );
 }
 
