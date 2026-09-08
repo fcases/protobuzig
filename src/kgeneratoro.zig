@@ -2249,13 +2249,13 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
 
     try verkisto.print(
         \\{s}pub fn seriigiAlDosiero(self: *const {s}, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {{
-        \\{s}    return try seriigiTiponAlDosiero(allocator, {s}, @as(*{s}, self), path, b_formato);
+        \\{s}    return try seriigiTiponAlDosiero(allocator, {s}, self, b_formato, path);
         \\{s}}}
         \\
         \\
     , .{
         ind, msg.name, // fn
-        ind, msg.name, msg.name, // return
+        ind, msg.name, // return
         ind, // }
     });
 

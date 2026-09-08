@@ -2,11 +2,13 @@ const std = @import("std");
 const analizilo = @import("analizilo.zig");
 const kgen = @import("kgeneratoro.zig");
 const kgapi = @import("kgenapi.zig");
+const kgenws = @import("kgenws.zig");
 const auks = @import("kgen_auks.zig");
 
 const CliOptions = struct {
     proto_dir: []const u8 = ".",
     output_dir: []const u8 = ".",
+    ws_dir: ?[]const u8 = null,
     proto_file: ?[]const u8 = null,
     verbose: bool = false,
     help: bool = false,
@@ -47,6 +49,14 @@ pub fn main() !void {
     );
     defer analizilo.liberiProtoDosieron(&ast_proto_dosiero);
 
+    // Con --ws <dir> el andamiaje dirige la generacion a <dir>/src/runtime
+    // (ignora --output_dir); sin --ws se escribe en --output_dir.
+    const output_dir = if (opts.ws_dir) |ws_dir|
+        try std.fs.path.join(allocator, &.{ ws_dir, "src", "runtime" })
+    else
+        opts.output_dir;
+    defer if (opts.ws_dir != null) allocator.free(output_dir);
+
     // L2: arena de generacion. shpa (kgen_auks) apunta a el durante la
     // generacion: reservar temporales es un bump (rapido) y arenoFini()
     // libera TODO de golpe al terminar (cero fugas). arenoReset() reutiliza
@@ -56,7 +66,7 @@ pub fn main() !void {
 
     try kgen.generiZigKodon(
         proto_path,
-        opts.output_dir,
+        output_dir,
         &ast_proto_dosiero,
     );
 
@@ -64,9 +74,24 @@ pub fn main() !void {
 
     try kgapi.generiZigAPI(
         proto_path,
-        opts.output_dir,
+        output_dir,
         &ast_proto_dosiero,
     );
+
+    // Andamiaje de workspace: copia del .proto, encdec, main/root/tests de
+    // ejemplo, build.zig y .vscode (los generados ya estan en src/runtime).
+    if (opts.ws_dir) |ws_dir| {
+        const nuda = std.fs.path.basename(proto_path);
+        const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse nuda.len;
+        const basa_nomo = nuda[0..punkta_indekso];
+
+        try kgenws.generiWorkshop(
+            ws_dir,
+            basa_nomo,
+            proto_path,
+            &ast_proto_dosiero,
+        );
+    }
 }
 
 fn parseArgs(args: []const []const u8) !CliOptions {
@@ -104,6 +129,14 @@ fn parseArgs(args: []const []const u8) !CliOptions {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, "--ws")) {
+            i += 1;
+            if (i >= args.len) return error.MissingWsDirValue;
+            opts.ws_dir = args[i];
+            i += 1;
+            continue;
+        }
+
         if (std.mem.startsWith(u8, arg, "--")) {
             std.debug.print("Unknown option: {s}\n\n", .{arg});
             printHelp();
@@ -134,6 +167,13 @@ fn printHelp() void {
         \\  --output_dir <dir>     Directory where generated .zig is written.
         \\                         Default: "."
         \\
+        \\  --ws <dir>             Create a self-contained workspace at <dir>
+        \\                         (ignores --output_dir): copies the .proto to
+        \\                         <dir>/protos, writes generated .zig + encdec
+        \\                         to <dir>/src/runtime, and scaffolds
+        \\                         main.zig/root.zig/tests.zig, build.zig and
+        \\                         .vscode (settings/tasks/launch).
+        \\
         \\  --verbose, -v          Print parser/analyzer traces.
         \\
         \\  --help, -h             Show this help.
@@ -142,6 +182,7 @@ fn printHelp() void {
         \\  protobuzig Msg.proto
         \\  protobuzig --proto_dir protos/k6bus --output_dir generated/core Msg.proto
         \\  protobuzig --verbose --proto_dir protos/k6bus --output_dir generated/core Packet.proto
+        \\  protobuzig --ws miws --proto_dir protos Config.proto
         \\
     ,
         .{},
