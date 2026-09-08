@@ -121,13 +121,27 @@ fn nudiKomentaijnLinojn(input: []const u8) []const u8 {
     var out = std.ArrayList(u8).empty;
 
     var i: usize = 0;
-    while (i < input.len) : (i += 1) {
+    while (i < input.len) {
         if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '/') {
-            // saltar hasta el final de la línea
+            // comentario de linea: descartar hasta '\n' (el '\n' se copia
+            // en la siguiente iteracion: las lineas no se fusionan).
             while (i < input.len and input[i] != '\n') : (i += 1) {}
-        } else {
-            out.append(shpa, input[i]) catch {};
+            continue;
         }
+        if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '*') {
+            // comentario de bloque (F5, parte): descartar hasta '*''/',
+            // conservando los '\n' para no descuadrar los numeros de linea
+            // de los diagnosticos posteriores.
+            i += 2;
+            while (i + 1 < input.len and !(input[i] == '*' and input[i + 1] == '/')) {
+                if (input[i] == '\n') out.append(shpa, '\n') catch {};
+                i += 1;
+            }
+            i += 2; // consumir '*' '/' (si no cerro, termina el bucle)
+            continue;
+        }
+        out.append(shpa, input[i]) catch {};
+        i += 1;
     }
     return out.toOwnedSlice(shpa) catch input;
 }
