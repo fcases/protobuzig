@@ -197,15 +197,19 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                     });
                 }
             },
-            .TYPE_STRING => {
+            .TYPE_STRING, .TYPE_BYTES => {
                 try verkisto.print(
                     \\{s}        .{s} => |val| {{
-                    \\{s}            try bufro.print(allocator, "{{s}}{s}: \"{{s}}\"\n", .{{ ind, val }});
+                    \\{s}            const {s}_esc = try escapePbTextToken(allocator, val);
+                    \\{s}            defer allocator.free({s}_esc);
+                    \\{s}            try bufro.print(allocator, "{{s}}{s}: \"{{s}}\"\n", .{{ ind, {s}_esc }});
                     \\{s}        }},
                     \\
                 , .{
                     ind, field.name,
                     ind, field.name,
+                    ind, field.name,
+                    ind, field.name, field.name,
                     ind,
                 });
             },
@@ -213,18 +217,6 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                 try verkisto.print(
                     \\{s}        .{s} => |val| {{
                     \\{s}            try bufro.print(allocator, "{{s}}{s}: {{s}}\n", .{{ ind, @tagName(val) }});
-                    \\{s}        }},
-                    \\
-                , .{
-                    ind, field.name,
-                    ind, field.name,
-                    ind,
-                });
-            },
-            .TYPE_BYTES => {
-                try verkisto.print(
-                    \\{s}        .{s} => |val| {{
-                    \\{s}            try bufro.print(allocator, "{{s}}{s}: \"{{s}}\"\n", .{{ ind, val }});
                     \\{s}        }},
                     \\
                 , .{
@@ -342,7 +334,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             => {
                 try verkisto.print(
                     \\{s}        if( equal(u8, tok, "{s}" ) ) {{
-                    \\{s}            const {s} = try allocator.dupe(u8, val);
+                    \\{s}            const {s} = try unescapePbTextToken(allocator, val);
                     \\{s}            mia_Mesagho.deinit{s}(allocator);
                     \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
                     \\{s}            continue;
@@ -1626,6 +1618,39 @@ fn skribiGeneralajnFunkciojn() !void {
         \\
     , .{});
 
+    try verkisto.print(
+        \\fn escapePbTextToken(allocator: std.mem.Allocator, input: []const u8) ![]u8 {{
+        \\    var result: std.ArrayList(u8) = .empty;
+        \\    errdefer result.deinit(allocator);
+        \\    const hex_digits = "0123456789abcdef";
+        \\    for (input) |byte| {{
+        \\        switch (byte) {{
+        \\            '"' => try result.appendSlice(allocator, "\\\""),
+        \\            '\\' => try result.appendSlice(allocator, "\\\\"),
+        \\            '\n' => try result.appendSlice(allocator, "\\n"),
+        \\            '\r' => try result.appendSlice(allocator, "\\r"),
+        \\            '\t' => try result.appendSlice(allocator, "\\t"),
+        \\            0x07 => try result.appendSlice(allocator, "\\a"),
+        \\            0x08 => try result.appendSlice(allocator, "\\b"),
+        \\            0x0b => try result.appendSlice(allocator, "\\v"),
+        \\            0x0c => try result.appendSlice(allocator, "\\f"),
+        \\            else => {{
+        \\                if (byte < 0x20 or byte == 0x7f) {{
+        \\                    try result.appendSlice(allocator, "\\x");
+        \\                    try result.append(allocator, hex_digits[byte >> 4]);
+        \\                    try result.append(allocator, hex_digits[byte & 0x0f]);
+        \\                }} else {{
+        \\                    try result.append(allocator, byte);
+        \\                }}
+        \\            }},
+        \\        }}
+        \\    }}
+        \\    return try result.toOwnedSlice(allocator);
+        \\}}
+        \\
+        \\
+    , .{});
+
     try verkisto.flush();
 }
 
@@ -1704,7 +1729,7 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
             try verkisto.print(
                 \\{s}    if( self.{s} ) |val|  {s}
                 \\{s}
-            , .{ ind, f.name, if (f.field_type_enum == .TYPE_MESSAGE) "{" else "", "    " });
+            , .{ ind, f.name, if (f.field_type_enum == .TYPE_MESSAGE or f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) "{" else "", "    " });
         }
 
         var needs_indent = false;
@@ -1821,43 +1846,78 @@ fn skribiSkribiAlPBTeksto(msg: prs.Message, ind: []const u8) !void {
                     });
                 }
             } else if (f.label_enum == .LABEL_REPEATED) {
-                try verkisto.print(
-                    \\{s}    try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, obj }});
-                    \\
-                , .{
-                    ind,
-                    f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                });
+                if (f.field_type_enum == .TYPE_STRING or
+                    f.field_type_enum == .TYPE_BYTES)
+                {
+                    try verkisto.print(
+                        \\{s}    const {s}_esc = try escapePbTextToken(allocator, obj);
+                        \\{s}        defer allocator.free({s}_esc);
+                        \\{s}        try bufro.print(allocator,"{{s}}{s}: \"{{s}}\"\n",.{{ind, {s}_esc }});
+                        \\
+                    , .{
+                        ind, f.name,
+                        ind, f.name,
+                        ind, f.name, f.name,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}    try bufro.print(allocator,"{{s}}{s}: {{any}}\n",.{{ind, obj }});
+                        \\
+                    , .{
+                        ind, f.name,
+                    });
+                }
             } else if (f.label_enum == .LABEL_OPTIONAL) {
-                try verkisto.print(
-                    \\{s}    try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ ind, val }});
-                    \\
-                , .{
-                    ind,
-                    f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                });
+                if (f.field_type_enum == .TYPE_STRING or
+                    f.field_type_enum == .TYPE_BYTES)
+                {
+                    try verkisto.print(
+                        \\{s}    const {s}_esc = try escapePbTextToken(allocator, val);
+                        \\{s}        defer allocator.free({s}_esc);
+                        \\{s}        try bufro.print(allocator,"{{s}}{s}: \"{{s}}\"\n",.{{ ind, {s}_esc }});
+                        \\
+                    , .{
+                        ind, f.name,
+                        ind, f.name,
+                        ind, f.name, f.name,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}    try bufro.print(allocator,"{{s}}{s}: {{any}}\n",.{{ ind, val }});
+                        \\
+                    , .{
+                        ind, f.name,
+                    });
+                }
             } else {
-                try verkisto.print(
-                    \\{s}    try bufro.print(allocator,"{{s}}{s}: {s}{{{s}}}{s}\n",.{{ind, self.{s} }});
-                    \\
-                , .{
-                    ind,
-                    f.name,
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                    if (f.field_type_enum == .TYPE_STRING) "s" else "any",
-                    if (f.field_type_enum == .TYPE_STRING) "\\\"" else "",
-                    f.name,
-                });
+                if (f.field_type_enum == .TYPE_STRING or
+                    f.field_type_enum == .TYPE_BYTES)
+                {
+                    try verkisto.print(
+                        \\{s}    const {s}_esc = try escapePbTextToken(allocator, self.{s});
+                        \\{s}    defer allocator.free({s}_esc);
+                        \\{s}    try bufro.print(allocator,"{{s}}{s}: \"{{s}}\"\n",.{{ind, {s}_esc }});
+                        \\
+                    , .{
+                        ind, f.name, f.name,
+                        ind, f.name,
+                        ind, f.name, f.name,
+                    });
+                } else {
+                    try verkisto.print(
+                        \\{s}    try bufro.print(allocator,"{{s}}{s}: {{any}}\n",.{{ind, self.{s} }});
+                        \\
+                    , .{
+                        ind, f.name, f.name,
+                    });
+                }
             }
         }
         if (f.label_enum == .LABEL_REPEATED or
-            (f.label_enum == .LABEL_OPTIONAL and f.field_type_enum == .TYPE_MESSAGE))
+            (f.label_enum == .LABEL_OPTIONAL and
+                (f.field_type_enum == .TYPE_MESSAGE or
+                 f.field_type_enum == .TYPE_STRING or
+                 f.field_type_enum == .TYPE_BYTES)))
         {
             try verkisto.print(
                 \\{s}    }}
@@ -2213,9 +2273,7 @@ fn skribiSeriigi(msg: prs.Message, ind: []const u8) !void {
     if (!uses_allocator) {
         for (msg.oneofs) |oneof_decl| {
             for (oneof_decl.fields) |field| {
-                if (field.field_type_enum == .TYPE_MESSAGE or
-                    field.field_type_enum == .TYPE_STRING or
-                    field.field_type_enum == .TYPE_BYTES)
+                if (field.field_type_enum == .TYPE_MESSAGE)
                 {
                     uses_allocator = true;
                     break;
