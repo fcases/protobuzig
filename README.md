@@ -1,6 +1,6 @@
 # ProtobuZig
 
-(leeme en español en README_es.md)
+(leeme en español en README_es.md)  
 (readme in english in README_en.md)
 
 ProtobuZig estas kompililo de Google Protocol Buffers al Zig 0.15.2. Ne
