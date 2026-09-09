@@ -383,6 +383,42 @@ const packed_parser = mecha.combine(.{
     }
 }.mapFn);
 
+/// Opcion de campo generica (F5, parte): traga cualquier '[clave[ = valor]]'
+/// (deprecated, jstype, ctype, lazy, comas...), devolviendo el texto COMPLETO
+/// entre corchetes para distinguirlo de un [default=...]/[packed=...] real.
+/// Respeta comillas y barras dentro del corchete.
+fn opcioAliaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
+    _ = gpa;
+    // Sin '[' inicial: no aplica -> Result err (no-match), NO error duro.
+    if (input.len == 0 or input[0] != '[') return mecha.Result([]const u8).err(0);
+
+    var i: usize = 1;
+    var citita: ?u8 = null;
+    while (i < input.len) {
+        const c = input[i];
+        if (citita == null) {
+            if (c == '"' or c == '\'') {
+                citita = c;
+            } else if (c == ']') {
+                return mecha.Result([]const u8).ok(i + 1, input[0 .. i + 1]);
+            } else if (c == '\\') {
+                i += 2;
+                continue;
+            }
+        } else {
+            if (c == '\\') {
+                i += 2;
+                continue;
+            }
+            if (c == citita.?) citita = null;
+        }
+        i += 1;
+    }
+    // Corchete sin cerrar: no-match.
+    return mecha.Result([]const u8).err(0);
+}
+const opcio_alia = mecha.Parser([]const u8){ .parse = &opcioAliaFn };
+
 const field_parser = mecha.combine(.{
     ws.discard(), // ojo con esto
     mecha.oneOf(.{
@@ -395,8 +431,8 @@ const field_parser = mecha.combine(.{
     anu_parser, ws, // 4,5
     mecha.string("="), ws, // 6,7
     mecha.intToken(.{}), ws, // 8,9
-    mecha.opt(default_parser), ws, // 10,11
-    mecha.opt(packed_parser), ws, // 12,13
+    mecha.opt(mecha.oneOf(.{ default_parser, opcio_alia })), ws, // 10,11
+    mecha.opt(mecha.oneOf(.{ packed_parser, opcio_alia })), ws, // 12,13
     mecha.string(";"), ws, // 14,15
 }).map(struct {
     pub fn mapFn(items: anytype) Respondo {
@@ -405,8 +441,16 @@ const field_parser = mecha.combine(.{
         const name = shpa.dupe(u8, items[4]) catch &[_]u8{};
         const number = std.fmt.parseInt(u32, items[8], 10) catch 0;
 
-        const default_value = if (items[10]) |def| shpa.dupe(u8, def) catch &[_]u8{} else null;
-        const packed_value = if (items[12]) |pck| equal(u8, pck, "true") else false;
+        // Un resultado que empieza por '[' es una opcion generica tragada
+        // (deprecated, jstype...), no un default/packed real.
+        const default_value = if (items[10]) |def|
+            (if (def.len > 0 and def[0] == '[') null else shpa.dupe(u8, def) catch &[_]u8{})
+        else
+            null;
+        const packed_value = if (items[12]) |pck|
+            (!(pck.len > 0 and pck[0] == '[') and equal(u8, pck, "true"))
+        else
+            false;
 
         return Respondo{ .Type = .FIELD, .Data = .{ .f = Field{
             .label = label,
@@ -427,16 +471,22 @@ const oneof_field_parser = mecha.combine(.{
     anu_parser, ws, // 2,3
     mecha.string("="), ws, // 4,5
     mecha.intToken(.{}), ws, // 6,7
-    mecha.opt(default_parser), ws, // 8,9
-    mecha.opt(packed_parser), ws, // 10,11
+    mecha.opt(mecha.oneOf(.{ default_parser, opcio_alia })), ws, // 8,9
+    mecha.opt(mecha.oneOf(.{ packed_parser, opcio_alia })), ws, // 10,11
     mecha.string(";"), ws, // 12,13
 }).map(struct {
     pub fn mapFn(items: anytype) OneOfField {
         const field_type = shpa.dupe(u8, items[0]) catch &[_]u8{};
         const name = shpa.dupe(u8, items[2]) catch &[_]u8{};
         const number = std.fmt.parseInt(u32, items[6], 10) catch 0;
-        const default_value = if (items[8]) |def| shpa.dupe(u8, def) catch &[_]u8{} else null;
-        const packed_value = if (items[10]) |pck| equal(u8, pck, "true") else false;
+        const default_value = if (items[8]) |def|
+            (if (def.len > 0 and def[0] == '[') null else shpa.dupe(u8, def) catch &[_]u8{})
+        else
+            null;
+        const packed_value = if (items[10]) |pck|
+            (!(pck.len > 0 and pck[0] == '[') and equal(u8, pck, "true"))
+        else
+            false;
 
         return OneOfField{
             .field_type = field_type,
