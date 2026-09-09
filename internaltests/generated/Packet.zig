@@ -490,10 +490,18 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
             };
         },
         .TF_JSON => {
-            parsed = std.json.parseFromSliceLeaky(T, allocator, input, .{ .ignore_unknown_fields = false, .allocate = .alloc_always }) catch |err| {
+            // L1: parseFromSlice con arena es error-clean; en exito se
+            // copia el valor a memoria del llamante con un round-trip
+            // binario antes de liberar el arena (parseFromSliceLeaky
+            // filtraba parcial en la ruta de error).
+            var par = std.json.parseFromSlice(T, allocator, input, .{ .ignore_unknown_fields = false, .allocate = .alloc_always }) catch |err| {
                 std.debug.print("eraro dun deseriigo: {}\n", .{err});
                 return err;
             };
+            defer par.deinit();
+            const kopio_bytes = try par.value.seriigiAlBin(allocator, .BF_PROTOBUF);
+            defer allocator.free(kopio_bytes);
+            parsed = try T.deseriigiElBin(allocator, kopio_bytes, .BF_PROTOBUF);
         },
         .TF_PROTOBUF => {
 //            var it: TokenIterType = std.mem.tokenizeAny(u8, input, ":\", \n\r\t");

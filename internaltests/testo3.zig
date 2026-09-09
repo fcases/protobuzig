@@ -43,6 +43,7 @@ const std = @import("std");
 const CctrolRaw = @import("generated/cctrol.zig");
 const Api = @import("generated/cctrol_api.zig");
 const ConfigApi = @import("generated/Config_api.zig");
+const R8Raw = @import("generated/r8.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -65,6 +66,11 @@ pub fn main() !void {
     try testCloneEstMeteo(allocator);
     try testRepeatedMessage(allocator);
     try testRepeatedProtobufTexto(allocator);
+    try testOneofTextoScalarYEnum(allocator);
+    try testRepeatedBase64Grande(allocator);
+    try testFormatosNegativos(allocator);
+    try testPackedRepeated(allocator);
+    try testOneofJsonDuplicados(allocator);
     try testOneofPanelBase(allocator);
     try testOneofProtobufTextRoundTrip(allocator);
     try testOptionalString(allocator);
@@ -1236,6 +1242,126 @@ fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
         "testo3: repeated Protobuf TEXT round-trip OK\n",
         .{},
     );
+}
+
+fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
+    // R8: oneof con miembro scalar (numero) y enum (tp) en Protobuf Text + JSON.
+    var panel = try Api.PanelBase.initDefault(allocator);
+    defer panel.deinit(allocator);
+    try panel.setNombre(allocator, "r8-oneof");
+
+    // Rama scalar: uint32 numero (Protobuf Text roundtrip).
+    panel.setDatosNumero(allocator, 1234);
+    try std.testing.expect(panel.hasDatosNumero());
+    try std.testing.expectEqual(@as(u32, 1234), try panel.getDatosNumero());
+
+    const txt1 = try panel.writeToText(allocator, .TF_PROTOBUF);
+    defer allocator.free(txt1);
+    var p1 = try Api.PanelBase.readFromText(allocator, txt1, .TF_PROTOBUF);
+    defer p1.deinit(allocator);
+    try std.testing.expect(p1.hasDatosNumero());
+    try std.testing.expectEqual(@as(u32, 1234), try p1.getDatosNumero());
+
+    // Cambio de rama scalar -> enum (libera la anterior; GPA lo verifica).
+    panel.setDatosTp(allocator, .NUMERO);
+    try std.testing.expect(panel.hasDatosTp());
+    try std.testing.expectEqual(Api.TipoPanel.NUMERO, try panel.getDatosTp());
+
+    const txt2 = try panel.writeToText(allocator, .TF_PROTOBUF);
+    defer allocator.free(txt2);
+    var p2 = try Api.PanelBase.readFromText(allocator, txt2, .TF_PROTOBUF);
+    defer p2.deinit(allocator);
+    try std.testing.expect(p2.hasDatosTp());
+    try std.testing.expectEqual(Api.TipoPanel.NUMERO, try p2.getDatosTp());
+
+    // JSON roundtrip con la rama enum.
+    const json = try panel.writeToText(allocator, .TF_JSON);
+    defer allocator.free(json);
+    var p3 = try Api.PanelBase.readFromText(allocator, json, .TF_JSON);
+    defer p3.deinit(allocator);
+    try std.testing.expectEqual(Api.TipoPanel.NUMERO, try p3.getDatosTp());
+
+    std.debug.print("testo3: oneof texto scalar/enum (texto + JSON) OK\n", .{});
+}
+
+fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
+    // R8: BF_BASE64 con repeated grande (500 floats) y GPA.
+    var trafico = try Api.SnrTrafico.initDefault(allocator);
+    defer trafico.deinit(allocator);
+    try trafico.setSeccion(allocator, "R8-B64");
+    trafico.setCarriles(1);
+
+    var i: u32 = 0;
+    while (i < 500) : (i += 1) {
+        try trafico.appendVelMedia(allocator, @floatFromInt(i));
+    }
+    try std.testing.expectEqual(@as(usize, 500), trafico.getVelMediaCount());
+
+    const b64 = try trafico.serializeToBin(allocator, .BF_BASE64);
+    defer allocator.free(b64);
+
+    var t2 = try Api.SnrTrafico.deserializeFromBin(allocator, b64, .BF_BASE64);
+    defer t2.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 500), t2.getVelMediaCount());
+    try std.testing.expect(approxEqAbs(f32, try t2.getVelMediaAt(499), 499.0, 0.001));
+
+    std.debug.print("testo3: BF_BASE64 repeated grande OK\n", .{});
+}
+
+fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
+    // R8: JSON con dos ramas del oneof -> ERROR (std.json rechaza duplicados;
+    // no hay last-one-wins en JSON, se documenta).
+    // L1 resuelto: la ruta de error del parseo JSON generado ya no filtra
+    // (parseFromSlice con arena + copia); el parse directo debe quedar limpio.
+    const json = "{\"nombre\":\"n\",\"tipo\":\"NUMERO\",\"datos\":{\"numero\":7,\"tp\":\"TEXTO\"}}";
+    if (Api.PanelBase.readFromText(allocator, json, .TF_JSON)) |_| {
+        return error.ShouldRejectDuplicates;
+    } else |_| {}
+    std.debug.print("testo3: oneof JSON duplicados rechazado OK\n", .{});
+}
+
+fn testPackedRepeated(allocator: std.mem.Allocator) !void {
+    // R8: repeated con [packed = true] (path/vals) y control no-packed (simple).
+    var m = try R8Raw.PackedMsg.initDefault(allocator);
+    defer m.deinit(allocator);
+
+    m.path = try allocator.alloc(i32, 4);
+    m.path[0] = 1; m.path[1] = -2; m.path[2] = 300; m.path[3] = -4000;
+    m.simple = try allocator.alloc(i32, 2);
+    m.simple[0] = 10; m.simple[1] = 20;
+    m.vals = try allocator.alloc(f64, 3);
+    m.vals[0] = 1.5; m.vals[1] = -2.25; m.vals[2] = 3.0;
+
+    const bin = try m.seriigiAlBin(allocator, .BF_PROTOBUF);
+    defer allocator.free(bin);
+
+    var m2 = try R8Raw.PackedMsg.deseriigiElBin(allocator, bin, .BF_PROTOBUF);
+    defer m2.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 4), m2.path.len);
+    try std.testing.expectEqual(@as(i32, 1), m2.path[0]);
+    try std.testing.expectEqual(@as(i32, -2), m2.path[1]);
+    try std.testing.expectEqual(@as(i32, 300), m2.path[2]);
+    try std.testing.expectEqual(@as(i32, -4000), m2.path[3]);
+    try std.testing.expectEqual(@as(usize, 2), m2.simple.len);
+    try std.testing.expectEqual(@as(i32, 20), m2.simple[1]);
+    try std.testing.expectEqual(@as(usize, 3), m2.vals.len);
+    try std.testing.expect(approxEqAbs(f64, m2.vals[1], -2.25, 0.0001));
+
+    std.debug.print("testo3: packed repeated OK\n", .{});
+}
+
+fn testFormatosNegativos(allocator: std.mem.Allocator) !void {
+    // R8: entradas JSON/ZON invalidas -> error (no silencio) y GPA limpio.
+    if (ConfigApi.AppConfig.readFromText(allocator, "{ no es json", .TF_JSON)) |_| {
+        return error.ShouldFailJson;
+    } else |_| {}
+    if (ConfigApi.AppConfig.readFromText(allocator, ".{ esto no es zon", .TF_ZIG_ZON)) |_| {
+        return error.ShouldFailZon;
+    } else |_| {}
+
+    std.debug.print("testo3: formatos JSON/ZON negativos OK\n", .{});
 }
 
 fn testOptionales(allocator: std.mem.Allocator) !void {

@@ -11,290 +11,156 @@ const DecodeBuffer = encdec.DecodeBuffer;
 //const TokenIterType = std.mem.TokenIterator(u8, .any);
 const TokenIterType = CustomTokenizer;
 
-pub const k6bus = struct {
+pub const PackedMsg = struct {
+    path: []i32 = &.{},
+    simple: []i32 = &.{},
+    vals: []f64 = &.{},
 
-    pub const security = struct {
-
-
-pub const CryptoMode = enum(u64) {
-   CRYPTO_NONE = 0,
-   CRYPTO_AES_256_CBC = 1,
-   CRYPTO_AES_256_GCM = 2,
-   CRYPTO_CHACHA20_POLY1305 = 3,
-};
-
-pub const KeyRegistry = struct {
-    Version: ?u32 = 1 ,
-    Date: []const u8,
-    Time: []const u8,
-    Sender: []const u8,
-    Phrase: ?[]const u8 = null,
-    Salt: ?[]const u8 = null,
-    Mode: ?CryptoMode = .CRYPTO_AES_256_GCM ,
-    KeyId: ?u32 = 0 ,
-    Key: []const u8,
-    LegacyIV: ?[]const u8 = null,
-
-    pub fn initDefault(allocator: all.Allocator) !KeyRegistry {
-        const mia_Date = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_Date);
-        const mia_Time = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_Time);
-        const mia_Sender = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_Sender);
-        const mia_Key = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_Key);
-        return KeyRegistry {
-            .Version = 1,
-            .Date = mia_Date,
-            .Time = mia_Time,
-            .Sender = mia_Sender,
-            .Phrase = null,
-            .Salt = null,
-            .Mode = .CRYPTO_AES_256_GCM,
-            .KeyId = 0,
-            .Key = mia_Key,
-            .LegacyIV = null,
+    pub fn initDefault(allocator: all.Allocator) !PackedMsg {
+        const mia_path = try allocator.alloc(i32, 0);
+        errdefer allocator.free(mia_path);
+        const mia_simple = try allocator.alloc(i32, 0);
+        errdefer allocator.free(mia_simple);
+        const mia_vals = try allocator.alloc(f64, 0);
+        errdefer allocator.free(mia_vals);
+        return PackedMsg {
+            .path = mia_path,
+            .simple = mia_simple,
+            .vals = mia_vals,
         };
     }
 
-    pub fn deinit(self: *const KeyRegistry, allocator: all.Allocator) void {
-        allocator.free(self.Date);
-        allocator.free(self.Time);
-        allocator.free(self.Sender);
-        if( self.Phrase ) |f| {
-            allocator.free(f);
-        }
-        if( self.Salt ) |f| {
-            allocator.free(f);
-        }
-        allocator.free(self.Key);
-        if( self.LegacyIV ) |f| {
-            allocator.free(f);
-        }
+    pub fn deinit(self: *const PackedMsg, allocator: all.Allocator) void {
+        if (self.path.len > 0) allocator.free(self.path);
+        if (self.simple.len > 0) allocator.free(self.simple);
+        if (self.vals.len > 0) allocator.free(self.vals);
     }
 
-    pub fn plenigiDefaultojn(self: *KeyRegistry, allocator: all.Allocator) !void {
+    pub fn plenigiDefaultojn(self: *PackedMsg, allocator: all.Allocator) !void {
         _ = self;
         _ = allocator;
     }
 
-    pub fn skribiAlTeksto(self: *KeyRegistry, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
-        return try skribiTiponAlTeksto(allocator, KeyRegistry, @as(*KeyRegistry, self), t_formato);
+    pub fn skribiAlTeksto(self: *PackedMsg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, PackedMsg, @as(*PackedMsg, self), t_formato);
     }
 
-    pub fn skribiAlDosiero(self: *KeyRegistry, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
-        try skribiTiponAlDosiero(allocator, KeyRegistry, @as(*KeyRegistry, self), path, t_formato);
+    pub fn skribiAlDosiero(self: *PackedMsg, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, PackedMsg, @as(*PackedMsg, self), path, t_formato);
     }
 
-    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !KeyRegistry {
-        return try legiTiponElTeksto(allocator, KeyRegistry, input, t_formato);
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !PackedMsg {
+        return try legiTiponElTeksto(allocator, PackedMsg, input, t_formato);
     }
 
-    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !KeyRegistry {
-        return try legiTiponElDosiero(allocator, KeyRegistry, path, t_formato);
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !PackedMsg {
+        return try legiTiponElDosiero(allocator, PackedMsg, path, t_formato);
     }
 
-    fn skribiAlProtobufTeksto(self: *const KeyRegistry, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+    fn skribiAlProtobufTeksto(self: *const PackedMsg, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        if( self.Version ) |val|  
-            try bufro.print(allocator,"{s}Version: {any}\n",.{ ind, val });
-        const Date_esc = try escapePbTextToken(allocator, self.Date);
-        defer allocator.free(Date_esc);
-        try bufro.print(allocator,"{s}Date: \"{s}\"\n",.{ind, Date_esc });
-        const Time_esc = try escapePbTextToken(allocator, self.Time);
-        defer allocator.free(Time_esc);
-        try bufro.print(allocator,"{s}Time: \"{s}\"\n",.{ind, Time_esc });
-        const Sender_esc = try escapePbTextToken(allocator, self.Sender);
-        defer allocator.free(Sender_esc);
-        try bufro.print(allocator,"{s}Sender: \"{s}\"\n",.{ind, Sender_esc });
-        if( self.Phrase ) |val|  {
-            const Phrase_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(Phrase_esc);
-            try bufro.print(allocator,"{s}Phrase: \"{s}\"\n",.{ ind, Phrase_esc });
+        for(self.path) |obj| {
+            try bufro.print(allocator,"{s}path: {any}\n",.{ind, obj });
         }
-        if( self.Salt ) |val|  {
-            const Salt_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(Salt_esc);
-            try bufro.print(allocator,"{s}Salt: \"{s}\"\n",.{ ind, Salt_esc });
+        for(self.simple) |obj| {
+            try bufro.print(allocator,"{s}simple: {any}\n",.{ind, obj });
         }
-        if( self.Mode ) |val|  
-            try bufro.print(allocator, "{s}Mode: {s}\n", .{ ind, @tagName(val) });
-        if( self.KeyId ) |val|  
-            try bufro.print(allocator,"{s}KeyId: {any}\n",.{ ind, val });
-        const Key_esc = try escapePbTextToken(allocator, self.Key);
-        defer allocator.free(Key_esc);
-        try bufro.print(allocator,"{s}Key: \"{s}\"\n",.{ind, Key_esc });
-        if( self.LegacyIV ) |val|  {
-            const LegacyIV_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(LegacyIV_esc);
-            try bufro.print(allocator,"{s}LegacyIV: \"{s}\"\n",.{ ind, LegacyIV_esc });
+        for(self.vals) |obj| {
+            try bufro.print(allocator,"{s}vals: {any}\n",.{ind, obj });
         }
 
         return bufro.toOwnedSlice(allocator);
     }
 
-    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !KeyRegistry {
-        var mia_Mesagho = try KeyRegistry.initDefault(allocator);
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !PackedMsg {
+        var mia_Mesagho = try PackedMsg.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
+        var path_list: std.ArrayList(i32) = .empty;
+        errdefer path_list.deinit(allocator);
+        var simple_list: std.ArrayList(i32) = .empty;
+        errdefer simple_list.deinit(allocator);
+        var vals_list: std.ArrayList(f64) = .empty;
+        errdefer vals_list.deinit(allocator);
 
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
-            if( equal(u8, tok, "Version" ) ) {
-                mia_Mesagho.Version =  try std.fmt.parseInt(u32,val,10);
+            if( equal(u8, tok, "path" ) ) {
+                try path_list.append(allocator, try std.fmt.parseInt(i32,val,10));
                 continue;
             }
-            if( equal(u8, tok, "Date" ) ) {
-                const tmp_Date = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.Date);
-                mia_Mesagho.Date = tmp_Date;
+            if( equal(u8, tok, "simple" ) ) {
+                try simple_list.append(allocator, try std.fmt.parseInt(i32,val,10));
                 continue;
             }
-            if( equal(u8, tok, "Time" ) ) {
-                const tmp_Time = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.Time);
-                mia_Mesagho.Time = tmp_Time;
-                continue;
-            }
-            if( equal(u8, tok, "Sender" ) ) {
-                const tmp_Sender = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.Sender);
-                mia_Mesagho.Sender = tmp_Sender;
-                continue;
-            }
-            if( equal(u8, tok, "Phrase" ) ) {
-                const tmp_Phrase = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.Phrase) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.Phrase = tmp_Phrase;
-                continue;
-            }
-            if( equal(u8, tok, "Salt" ) ) {
-                const tmp_Salt = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.Salt) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.Salt = tmp_Salt;
-                continue;
-            }
-            if( equal(u8, tok, "Mode" ) ) {
-                mia_Mesagho.Mode = try parseEnumValue(CryptoMode, val);
-                continue;
-            }
-            if( equal(u8, tok, "KeyId" ) ) {
-                mia_Mesagho.KeyId =  try std.fmt.parseInt(u32,val,10);
-                continue;
-            }
-            if( equal(u8, tok, "Key" ) ) {
-                const tmp_Key = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.Key);
-                mia_Mesagho.Key = tmp_Key;
-                continue;
-            }
-            if( equal(u8, tok, "LegacyIV" ) ) {
-                const tmp_LegacyIV = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.LegacyIV) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.LegacyIV = tmp_LegacyIV;
+            if( equal(u8, tok, "vals" ) ) {
+                try vals_list.append(allocator, try std.fmt.parseFloat(f64,val));
                 continue;
             }
         }
+        allocator.free(mia_Mesagho.path);
+        mia_Mesagho.path = try path_list.toOwnedSlice(allocator); 
+        allocator.free(mia_Mesagho.simple);
+        mia_Mesagho.simple = try simple_list.toOwnedSlice(allocator); 
+        allocator.free(mia_Mesagho.vals);
+        mia_Mesagho.vals = try vals_list.toOwnedSlice(allocator); 
 
         return mia_Mesagho;
     }
 
-    pub fn seriigiAlBin(self: *const KeyRegistry, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, KeyRegistry, self, b_formato);
+    pub fn seriigiAlBin(self: *const PackedMsg, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, PackedMsg, self, b_formato);
     }
 
-    pub fn seriigiAlDosiero(self: *const KeyRegistry, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, KeyRegistry, self, b_formato, path);
+    pub fn seriigiAlDosiero(self: *const PackedMsg, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, PackedMsg, self, b_formato, path);
     }
 
-    fn seriigi(self: *const KeyRegistry, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+    fn seriigi(self: *const PackedMsg, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
  
         _ = allocator;
         var tuta_longo: usize = 0;
  
-        if ( self.LegacyIV ) |val| {
-            const st_longa = try buffer.encodeBytes( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(82);
-        }  //3  opt - no def - varlong
+        var vals_i: usize = self.vals.len;
+        while (vals_i > 0) {
+            vals_i -= 1;
+            const item = self.vals[vals_i];
+            tuta_longo += try buffer.encodeDouble( item );
+            tuta_longo += try buffer.encodeVarint(25);
+        }  // 9 rept - no def - no varlong
 
-        const Key_longa = try buffer.encodeBytes( self.Key );
-        tuta_longo += Key_longa;
-        tuta_longo += try buffer.encodeVarint(Key_longa);
-        tuta_longo += try buffer.encodeVarint(74);
-        //7  req - no def - varlong
+        var simple_i: usize = self.simple.len;
+        while (simple_i > 0) {
+            simple_i -= 1;
+            const item = self.simple[simple_i];
+            tuta_longo += try buffer.encodeInt32( item );
+            tuta_longo += try buffer.encodeVarint(16);
+        }  // 9 rept - no def - no varlong
 
-        if( self.KeyId ) |val| {
-            tuta_longo += try buffer.encodeUint32( val );
-            tuta_longo += try buffer.encodeVarint(64);
-        }   //1 opt - no def - no varlong
-
-        if( self.Mode ) |val| {
-            tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
-            tuta_longo += try buffer.encodeVarint(56);
-        }   //1 opt - no def - no varlong
-
-        if ( self.Salt ) |val| {
-            const st_longa = try buffer.encodeString( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(50);
-        }  //3  opt - no def - varlong
-
-        if ( self.Phrase ) |val| {
-            const st_longa = try buffer.encodeString( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(42);
-        }  //3  opt - no def - varlong
-
-        const Sender_longa = try buffer.encodeString( self.Sender );
-        tuta_longo += Sender_longa;
-        tuta_longo += try buffer.encodeVarint(Sender_longa);
-        tuta_longo += try buffer.encodeVarint(34);
-        //7  req - no def - varlong
-
-        const Time_longa = try buffer.encodeString( self.Time );
-        tuta_longo += Time_longa;
-        tuta_longo += try buffer.encodeVarint(Time_longa);
-        tuta_longo += try buffer.encodeVarint(26);
-        //7  req - no def - varlong
-
-        const Date_longa = try buffer.encodeString( self.Date );
-        tuta_longo += Date_longa;
-        tuta_longo += try buffer.encodeVarint(Date_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-        //7  req - no def - varlong
-
-        if( self.Version ) |val| {
-            tuta_longo += try buffer.encodeUint32( val );
+        var path_i: usize = self.path.len;
+        while (path_i > 0) {
+            path_i -= 1;
+            const item = self.path[path_i];
+            tuta_longo += try buffer.encodeInt32( item );
             tuta_longo += try buffer.encodeVarint(8);
-        }   //1 opt - no def - no varlong
+        }  // 9 rept - no def - no varlong
 
         return tuta_longo;
     }
 
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !KeyRegistry {
-        return try deseriigiTiponElBin(allocator, KeyRegistry, input, b_formato);
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !PackedMsg {
+        return try deseriigiTiponElBin(allocator, PackedMsg, input, b_formato);
     }
 
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !KeyRegistry {
-        return try deseriigiTiponElDosiero(allocator, KeyRegistry, path, b_formato);
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !PackedMsg {
+        return try deseriigiTiponElDosiero(allocator, PackedMsg, path, b_formato);
     }
 
-    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !KeyRegistry {
-        var mia_Mesagho = try KeyRegistry.initDefault(allocator);
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !PackedMsg {
+        var mia_Mesagho = try PackedMsg.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
         var end: usize = undefined;
@@ -303,6 +169,12 @@ pub const KeyRegistry = struct {
         else
             end = buffer.buffer.len;
 
+        var path_list: std.ArrayList(i32) = .empty; 
+        errdefer path_list.deinit(allocator);
+        var simple_list: std.ArrayList(i32) = .empty; 
+        errdefer simple_list.deinit(allocator);
+        var vals_list: std.ArrayList(f64) = .empty; 
+        errdefer vals_list.deinit(allocator);
 
         while (buffer.read_index < end) {
             const key: u64 = try buffer.decodeVarint();
@@ -310,68 +182,41 @@ pub const KeyRegistry = struct {
             const field_number = key >> 3;
 
             if ( field_number == 1 and wire_type == 0 ) 
-                mia_Mesagho.Version = try buffer.decodeUint32()
-            else if ( field_number == 2 and wire_type == 2 ) 
-            {
-                const tmp_Date = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.Date);
-                mia_Mesagho.Date = tmp_Date;
+            { 
+                try path_list.append( 
+                    allocator, 
+                    try buffer.decodeInt32()
+                );
             }
-            else if ( field_number == 3 and wire_type == 2 ) 
-            {
-                const tmp_Time = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.Time);
-                mia_Mesagho.Time = tmp_Time;
+            else if ( field_number == 2 and wire_type == 0 ) 
+            { 
+                try simple_list.append( 
+                    allocator, 
+                    try buffer.decodeInt32()
+                );
             }
-            else if ( field_number == 4 and wire_type == 2 ) 
-            {
-                const tmp_Sender = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.Sender);
-                mia_Mesagho.Sender = tmp_Sender;
-            }
-            else if ( field_number == 5 and wire_type == 2 ) 
-            {
-                const tmp_Phrase = try buffer.decodeString(  try buffer.decodeVarint() );
-                if (mia_Mesagho.Phrase) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.Phrase = tmp_Phrase;
-            }
-            else if ( field_number == 6 and wire_type == 2 ) 
-            {
-                const tmp_Salt = try buffer.decodeString(  try buffer.decodeVarint() );
-                if (mia_Mesagho.Salt) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.Salt = tmp_Salt;
-            }
-            else if ( field_number == 7 and wire_type == 0 ) 
-                mia_Mesagho.Mode = try std.meta.intToEnum(CryptoMode, try buffer.decodeVarint() ) 
-            else if ( field_number == 8 and wire_type == 0 ) 
-                mia_Mesagho.KeyId = try buffer.decodeUint32()
-            else if ( field_number == 9 and wire_type == 2 ) 
-            {
-                const tmp_Key = try buffer.decodeBytes(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.Key);
-                mia_Mesagho.Key = tmp_Key;
-            }
-            else if ( field_number == 10 and wire_type == 2 ) 
-            {
-                const tmp_LegacyIV = try buffer.decodeBytes(  try buffer.decodeVarint() );
-                if (mia_Mesagho.LegacyIV) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.LegacyIV = tmp_LegacyIV;
+            else if ( field_number == 3 and wire_type == 1 ) 
+            { 
+                try vals_list.append( 
+                    allocator, 
+                    try buffer.decodeDouble()
+                );
             }
         }
 
+        const tmp_path = try path_list.toOwnedSlice(allocator);
+        allocator.free(mia_Mesagho.path);
+        mia_Mesagho.path = tmp_path;
+        const tmp_simple = try simple_list.toOwnedSlice(allocator);
+        allocator.free(mia_Mesagho.simple);
+        mia_Mesagho.simple = tmp_simple;
+        const tmp_vals = try vals_list.toOwnedSlice(allocator);
+        allocator.free(mia_Mesagho.vals);
+        mia_Mesagho.vals = tmp_vals;
 
         return mia_Mesagho;
     }
-};    // KeyRegistry
-
-    };   // security
-};   // k6bus
+};    // PackedMsg
 
 //////////////////////////////////////////////
 /// //////////////////////////////////////////
