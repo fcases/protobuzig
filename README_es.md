@@ -1,7 +1,7 @@
 # ProtobuZig
 
 (readme in [english](README_en.md))  
-(legu min en la [esperantan versiono](README.md))
+(legu min en la [Esperanta versio](README.md))
 
 ProtobuZig es un compilador de Google Protocol Buffers a **Zig 0.15.2**. No
 necesita instalar `protoc`: usa su propio analizador ([mecha](https://github.com/Hejsil/mecha))
