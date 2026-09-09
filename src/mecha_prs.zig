@@ -309,6 +309,15 @@ const option_parser = mecha.combine(.{
     }
 }.mapFn);
 
+/// Numero de valor de enum: decimal o hexadecimal (0x/0X), p. ej.
+/// EDITION_MAX = 0x7FFFFFFF.
+fn parseEnumNumero(teksto: []const u8) u32 {
+    if (teksto.len > 2 and teksto[0] == '0' and (teksto[1] == 'x' or teksto[1] == 'X')) {
+        return std.fmt.parseInt(u32, teksto[2..], 16) catch 0;
+    }
+    return std.fmt.parseInt(u32, teksto, 10) catch 0;
+}
+
 const enum_parser = mecha.combine(.{
     ws, // 0
     mecha.string("enum"), ws, // 1, 2
@@ -319,12 +328,12 @@ const enum_parser = mecha.combine(.{
             ws, // 7: 0
             anu_parser, ws, // 7: 1, 2
             mecha.string("="), ws, // 7: 3, 4
-            mecha.intToken(.{}), ws, // 7: 5, 6
+            anu_parser, ws, // 7: 5, 6  (tambien hex: EDITION_MAX = 0x7FFFFFFF)
             mecha.string(";").opt(), ws, // 7: 7, 8
         }).map(struct {
             pub fn mapFn(items: anytype) EnumValue {
                 const name = shpa.dupe(u8, items[1]) catch &[_]u8{};
-                const number = std.fmt.parseInt(u32, items[5], 10) catch 0;
+                const number = parseEnumNumero(items[5]);
                 return EnumValue{
                     .name = name,
                     .number = number,
@@ -585,6 +594,7 @@ const message_parser = mecha.combine(.{
         oneof_parser,
         enum_parser,
         message_internal_parser,
+        sentenco_ignorata_parser,
     }).many(.{ .collect = true }),
     ws, // 7,8
     mecha.string("}"), ws, // 9,10
@@ -639,6 +649,60 @@ const other_line_parser = mecha.combine(.{
         return Respondo{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } };
     }
 }.mapFn);
+
+/// Sentencias ignorables DENTRO de un mensaje (F5, parte): 'reserved ...;'
+/// (numeros, rangos '4 to max', nombres con comillas), 'extensions ...;'
+/// (rangos y bloques '[declaration = { ... }]' multilinea) y 'option ...;'.
+/// Escanea hasta el ';' a profundidad de llaves 0, respetando comillas y
+/// barras; sin esos prefijos devuelve no-match (Result.err).
+fn sentencoIgnorataFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result(Respondo) {
+    _ = gpa;
+
+    var i: usize = 0;
+    while (i < input.len and (input[i] == ' ' or input[i] == '\t' or input[i] == '\n' or input[i] == '\r')) : (i += 1) {}
+
+    const vortoj = [_][]const u8{ "reserved", "extensions", "option" };
+    var matcxas = false;
+    for (vortoj) |vorto| {
+        if (std.mem.startsWith(u8, input[i..], vorto)) {
+            if (i + vorto.len >= input.len or !std.ascii.isAlphanumeric(input[i + vorto.len])) {
+                matcxas = true;
+                break;
+            }
+        }
+    }
+    if (!matcxas) return mecha.Result(Respondo).err(0);
+
+    var profundo: usize = 0;
+    var citita: ?u8 = null;
+    while (i < input.len) {
+        const c = input[i];
+        if (citita == null) {
+            if (c == '"' or c == '\'') {
+                citita = c;
+            } else if (c == '{') {
+                profundo += 1;
+            } else if (c == '}') {
+                if (profundo == 0) return mecha.Result(Respondo).err(0); // cerraria el mensaje
+                profundo -= 1;
+            } else if (c == ';' and profundo == 0) {
+                return mecha.Result(Respondo).ok(i + 1, .{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } });
+            } else if (c == '\\') {
+                i += 2;
+                continue;
+            }
+        } else {
+            if (c == '\\') {
+                i += 2;
+                continue;
+            }
+            if (c == citita.?) citita = null;
+        }
+        i += 1;
+    }
+    return mecha.Result(Respondo).err(0); // sin ';' final
+}
+const sentenco_ignorata_parser = mecha.Parser(Respondo){ .parse = &sentencoIgnorataFn };
 
 pub const protofile_parser = mecha.oneOf(.{
     syntax_parser,
