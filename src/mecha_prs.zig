@@ -144,6 +144,9 @@ pub const ProtoFile = struct {
     options: []Option,
     messages: []Message,
     enums: []Enum, // enums fuera de mensajes
+    // Lineas de nivel fichero no reconocidas (other_line): se ignoran pero
+    // se guardan para que analizilo avise (F5: aviso, no error).
+    ignorataj: [][]const u8 = &.{},
 };
 
 ///////////////////////////////////////////////////////
@@ -657,15 +660,27 @@ const message_parser = mecha.combine(.{
     }
 }.mapFn);
 
-const other_line_parser = mecha.combine(.{
-    non_newline_char.many(.{ .min = 1 }).discard(),
-    mecha.string("\n").discard(),
-}).map(struct {
-    pub fn mapFn(items: anytype) Respondo {
-        _ = items; // Ignorar el resultado void/tuple
-        return Respondo{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } };
+/// Linea de nivel fichero no reconocida (F5): la consume entera (hasta '\n'
+/// inclusive o fin de entrada) y la devuelve recortada para que analizilo
+/// avise; una linea vacia no aplica (no-match).
+fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result(Respondo) {
+    _ = gpa;
+    if (input.len == 0 or input[0] == '\n') return mecha.Result(Respondo).err(0);
+
+    var i: usize = 0;
+    while (i < input.len and input[i] != '\n') : (i += 1) {}
+
+    const texto = std.mem.trim(u8, input[0..i], " \t\r");
+
+    if (i < input.len) i += 1; // consumir el '\n'
+
+    // Linea solo-espacios: se consume pero sin contenido (no se avisa).
+    if (texto.len == 0) {
+        return mecha.Result(Respondo).ok(i, .{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } });
     }
-}.mapFn);
+    return mecha.Result(Respondo).ok(i, .{ .Type = .LINIO, .Data = .{ .l = shpa.dupe(u8, texto) catch &[_]u8{} } });
+}
+const other_line_parser = mecha.Parser(Respondo){ .parse = &otherLineFn };
 
 /// Sentencias ignorables DENTRO de un mensaje (F5, parte): 'reserved ...;'
 /// (numeros, rangos '4 to max', nombres con comillas), 'extensions ...;'
@@ -737,11 +752,16 @@ pub const protofile_parser = mecha.oneOf(.{
         var mia_options = std.ArrayList(Option).empty;
         var mia_enums = std.ArrayList(Enum).empty;
         var mia_messages = std.ArrayList(Message).empty;
+        var mia_ignorataj = std.ArrayList([]const u8).empty;
 
         for (items) |it| {
             switch (it.Type) {
                 .LINIO => {
-                    // dbgPrint(".0 {s}\n", .{it.Data.l});
+                    // Linea de nivel fichero no reconocida: se conserva para
+                    // que analizilo avise (no se pierde del todo en silencio).
+                    if (it.Data.l.len > 0) {
+                        mia_ignorataj.append(shpa, it.Data.l) catch {};
+                    }
                 },
                 .SYNTAX => {
                     mia_syntax = it.Data.s;
@@ -792,6 +812,7 @@ pub const protofile_parser = mecha.oneOf(.{
             .options = mia_options.toOwnedSlice(shpa) catch &[_]Option{},
             .enums = mia_enums.toOwnedSlice(shpa) catch &[_]Enum{},
             .messages = mia_messages.toOwnedSlice(shpa) catch &[_]Message{},
+            .ignorataj = mia_ignorataj.toOwnedSlice(shpa) catch &[_][]const u8{},
         };
     }
 }.mapFn);

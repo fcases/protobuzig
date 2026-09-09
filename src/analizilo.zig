@@ -19,7 +19,7 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
     _ = try dosiero.readAll(enhavo[0..dosiera_long]);
     enhavo[dosiera_long] = 0;
 
-    const nuda_enhavo = nudiKomentaijnLinojn(enhavo);
+    const nuda_enhavo = nudiKomentaijnLinojn(enhavo[0..dosiera_long]);
     defer shpa.free(nuda_enhavo);
 
     try kontroliNesubtenatajnKonstruojn(nuda_enhavo);
@@ -55,11 +55,45 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
     }
     if (presi) presiProtoDosieron(pf.*);
 
+    try avertiIgnoratajnLinojn(pf.*, nuda_enhavo);
+
     try validiNedifinitajnTipojn(pf.*, dosieroaNomo);
 
     return pf.*;
 }
 // Me faltan   extensions,
+
+/// F5: aviso (no error) por cada linea de nivel fichero que el parser no
+/// reconocio y descarto (other_line). El usuario del proto decide que hacer:
+/// modificarlo o asumirlo. Se calcula el numero de linea buscando el texto
+/// en el contenido (tras quitar comentarios) de forma secuencial.
+fn avertiIgnoratajnLinojn(pf: prs.ProtoFile, enhavo: []const u8) !void {
+    var cursor: usize = 0;
+    for (pf.ignorataj) |linio| {
+        if (linio.len == 0) continue;
+
+        const encontrada = std.mem.indexOf(u8, enhavo[cursor..], linio) orelse {
+            std.debug.print(
+                "protobuzig: aviso: linea ignorada: '{s}' (constructo no soportado o sintaxis desconocida).\n",
+                .{linio},
+            );
+            continue;
+        };
+        const pos = cursor + encontrada;
+        cursor = pos + linio.len;
+
+        var numero_linio: usize = 1;
+        for (enhavo[0..pos]) |c| {
+            if (c == '\n') numero_linio += 1;
+        }
+
+        const fragmento = if (linio.len > 70) linio[0..70] else linio;
+        std.debug.print(
+            "protobuzig: aviso: linea {d}: '{s}' (constructo no soportado o sintaxis desconocida; ignorada).\n",
+            .{ numero_linio, fragmento },
+        );
+    }
+}
 
 /// F5: errores limpios para tipos no definidos. Tras la resolucion por
 /// nombre, cualquier campo cuyo tipo siga contando como "message asumido
@@ -180,6 +214,11 @@ pub fn liberiProtoDosieron(pf: *prs.ProtoFile) void {
         shpa.free(opt.value);
     }
     shpa.free(pf.options);
+
+    for (pf.ignorataj) |linio| {
+        shpa.free(linio);
+    }
+    shpa.free(pf.ignorataj);
 }
 
 fn nudiKomentaijnLinojn(input: []const u8) []const u8 {
