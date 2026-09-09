@@ -36,6 +36,7 @@ Protobuf Text, ZON, JSON), deseriaĵo, tekstaj reprezentoj kaj sekura API.
 - Pliaj binarigoj: **CDR**, **ASN.1-BER**, **ASN.1-DER**.
 - Analizi kaj parse **OMG IDL** anstataŭ protobuf (mondo OMG-DDS kaj CORBA).
 - Traduki al **Zig 0.16** aŭ posta.
+- Versioj por **Windows** kaj **BSD**.
 
 ---
 
@@ -47,7 +48,11 @@ Unue akiru kaj kompilu la ilon (bezonas Zig 0.15.2):
 git clone https://github.com/fcases/protobuzig.git
 cd protobuzig
 zig build          # kreas zig-out/bin/protobuzig
+export PATH="$PWD/zig-out/bin:$PATH"   # nedeviga: por uzi nur 'protobuzig'
 ```
+
+La ekzemploj sube supozas ke `protobuzig` estas en la PATH (aŭ vi skribas
+`zig-out/bin/protobuzig`). Post kompilo la dosiero estas ĉe `zig-out/bin/`.
 
 ### 2.1. Komandlinio
 

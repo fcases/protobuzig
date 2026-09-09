@@ -36,6 +36,7 @@ ZON, JSON), deserialización, representaciones de texto y una API segura.
 - Más binarizaciones: **CDR**, **ASN.1-BER**, **ASN.1-DER**.
 - Analizar y parsear **OMG IDL** en lugar de protobuf (mundo OMG-DDS y CORBA).
 - Traducir a **Zig 0.16** o posterior.
+- Versiones para **Windows** y **BSD**.
 
 ---
 
@@ -47,7 +48,12 @@ Primero obtén y compila la herramienta (necesita Zig 0.15.2):
 git clone https://github.com/fcases/protobuzig.git
 cd protobuzig
 zig build          # crea zig-out/bin/protobuzig
+export PATH="$PWD/zig-out/bin:$PATH"   # opcional: para usar solo 'protobuzig'
 ```
+
+Los ejemplos de abajo dan por hecho que `protobuzig` está en el PATH (o
+escribe `zig-out/bin/protobuzig`). Tras compilar, el binario está en
+`zig-out/bin/`.
 
 ### 2.1. Línea de comandos
 
