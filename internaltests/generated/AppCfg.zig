@@ -19,13 +19,15 @@ pub const ProtocolBus = struct {
 pub const AppConfig = struct {
     ActivateTrace: ?bool = false ,
     TraceLevel: ?i32 = 0 ,
-    Domains: []DomainCfg,
+    Domains: []DomainCfg = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !AppConfig {
+        const mia_Domains = try allocator.alloc(DomainCfg, 0);
+        errdefer allocator.free(mia_Domains);
         return AppConfig {
             .ActivateTrace = false,
             .TraceLevel = 0,
-            .Domains = try allocator.alloc(DomainCfg, 0),
+            .Domains = mia_Domains,
         };
     }
 
@@ -33,7 +35,11 @@ pub const AppConfig = struct {
         for (self.Domains) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.Domains);
+        if (self.Domains.len > 0) allocator.free(self.Domains);
+    }
+
+    pub fn plenigiDefaultojn(self: *AppConfig, allocator: all.Allocator) !void {
+        for (self.Domains) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *AppConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -75,22 +81,32 @@ pub const AppConfig = struct {
         var mia_Mesagho = try AppConfig.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var Domains_list: std.ArrayList(DomainCfg) = .empty; 
+        var Domains_list: std.ArrayList(DomainCfg) = .empty;
+        errdefer {
+            for (Domains_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            Domains_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "ActivateTrace" ) ) {
-                mia_Mesagho.ActivateTrace =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.ActivateTrace =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "TraceLevel" ) ) {
-                mia_Mesagho.TraceLevel =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.TraceLevel =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "Domains" ) ) {
                 const sub_msg = try DomainCfg.legiElProtobufTeksto(allocator, it); 
-                try Domains_list.append(allocator, sub_msg); 
+                Domains_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
         }
@@ -108,7 +124,7 @@ pub const AppConfig = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const AppConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, AppConfig, @as(*AppConfig, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, AppConfig, self, b_formato, path);
     }
 
     fn seriigi(self: *const AppConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -157,9 +173,13 @@ pub const AppConfig = struct {
             end = buffer.buffer.len;
 
         var Domains_list: std.ArrayList(DomainCfg) = .empty; 
+        errdefer {
+            for (Domains_list.items) |*it| it.deinit(allocator);
+            Domains_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -192,16 +212,18 @@ pub const DomainCfg = struct {
     ActivateDefaultTransport: bool = false ,
     DirectDispacthToSubs: ?bool = false ,
     KeyFile: ?[]const u8 = null,
-    Transports: []TransportDef,
+    Transports: []TransportDef = &.{},
     CrossConnector: ?CrossConnectorDef = null,
 
     pub fn initDefault(allocator: all.Allocator) !DomainCfg {
+        const mia_Transports = try allocator.alloc(TransportDef, 0);
+        errdefer allocator.free(mia_Transports);
         return DomainCfg {
             .Id = 0,
             .ActivateDefaultTransport = false,
             .DirectDispacthToSubs = false,
             .KeyFile = null,
-            .Transports = try allocator.alloc(TransportDef, 0),
+            .Transports = mia_Transports,
             .CrossConnector = null,
         };
     }
@@ -213,10 +235,15 @@ pub const DomainCfg = struct {
         for (self.Transports) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.Transports);
+        if (self.Transports.len > 0) allocator.free(self.Transports);
         if (self.CrossConnector) |item| {
             item.deinit(allocator);
         }
+    }
+
+    pub fn plenigiDefaultojn(self: *DomainCfg, allocator: all.Allocator) !void {
+        for (self.Transports) |*v| try v.plenigiDefaultojn(allocator);
+        if (self.CrossConnector) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *DomainCfg, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -242,8 +269,11 @@ pub const DomainCfg = struct {
         try bufro.print(allocator,"{s}ActivateDefaultTransport: {any}\n",.{ind, self.ActivateDefaultTransport });
         if( self.DirectDispacthToSubs ) |val|  
             try bufro.print(allocator,"{s}DirectDispacthToSubs: {any}\n",.{ ind, val });
-        if( self.KeyFile ) |val|  
-            try bufro.print(allocator,"{s}KeyFile: \"{s}\"\n",.{ ind, val });
+        if( self.KeyFile ) |val|  {
+            const KeyFile_esc = try escapePbTextToken(allocator, val);
+            defer allocator.free(KeyFile_esc);
+            try bufro.print(allocator,"{s}KeyFile: \"{s}\"\n",.{ ind, KeyFile_esc });
+        }
         for(self.Transports) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
             defer allocator.free(indent);
@@ -268,33 +298,44 @@ pub const DomainCfg = struct {
         var mia_Mesagho = try DomainCfg.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var Transports_list: std.ArrayList(TransportDef) = .empty; 
+        var Transports_list: std.ArrayList(TransportDef) = .empty;
+        errdefer {
+            for (Transports_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            Transports_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "Id" ) ) {
-                mia_Mesagho.Id =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.Id =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "ActivateDefaultTransport" ) ) {
-                mia_Mesagho.ActivateDefaultTransport =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.ActivateDefaultTransport =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "DirectDispacthToSubs" ) ) {
-                mia_Mesagho.DirectDispacthToSubs =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.DirectDispacthToSubs =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "KeyFile" ) ) {
+                const tmp_KeyFile = try unescapePbTextToken(allocator, val);
                 if (mia_Mesagho.KeyFile) |old| {
                     allocator.free(old);
                 }
-                mia_Mesagho.KeyFile = try allocator.dupe(u8, val);
+                mia_Mesagho.KeyFile = tmp_KeyFile;
                 continue;
             }
             if( equal(u8, tok, "Transports" ) ) {
                 const sub_msg = try TransportDef.legiElProtobufTeksto(allocator, it); 
-                try Transports_list.append(allocator, sub_msg); 
+                Transports_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
             if( equal(u8, tok, "CrossConnector" ) ) {
@@ -317,7 +358,7 @@ pub const DomainCfg = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const DomainCfg, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, DomainCfg, @as(*DomainCfg, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, DomainCfg, self, b_formato, path);
     }
 
     fn seriigi(self: *const DomainCfg, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -384,9 +425,13 @@ pub const DomainCfg = struct {
             end = buffer.buffer.len;
 
         var Transports_list: std.ArrayList(TransportDef) = .empty; 
+        errdefer {
+            for (Transports_list.items) |*it| it.deinit(allocator);
+            Transports_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -436,10 +481,16 @@ pub const TransportDef = struct {
     UDPStarParams: ?UDPStarDefConfig = null,
 
     pub fn initDefault(allocator: all.Allocator) !TransportDef {
+        const mia_TransportName = try allocator.dupe(u8, "MCastDefault0");
+        errdefer allocator.free(mia_TransportName);
+        const mia_DllImport = try allocator.dupe(u8, "Default");
+        errdefer allocator.free(mia_DllImport);
+        const mia_TransportClass = try allocator.dupe(u8, "Default");
+        errdefer allocator.free(mia_TransportClass);
         return TransportDef {
-            .TransportName = try allocator.dupe(u8, "MCastDefault0"),
-            .DllImport = try allocator.dupe(u8, "Default"),
-            .TransportClass = try allocator.dupe(u8, "Default"),
+            .TransportName = mia_TransportName,
+            .DllImport = mia_DllImport,
+            .TransportClass = mia_TransportClass,
             .ReceiveOwnMsgs = false,
             .MCastParams = null,
             .BCastParams = null,
@@ -462,6 +513,12 @@ pub const TransportDef = struct {
         }
     }
 
+    pub fn plenigiDefaultojn(self: *TransportDef, allocator: all.Allocator) !void {
+        if (self.MCastParams) |*v| try v.plenigiDefaultojn(allocator);
+        if (self.BCastParams) |*v| try v.plenigiDefaultojn(allocator);
+        if (self.UDPStarParams) |*v| try v.plenigiDefaultojn(allocator);
+    }
+
     pub fn skribiAlTeksto(self: *TransportDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
         return try skribiTiponAlTeksto(allocator, TransportDef, @as(*TransportDef, self), t_formato);
     }
@@ -481,9 +538,15 @@ pub const TransportDef = struct {
     fn skribiAlProtobufTeksto(self: *const TransportDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}TransportName: \"{s}\"\n",.{ind, self.TransportName });
-        try bufro.print(allocator,"{s}DllImport: \"{s}\"\n",.{ind, self.DllImport });
-        try bufro.print(allocator,"{s}TransportClass: \"{s}\"\n",.{ind, self.TransportClass });
+        const TransportName_esc = try escapePbTextToken(allocator, self.TransportName);
+        defer allocator.free(TransportName_esc);
+        try bufro.print(allocator,"{s}TransportName: \"{s}\"\n",.{ind, TransportName_esc });
+        const DllImport_esc = try escapePbTextToken(allocator, self.DllImport);
+        defer allocator.free(DllImport_esc);
+        try bufro.print(allocator,"{s}DllImport: \"{s}\"\n",.{ind, DllImport_esc });
+        const TransportClass_esc = try escapePbTextToken(allocator, self.TransportClass);
+        defer allocator.free(TransportClass_esc);
+        try bufro.print(allocator,"{s}TransportClass: \"{s}\"\n",.{ind, TransportClass_esc });
         if( self.ReceiveOwnMsgs ) |val|  
             try bufro.print(allocator,"{s}ReceiveOwnMsgs: {any}\n",.{ ind, val });
         if( self.MCastParams ) |val|  {
@@ -524,22 +587,25 @@ pub const TransportDef = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "TransportName" ) ) {
+                const tmp_TransportName = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.TransportName);
-                mia_Mesagho.TransportName = try allocator.dupe(u8, val);
+                mia_Mesagho.TransportName = tmp_TransportName;
                 continue;
             }
             if( equal(u8, tok, "DllImport" ) ) {
+                const tmp_DllImport = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.DllImport);
-                mia_Mesagho.DllImport = try allocator.dupe(u8, val);
+                mia_Mesagho.DllImport = tmp_DllImport;
                 continue;
             }
             if( equal(u8, tok, "TransportClass" ) ) {
+                const tmp_TransportClass = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.TransportClass);
-                mia_Mesagho.TransportClass = try allocator.dupe(u8, val);
+                mia_Mesagho.TransportClass = tmp_TransportClass;
                 continue;
             }
             if( equal(u8, tok, "ReceiveOwnMsgs" ) ) {
-                mia_Mesagho.ReceiveOwnMsgs =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.ReceiveOwnMsgs =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "MCastParams" ) ) {
@@ -567,7 +633,7 @@ pub const TransportDef = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const TransportDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, TransportDef, @as(*TransportDef, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, TransportDef, self, b_formato, path);
     }
 
     fn seriigi(self: *const TransportDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -644,7 +710,7 @@ pub const TransportDef = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -690,9 +756,13 @@ pub const MCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !MCastDefConfig {
+        const mia_LocalAddress = try allocator.dupe(u8, "Any");
+        errdefer allocator.free(mia_LocalAddress);
+        const mia_MCastAddress = try allocator.dupe(u8, "239.255.0.1");
+        errdefer allocator.free(mia_MCastAddress);
         return MCastDefConfig {
-            .LocalAddress = try allocator.dupe(u8, "Any"),
-            .MCastAddress = try allocator.dupe(u8, "239.255.0.1"),
+            .LocalAddress = mia_LocalAddress,
+            .MCastAddress = mia_MCastAddress,
             .Port = 40069,
             .TTL = 1,
             .ReceiveBuffer = 134217727,
@@ -703,6 +773,11 @@ pub const MCastDefConfig = struct {
     pub fn deinit(self: *const MCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.MCastAddress);
+    }
+
+    pub fn plenigiDefaultojn(self: *MCastDefConfig, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *MCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -724,8 +799,12 @@ pub const MCastDefConfig = struct {
     fn skribiAlProtobufTeksto(self: *const MCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
-        try bufro.print(allocator,"{s}MCastAddress: \"{s}\"\n",.{ind, self.MCastAddress });
+        const LocalAddress_esc = try escapePbTextToken(allocator, self.LocalAddress);
+        defer allocator.free(LocalAddress_esc);
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, LocalAddress_esc });
+        const MCastAddress_esc = try escapePbTextToken(allocator, self.MCastAddress);
+        defer allocator.free(MCastAddress_esc);
+        try bufro.print(allocator,"{s}MCastAddress: \"{s}\"\n",.{ind, MCastAddress_esc });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
         if( self.TTL ) |val|  
             try bufro.print(allocator,"{s}TTL: {any}\n",.{ ind, val });
@@ -747,29 +826,31 @@ pub const MCastDefConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) {
+                const tmp_LocalAddress = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.LocalAddress);
-                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
+                mia_Mesagho.LocalAddress = tmp_LocalAddress;
                 continue;
             }
             if( equal(u8, tok, "MCastAddress" ) ) {
+                const tmp_MCastAddress = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.MCastAddress);
-                mia_Mesagho.MCastAddress = try allocator.dupe(u8, val);
+                mia_Mesagho.MCastAddress = tmp_MCastAddress;
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) {
-                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.Port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "TTL" ) ) {
-                mia_Mesagho.TTL =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.TTL =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "ReceiveBuffer" ) ) {
-                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.ReceiveBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "SendBuffer" ) ) {
-                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.SendBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -782,7 +863,7 @@ pub const MCastDefConfig = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const MCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, MCastDefConfig, @as(*MCastDefConfig, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, MCastDefConfig, self, b_formato, path);
     }
 
     fn seriigi(self: *const MCastDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -847,7 +928,7 @@ pub const MCastDefConfig = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -886,9 +967,13 @@ pub const BCastDefConfig = struct {
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !BCastDefConfig {
+        const mia_LocalAddress = try allocator.dupe(u8, "Any");
+        errdefer allocator.free(mia_LocalAddress);
+        const mia_BCastAddress = try allocator.dupe(u8, "192.168.2.255");
+        errdefer allocator.free(mia_BCastAddress);
         return BCastDefConfig {
-            .LocalAddress = try allocator.dupe(u8, "Any"),
-            .BCastAddress = try allocator.dupe(u8, "192.168.2.255"),
+            .LocalAddress = mia_LocalAddress,
+            .BCastAddress = mia_BCastAddress,
             .Port = 40069,
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
@@ -898,6 +983,11 @@ pub const BCastDefConfig = struct {
     pub fn deinit(self: *const BCastDefConfig, allocator: all.Allocator) void {
         allocator.free(self.LocalAddress);
         allocator.free(self.BCastAddress);
+    }
+
+    pub fn plenigiDefaultojn(self: *BCastDefConfig, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *BCastDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -919,8 +1009,12 @@ pub const BCastDefConfig = struct {
     fn skribiAlProtobufTeksto(self: *const BCastDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
-        try bufro.print(allocator,"{s}BCastAddress: \"{s}\"\n",.{ind, self.BCastAddress });
+        const LocalAddress_esc = try escapePbTextToken(allocator, self.LocalAddress);
+        defer allocator.free(LocalAddress_esc);
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, LocalAddress_esc });
+        const BCastAddress_esc = try escapePbTextToken(allocator, self.BCastAddress);
+        defer allocator.free(BCastAddress_esc);
+        try bufro.print(allocator,"{s}BCastAddress: \"{s}\"\n",.{ind, BCastAddress_esc });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
         if( self.ReceiveBuffer ) |val|  
             try bufro.print(allocator,"{s}ReceiveBuffer: {any}\n",.{ ind, val });
@@ -940,25 +1034,27 @@ pub const BCastDefConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) {
+                const tmp_LocalAddress = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.LocalAddress);
-                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
+                mia_Mesagho.LocalAddress = tmp_LocalAddress;
                 continue;
             }
             if( equal(u8, tok, "BCastAddress" ) ) {
+                const tmp_BCastAddress = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.BCastAddress);
-                mia_Mesagho.BCastAddress = try allocator.dupe(u8, val);
+                mia_Mesagho.BCastAddress = tmp_BCastAddress;
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) {
-                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.Port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "ReceiveBuffer" ) ) {
-                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.ReceiveBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "SendBuffer" ) ) {
-                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.SendBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -971,7 +1067,7 @@ pub const BCastDefConfig = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const BCastDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, BCastDefConfig, @as(*BCastDefConfig, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, BCastDefConfig, self, b_formato, path);
     }
 
     fn seriigi(self: *const BCastDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1031,7 +1127,7 @@ pub const BCastDefConfig = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1063,15 +1159,19 @@ pub const BCastDefConfig = struct {
 pub const UDPStarDefConfig = struct {
     LocalAddress: []const u8,
     Port: i32 = 40069 ,
-    EndPoint: []EndPointDef,
+    EndPoint: []EndPointDef = &.{},
     ReceiveBuffer: ?i32 = 134217727 ,
     SendBuffer: ?i32 = 134217727 ,
 
     pub fn initDefault(allocator: all.Allocator) !UDPStarDefConfig {
+        const mia_LocalAddress = try allocator.dupe(u8, "Any");
+        errdefer allocator.free(mia_LocalAddress);
+        const mia_EndPoint = try allocator.alloc(EndPointDef, 0);
+        errdefer allocator.free(mia_EndPoint);
         return UDPStarDefConfig {
-            .LocalAddress = try allocator.dupe(u8, "Any"),
+            .LocalAddress = mia_LocalAddress,
             .Port = 40069,
-            .EndPoint = try allocator.alloc(EndPointDef, 0),
+            .EndPoint = mia_EndPoint,
             .ReceiveBuffer = 134217727,
             .SendBuffer = 134217727,
         };
@@ -1082,7 +1182,11 @@ pub const UDPStarDefConfig = struct {
         for (self.EndPoint) |item| {
             item.deinit(allocator);
         }
-        allocator.free(self.EndPoint);
+        if (self.EndPoint.len > 0) allocator.free(self.EndPoint);
+    }
+
+    pub fn plenigiDefaultojn(self: *UDPStarDefConfig, allocator: all.Allocator) !void {
+        for (self.EndPoint) |*v| try v.plenigiDefaultojn(allocator);
     }
 
     pub fn skribiAlTeksto(self: *UDPStarDefConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1104,7 +1208,9 @@ pub const UDPStarDefConfig = struct {
     fn skribiAlProtobufTeksto(self: *const UDPStarDefConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, self.LocalAddress });
+        const LocalAddress_esc = try escapePbTextToken(allocator, self.LocalAddress);
+        defer allocator.free(LocalAddress_esc);
+        try bufro.print(allocator,"{s}LocalAddress: \"{s}\"\n",.{ind, LocalAddress_esc });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
         for(self.EndPoint) |obj| {
             const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
@@ -1126,31 +1232,42 @@ pub const UDPStarDefConfig = struct {
         var mia_Mesagho = try UDPStarDefConfig.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var EndPoint_list: std.ArrayList(EndPointDef) = .empty; 
+        var EndPoint_list: std.ArrayList(EndPointDef) = .empty;
+        errdefer {
+            for (EndPoint_list.items) |*item| {
+                item.deinit(allocator);
+            }
+            EndPoint_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "LocalAddress" ) ) {
+                const tmp_LocalAddress = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.LocalAddress);
-                mia_Mesagho.LocalAddress = try allocator.dupe(u8, val);
+                mia_Mesagho.LocalAddress = tmp_LocalAddress;
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) {
-                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.Port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "EndPoint" ) ) {
                 const sub_msg = try EndPointDef.legiElProtobufTeksto(allocator, it); 
-                try EndPoint_list.append(allocator, sub_msg); 
+                EndPoint_list.append(allocator, sub_msg) catch |err| {
+                    sub_msg.deinit(allocator);
+                    return err;
+                };
                 continue;
             }
             if( equal(u8, tok, "ReceiveBuffer" ) ) {
-                mia_Mesagho.ReceiveBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.ReceiveBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "SendBuffer" ) ) {
-                mia_Mesagho.SendBuffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.SendBuffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -1168,7 +1285,7 @@ pub const UDPStarDefConfig = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const UDPStarDefConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, UDPStarDefConfig, @as(*UDPStarDefConfig, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, UDPStarDefConfig, self, b_formato, path);
     }
 
     fn seriigi(self: *const UDPStarDefConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1229,9 +1346,13 @@ pub const UDPStarDefConfig = struct {
             end = buffer.buffer.len;
 
         var EndPoint_list: std.ArrayList(EndPointDef) = .empty; 
+        errdefer {
+            for (EndPoint_list.items) |*it| it.deinit(allocator);
+            EndPoint_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1272,14 +1393,21 @@ pub const EndPointDef = struct {
     Port: i32 = 40069 ,
 
     pub fn initDefault(allocator: all.Allocator) !EndPointDef {
+        const mia_Host = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_Host);
         return EndPointDef {
-            .Host = try allocator.dupe(u8, ""),
+            .Host = mia_Host,
             .Port = 40069,
         };
     }
 
     pub fn deinit(self: *const EndPointDef, allocator: all.Allocator) void {
         allocator.free(self.Host);
+    }
+
+    pub fn plenigiDefaultojn(self: *EndPointDef, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *EndPointDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1301,7 +1429,9 @@ pub const EndPointDef = struct {
     fn skribiAlProtobufTeksto(self: *const EndPointDef, allocator: all.Allocator,ind: []const u8) ![]const u8 {
         var bufro:std.ArrayList(u8)= .empty;
 
-        try bufro.print(allocator,"{s}Host: \"{s}\"\n",.{ind, self.Host });
+        const Host_esc = try escapePbTextToken(allocator, self.Host);
+        defer allocator.free(Host_esc);
+        try bufro.print(allocator,"{s}Host: \"{s}\"\n",.{ind, Host_esc });
         try bufro.print(allocator,"{s}Port: {any}\n",.{ind, self.Port });
 
         return bufro.toOwnedSlice(allocator);
@@ -1317,12 +1447,13 @@ pub const EndPointDef = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "Host" ) ) {
+                const tmp_Host = try unescapePbTextToken(allocator, val);
                 allocator.free(mia_Mesagho.Host);
-                mia_Mesagho.Host = try allocator.dupe(u8, val);
+                mia_Mesagho.Host = tmp_Host;
                 continue;
             }
             if( equal(u8, tok, "Port" ) ) {
-                mia_Mesagho.Port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.Port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -1335,7 +1466,7 @@ pub const EndPointDef = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const EndPointDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, EndPointDef, @as(*EndPointDef, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, EndPointDef, self, b_formato, path);
     }
 
     fn seriigi(self: *const EndPointDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1377,7 +1508,7 @@ pub const EndPointDef = struct {
 
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1397,11 +1528,13 @@ pub const EndPointDef = struct {
 };    // EndPointDef
 
 pub const CrossConnectorDef = struct {
-    Transports: [][]const u8,
+    Transports: [][]const u8 = &.{},
 
     pub fn initDefault(allocator: all.Allocator) !CrossConnectorDef {
+        const mia_Transports = try allocator.alloc([]const u8, 0);
+        errdefer allocator.free(mia_Transports);
         return CrossConnectorDef {
-            .Transports = try allocator.alloc([]const u8, 0),
+            .Transports = mia_Transports,
         };
     }
 
@@ -1409,7 +1542,12 @@ pub const CrossConnectorDef = struct {
         for (self.Transports) |item| {
             allocator.free(item);
         }
-        allocator.free(self.Transports);
+        if (self.Transports.len > 0) allocator.free(self.Transports);
+    }
+
+    pub fn plenigiDefaultojn(self: *CrossConnectorDef, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
     }
 
     pub fn skribiAlTeksto(self: *CrossConnectorDef, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
@@ -1432,7 +1570,9 @@ pub const CrossConnectorDef = struct {
         var bufro:std.ArrayList(u8)= .empty;
 
         for(self.Transports) |obj| {
-            try bufro.print(allocator,"{s}Transports: \"{s}\"\n",.{ind, obj });
+            const Transports_esc = try escapePbTextToken(allocator, obj);
+            defer allocator.free(Transports_esc);
+            try bufro.print(allocator,"{s}Transports: \"{s}\"\n",.{ind, Transports_esc });
         }
 
         return bufro.toOwnedSlice(allocator);
@@ -1442,13 +1582,27 @@ pub const CrossConnectorDef = struct {
         var mia_Mesagho = try CrossConnectorDef.initDefault(allocator);
         errdefer mia_Mesagho.deinit(allocator);
 
-        var Transports_list: std.ArrayList([]const u8) = .empty; 
+        var Transports_list: std.ArrayList([]const u8) = .empty;
+        errdefer {
+            for (Transports_list.items) |item| {
+                allocator.free(item);
+            }
+            Transports_list.deinit(allocator);
+        }
+
         while (it.next()) |tok| {
             if( equal(u8, tok, "}" ) ) break;
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "Transports" ) ) {
-                try Transports_list.append(allocator, allocator.dupe(u8, val) catch "");
+                const tmp_item = try unescapePbTextToken(
+                    allocator,
+                    val,
+                );
+                Transports_list.append(allocator, tmp_item) catch |err| {
+                    allocator.free(tmp_item);
+                    return err;
+                };
                 continue;
             }
         }
@@ -1466,7 +1620,7 @@ pub const CrossConnectorDef = struct {
     }
 
     pub fn seriigiAlDosiero(self: *const CrossConnectorDef, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, CrossConnectorDef, @as(*CrossConnectorDef, self), path, b_formato);
+        return try seriigiTiponAlDosiero(allocator, CrossConnectorDef, self, b_formato, path);
     }
 
     fn seriigi(self: *const CrossConnectorDef, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
@@ -1506,9 +1660,13 @@ pub const CrossConnectorDef = struct {
             end = buffer.buffer.len;
 
         var Transports_list: std.ArrayList([]const u8) = .empty; 
+        errdefer {
+            for (Transports_list.items) |it| allocator.free(it);
+            Transports_list.deinit(allocator);
+        }
 
         while (buffer.read_index < end) {
-            const key: u64 = buffer.decodeVarint() catch 0 ;    
+            const key: u64 = try buffer.decodeVarint();
             const wire_type = key & 0x7;  
             const field_number = key >> 3;
 
@@ -1708,8 +1866,14 @@ const zon = std.zon;
 
 fn parseEnumValue(comptime E: type, tok: []const u8) !E {
     if (std.meta.stringToEnum(E, tok)) |v| return v;
-    const n = try std.fmt.parseInt(u64, tok, 10);
-    return try std.meta.intToEnum(E, n);
+    const n = std.fmt.parseInt(u64, tok, 10) catch return error.InvalidEnumValue;
+    return std.meta.intToEnum(E, n) catch error.InvalidEnumValue;
+}
+
+fn parseBoolValue(tok: []const u8) !bool {
+    if (std.ascii.eqlIgnoreCase(tok, "true")) return true;
+    if (std.ascii.eqlIgnoreCase(tok, "false")) return false;
+    return error.InvalidBoolValue;
 }
 
 fn legiSubProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) ![]const u8 {
@@ -1831,6 +1995,8 @@ pub fn legiTiponElTeksto(allocator: all.Allocator, comptime T: type, input: []co
             return error.UnsupportedFormat;
         },
     }
+
+    try parsed.plenigiDefaultojn(allocator);
 
     return parsed;
 }
@@ -1965,4 +2131,105 @@ pub const CustomTokenizer = struct {
         };
     }
 };
+
+fn unescapePbTextToken(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(allocator);
+    var index: usize = 0;
+    while (index < input.len) {
+        const current = input[index];
+        if (current != '\\') {
+            try result.append(allocator, current);
+            index += 1;
+            continue;
+        }
+        index += 1;
+        if (index >= input.len) {
+            return error.InvalidPbTextEscape;
+        }
+        const escaped = input[index];
+        index += 1;
+        switch (escaped) {
+            'a' => try result.append(allocator, 0x07),
+            'b' => try result.append(allocator, 0x08),
+            'f' => try result.append(allocator, 0x0c),
+            'n' => try result.append(allocator, '\n'),
+            'r' => try result.append(allocator, '\r'),
+            't' => try result.append(allocator, '\t'),
+            'v' => try result.append(allocator, 0x0b),
+            '\\' => try result.append(allocator, '\\'),
+            '\'' => try result.append(allocator, '\''),
+            '"' => try result.append(allocator, '"'),
+            '0'...'7' => {
+                var value: u16 = escaped - '0';
+                var digits: usize = 1;
+                while (
+                    digits < 3 and
+                    index < input.len and
+                    input[index] >= '0' and
+                    input[index] <= '7'
+                ) {
+                    value = value * 8 + input[index] - '0';
+                    index += 1;
+                    digits += 1;
+                }
+                if (value > 255) { return error.InvalidPbTextEscape; }
+                try result.append(allocator, @intCast(value));
+            },
+            'x', 'X' => {
+                var value: u16 = 0;
+                var digits: usize = 0;
+                while (digits < 2 and index < input.len) {
+                    const digit = hexDigitValue(input[index]) orelse break;
+                    value = value * 16 + digit;
+                    index += 1;
+                    digits += 1;
+                }
+                if (digits == 0) { return error.InvalidPbTextEscape; }
+                try result.append(allocator, @intCast(value));
+            },
+            else => return error.InvalidPbTextEscape,
+        }
+    }
+    return try result.toOwnedSlice(allocator);
+
+}
+
+fn hexDigitValue(c: u8) ?u8 {
+    return switch (c) {
+        '0'...'9' => c - '0', 
+        'a'...'f' => c - 'a' + 10,
+        'A'...'F' => c - 'A' + 10,
+        else => null,
+    };
+}
+
+fn escapePbTextToken(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(allocator);
+    const hex_digits = "0123456789abcdef";
+    for (input) |byte| {
+        switch (byte) {
+            '"' => try result.appendSlice(allocator, "\\\""),
+            '\\' => try result.appendSlice(allocator, "\\\\"),
+            '\n' => try result.appendSlice(allocator, "\\n"),
+            '\r' => try result.appendSlice(allocator, "\\r"),
+            '\t' => try result.appendSlice(allocator, "\\t"),
+            0x07 => try result.appendSlice(allocator, "\\a"),
+            0x08 => try result.appendSlice(allocator, "\\b"),
+            0x0b => try result.appendSlice(allocator, "\\v"),
+            0x0c => try result.appendSlice(allocator, "\\f"),
+            else => {
+                if (byte < 0x20 or byte == 0x7f) {
+                    try result.appendSlice(allocator, "\\x");
+                    try result.append(allocator, hex_digits[byte >> 4]);
+                    try result.append(allocator, hex_digits[byte & 0x0f]);
+                } else {
+                    try result.append(allocator, byte);
+                }
+            },
+        }
+    }
+    return try result.toOwnedSlice(allocator);
+}
 

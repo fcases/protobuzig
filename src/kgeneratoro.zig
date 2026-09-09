@@ -353,7 +353,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             .TYPE_ENUM => {
                 try verkisto.print(
                     \\{s}        if( equal(u8, tok, "{s}" ) ) {{
-                    \\{s}            const {s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);
+                    \\{s}            const {s} = try parseEnumValue({s}, val);
                     \\{s}            mia_Mesagho.deinit{s}(allocator);
                     \\{s}            mia_Mesagho.{s} = .{{ .{s} = {s} }};
                     \\{s}            continue;
@@ -362,7 +362,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
                 , .{
                     ind,              field.name,
                     ind,              temp_name,
-                    field.field_type, field.field_type,
+                    field.field_type,
                     ind,              union_name,
                     ind,              oneof_decl.name,
                     field.name,       temp_name,
@@ -373,7 +373,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             else => {
                 try verkisto.print(
                     \\{s}        if( equal(u8, tok, "{s}" ) ) {{
-                    \\{s}            const {s} = 
+                    \\{s}            const {s} = try 
                 , .{
                     ind, field.name,
                     ind, temp_name,
@@ -1274,8 +1274,14 @@ fn skribiGeneralajnFunkciojn() !void {
         \\
         \\fn parseEnumValue(comptime E: type, tok: []const u8) !E {{
         \\    if (std.meta.stringToEnum(E, tok)) |v| return v;
-        \\    const n = try std.fmt.parseInt(u64, tok, 10);
-        \\    return try std.meta.intToEnum(E, n);
+        \\    const n = std.fmt.parseInt(u64, tok, 10) catch return error.InvalidEnumValue;
+        \\    return std.meta.intToEnum(E, n) catch error.InvalidEnumValue;
+        \\}}
+        \\
+        \\fn parseBoolValue(tok: []const u8) !bool {{
+        \\    if (std.ascii.eqlIgnoreCase(tok, "true")) return true;
+        \\    if (std.ascii.eqlIgnoreCase(tok, "false")) return false;
+        \\    return error.InvalidBoolValue;
         \\}}
         \\
         \\fn legiSubProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) ![]const u8 {{
@@ -2085,7 +2091,7 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 
                     else => {
                         try verkisto.print(
-                            "{s}            try {s}_list.append(allocator, ",
+                            "{s}            try {s}_list.append(allocator, try ",
                             .{
                                 ind,
                                 field.name,
@@ -2109,8 +2115,8 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
 
                 if (field.field_type_enum == .TYPE_ENUM) {
                     try verkisto.print(
-                        "mia_Mesagho.{s} = parseEnumValue({s}, val) catch (std.meta.intToEnum({s}, 0) catch unreachable);\n",
-                        .{ field.name, field.field_type, field.field_type },
+                        "mia_Mesagho.{s} = try parseEnumValue({s}, val);\n",
+                        .{ field.name, field.field_type },
                     );
                 } else if (field.field_type_enum == .TYPE_STRING or
                     field.field_type_enum == .TYPE_BYTES)

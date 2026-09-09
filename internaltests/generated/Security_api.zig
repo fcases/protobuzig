@@ -1,14 +1,14 @@
 // ============================================================================
-// Ciudad_api.zig
+// Security_api.zig
 // ============================================================================
 //
 // Fichero generado por ProtobuZig / kgenapi.zig.
 //
 // Proto base:
-//   Ciudad
+//   Security
 //
 // Raw generado:
-//   Ciudad.zig
+//   Security.zig
 //
 // Este fichero contiene wrappers/API segura sobre el raw generado.
 //
@@ -25,26 +25,39 @@
 
 const std = @import("std");
 
-const RawFile = @import("Ciudad.zig");
+const RawFile = @import("Security.zig");
 
 pub const TekstaFormato = RawFile.TekstaFormato;
 pub const BinaraFormato = RawFile.BinaraFormato;
 
 // Alias al namespace raw generado.
 // En fase intermedia apunta al package actual del fichero raw.
-const Raw = RawFile.geo;
+const Raw = RawFile.k6bus.security;
 
 // Alias intencionadamente llamado *_impl aunque en fase intermedia
 // apunte al namespace raw actual.
 //
 // Fase intermedia:
-//   const Ciudad_impl = Raw;
+//   const Security_impl = Raw;
 //
 // Fase final:
-//   const Ciudad_impl = RawFile.<package>_impl;
+//   const Security_impl = RawFile.<package>_impl;
 
-const Ciudad_impl = Raw;
+const Security_impl = Raw;
 
+// ============================================================================
+// ALIASES PUBLICOS A ENUMS RAW / IMPL
+// ============================================================================
+//
+// Los enums no necesitan wrapper. Se reexportan desde el namespace raw/impl.
+//
+// En fase intermedia:
+//   pub const TipoPanel = cctrol_impl.TipoPanel;
+//
+// En fase final:
+//   pub const TipoPanel = cctrol_impl.TipoPanel;
+//
+pub const CryptoMode = Security_impl.CryptoMode;
 // ============================================================================
 // API SEGURA
 // ============================================================================
@@ -81,8 +94,7 @@ const Ciudad_impl = Raw;
 // Fase final:
 //   EstMeteoImpl = cctrol_impl.EstMeteo_impl
 //
-const EstacionImpl = Ciudad_impl.Estacion;
-const CiudadImpl = Ciudad_impl.Ciudad;
+const KeyRegistryImpl = Security_impl.KeyRegistry;
 
 // ============================================================================
 // HELPERS PRIVADOS DE COPIA PROFUNDA
@@ -124,14 +136,14 @@ fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {
 //   - readFromText()
 //   - setters/getters/builders seguros
 //
-pub const Estacion = struct {
-    impl: EstacionImpl,
+pub const KeyRegistry = struct {
+    impl: KeyRegistryImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try EstacionImpl.initDefault(allocator),
+            .impl = try KeyRegistryImpl.initDefault(allocator),
         };
     }
 
@@ -142,240 +154,193 @@ pub const Estacion = struct {
     pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
         return .{
             .impl = try cloneImpl(
-                EstacionImpl,
+                KeyRegistryImpl,
                 allocator,
                 &self.impl,
             ),
         };
     }
 
-    pub fn setId(self: *Self, value: u32) void {
-        self.impl.id = value;
+    pub fn setVersion(self: *Self, value: u32) void {
+        self.impl.Version = value;
     }
 
-    pub fn getId(self: *const Self) ?u32 {
-        return self.impl.id;
+    pub fn getVersion(self: *const Self) ?u32 {
+        return self.impl.Version;
     }
 
-    pub fn hasId(self: *const Self) bool {
-        return self.impl.id != null;
+    pub fn hasVersion(self: *const Self) bool {
+        return self.impl.Version != null;
     }
 
-    pub fn clearId(self: *Self) void {
-        self.impl.id = null;
+    pub fn clearVersion(self: *Self) void {
+        self.impl.Version = null;
     }
 
-    pub fn setNombre(
+    pub fn setMode(self: *Self, value: CryptoMode) void {
+        self.impl.Mode = value;
+    }
+
+    pub fn getMode(self: *const Self) ?CryptoMode {
+        return self.impl.Mode;
+    }
+
+    pub fn hasMode(self: *const Self) bool {
+        return self.impl.Mode != null;
+    }
+
+    pub fn clearMode(self: *Self) void {
+        self.impl.Mode = null;
+    }
+
+    pub fn setKeyId(self: *Self, value: u32) void {
+        self.impl.KeyId = value;
+    }
+
+    pub fn getKeyId(self: *const Self) ?u32 {
+        return self.impl.KeyId;
+    }
+
+    pub fn hasKeyId(self: *const Self) bool {
+        return self.impl.KeyId != null;
+    }
+
+    pub fn clearKeyId(self: *Self) void {
+        self.impl.KeyId = null;
+    }
+
+    pub fn setDate(
         self: *Self,
         allocator: std.mem.Allocator,
         value: []const u8,
     ) !void {
         const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+        allocator.free(self.impl.Date);
+        self.impl.Date = tmp;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
+    pub fn getDate(self: *const Self) []const u8 {
+        return self.impl.Date;
     }
 
-    pub fn writeToText(
+    pub fn setTime(
         self: *Self,
         allocator: std.mem.Allocator,
-        format: TekstaFormato,
-    ) ![]const u8 {
-        return try self.impl.skribiAlTeksto(
-            allocator,
-            format,
-        );
+        value: []const u8,
+    ) !void {
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.Time);
+        self.impl.Time = tmp;
     }
 
-    pub fn writeToFile(
+    pub fn getTime(self: *const Self) []const u8 {
+        return self.impl.Time;
+    }
+
+    pub fn setSender(
         self: *Self,
         allocator: std.mem.Allocator,
-        path: []const u8,
-        format: TekstaFormato,
+        value: []const u8,
     ) !void {
-        try self.impl.skribiAlDosiero(
-            allocator,
-            path,
-            format,
-        );
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.Sender);
+        self.impl.Sender = tmp;
     }
 
-    pub fn readFromText(
-        allocator: std.mem.Allocator,
-        input: []const u8,
-        format: TekstaFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.legiElTeksto(
-                allocator,
-                input,
-                format,
-            ),
-        };
+    pub fn getSender(self: *const Self) []const u8 {
+        return self.impl.Sender;
     }
 
-    pub fn readFromFile(
+    pub fn setKey(
+        self: *Self,
         allocator: std.mem.Allocator,
-        path: []const u8,
-        format: TekstaFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.legiElDosiero(
-                allocator,
-                path,
-                format,
-            ),
-        };
-    }
-
-    pub fn serializeToBin(
-        self: *const Self,
-        allocator: std.mem.Allocator,
-        format: BinaraFormato,
-    ) ![]const u8 {
-        return try self.impl.seriigiAlBin(
-            allocator,
-            format,
-        );
-    }
-
-    pub fn serializeToFile(
-        self: *const Self,
-        allocator: std.mem.Allocator,
-        path: []const u8,
-        format: BinaraFormato,
+        value: []const u8,
     ) !void {
-        try self.impl.seriigiAlDosiero(
-            allocator,
-            path,
-            format,
-        );
+        const tmp = try allocator.dupe(u8, value);
+        allocator.free(self.impl.Key);
+        self.impl.Key = tmp;
     }
 
-    pub fn deserializeFromBin(
-        allocator: std.mem.Allocator,
-        input: []const u8,
-        format: BinaraFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.deseriigiElBin(
-                allocator,
-                input,
-                format,
-            ),
-        };
+    pub fn getKey(self: *const Self) []const u8 {
+        return self.impl.Key;
     }
 
-    pub fn deserializeFromFile(
-        allocator: std.mem.Allocator,
-        path: [:0]const u8,
-        format: BinaraFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.deseriigiElDosiero(
-                allocator,
-                path,
-                format,
-            ),
-        };
-    }
-};
-
-pub const Ciudad = struct {
-    impl: CiudadImpl,
-
-    const Self = @This();
-
-    pub fn initDefault(allocator: std.mem.Allocator) !Self {
-        return .{
-            .impl = try CiudadImpl.initDefault(allocator),
-        };
-    }
-
-    pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
-        self.impl.deinit(allocator);
-    }
-
-    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
-        return .{
-            .impl = try cloneImpl(
-                CiudadImpl,
-                allocator,
-                &self.impl,
-            ),
-        };
-    }
-
-    pub fn setNombre(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+    pub fn setPhrase(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
         const tmp = try allocator.dupe(u8, value);
 
-        if (self.impl.nombre) |old| {
+        if (self.impl.Phrase) |old| {
             allocator.free(old);
         }
 
-        self.impl.nombre = tmp;
+        self.impl.Phrase = tmp;
     }
 
-    pub fn getNombre(self: *const Self) ?[]const u8 {
-        return self.impl.nombre;
+    pub fn getPhrase(self: *const Self) ?[]const u8 {
+        return self.impl.Phrase;
     }
 
-    pub fn hasNombre(self: *const Self) bool {
-        return self.impl.nombre != null;
+    pub fn hasPhrase(self: *const Self) bool {
+        return self.impl.Phrase != null;
     }
 
-    pub fn clearNombre(self: *Self, allocator: std.mem.Allocator) void {
-        if (self.impl.nombre) |old| {
+    pub fn clearPhrase(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.Phrase) |old| {
             allocator.free(old);
         }
 
-        self.impl.nombre = null;
+        self.impl.Phrase = null;
     }
 
-    pub fn getEstacionesCount(self: *const Self) usize {
-        return self.impl.estaciones.len;
-    }
+    pub fn setSalt(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
 
-    pub fn getEstacionesAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !Estacion {
-        if (index >= self.impl.estaciones.len) {
-            return error.IndexOutOfBounds;
+        if (self.impl.Salt) |old| {
+            allocator.free(old);
         }
 
-        return .{
-            .impl = try cloneImpl(
-                EstacionImpl,
-                allocator,
-                &self.impl.estaciones[index],
-            ),
-        };
+        self.impl.Salt = tmp;
     }
 
-    pub fn appendEstaciones(self: *Self, allocator: std.mem.Allocator, value: *const Estacion) !void {
-        const tmp_item = try cloneImpl(
-            EstacionImpl,
-            allocator,
-            &value.impl,
-        );
-        errdefer tmp_item.deinit(allocator);
-
-        const old_len = self.impl.estaciones.len;
-        self.impl.estaciones = try allocator.realloc(
-            self.impl.estaciones,
-            old_len + 1,
-        );
-
-        self.impl.estaciones[old_len] = tmp_item;
+    pub fn getSalt(self: *const Self) ?[]const u8 {
+        return self.impl.Salt;
     }
 
-    pub fn clearEstaciones(self: *Self, allocator: std.mem.Allocator) !void {
-        for (self.impl.estaciones) |*item| {
-            item.deinit(allocator);
+    pub fn hasSalt(self: *const Self) bool {
+        return self.impl.Salt != null;
+    }
+
+    pub fn clearSalt(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.Salt) |old| {
+            allocator.free(old);
         }
-        allocator.free(self.impl.estaciones);
-        self.impl.estaciones = try allocator.alloc(EstacionImpl, 0);
+
+        self.impl.Salt = null;
+    }
+
+    pub fn setLegacyIV(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
+        const tmp = try allocator.dupe(u8, value);
+
+        if (self.impl.LegacyIV) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.LegacyIV = tmp;
+    }
+
+    pub fn getLegacyIV(self: *const Self) ?[]const u8 {
+        return self.impl.LegacyIV;
+    }
+
+    pub fn hasLegacyIV(self: *const Self) bool {
+        return self.impl.LegacyIV != null;
+    }
+
+    pub fn clearLegacyIV(self: *Self, allocator: std.mem.Allocator) void {
+        if (self.impl.LegacyIV) |old| {
+            allocator.free(old);
+        }
+
+        self.impl.LegacyIV = null;
     }
 
     pub fn writeToText(
@@ -408,7 +373,7 @@ pub const Ciudad = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.legiElTeksto(
+            .impl = try KeyRegistryImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -422,7 +387,7 @@ pub const Ciudad = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.legiElDosiero(
+            .impl = try KeyRegistryImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -460,7 +425,7 @@ pub const Ciudad = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.deseriigiElBin(
+            .impl = try KeyRegistryImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -474,7 +439,7 @@ pub const Ciudad = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.deseriigiElDosiero(
+            .impl = try KeyRegistryImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,

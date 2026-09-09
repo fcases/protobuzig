@@ -364,15 +364,14 @@ pub fn estasLongaVar(field_type: tpj) bool {
 
 pub fn printParseType(verkisto: *std.Io.Writer, field_type: tpj, name: []const u8)!void {
     return switch (field_type) {
-        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i32,val,10) catch 0;\n", .{name}),
-        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(i64,val,10) catch 0;\n", .{name}),
-        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u32,val,10) catch 0;\n", .{name}),
-        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseInt(u64,val,10) catch 0;\n", .{name}),
-        .TYPE_FLOAT => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f32,val) catch 0.0;\n", .{name}),
-        .TYPE_DOUBLE => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0.0;\n", .{name}),
-        .TYPE_ENUM => try verkisto.print("mia_Mesagho.{s} =  std.fmt.parseFloat(f64,val) catch 0;\n", .{name}),
-        .TYPE_BOOL => try verkisto.print("mia_Mesagho.{s} =  if( equal(u8, val,\"true\") ) true else false;\n", .{name}),
-        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("mia_Mesagho.{s} =  allocator.dupe(u8, val) catch \"\";\n", .{name}),
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseInt(i32,val,10);\n", .{name}),
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseInt(i64,val,10);\n", .{name}),
+        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseInt(u32,val,10);\n", .{name}),
+        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseInt(u64,val,10);\n", .{name}),
+        .TYPE_FLOAT => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseFloat(f32,val);\n", .{name}),
+        .TYPE_DOUBLE => try verkisto.print("mia_Mesagho.{s} =  try std.fmt.parseFloat(f64,val);\n", .{name}),
+        .TYPE_BOOL => try verkisto.print("mia_Mesagho.{s} =  try parseBoolValue(val);\n", .{name}),
+        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("mia_Mesagho.{s} =  try allocator.dupe(u8, val);\n", .{name}),
         else => {},
     };
 }
@@ -384,15 +383,15 @@ pub fn printParseValueExpr(
     val_expr: []const u8,
 )!void {
     return switch (field_type) {
-        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("std.fmt.parseInt(i32,{s},10) catch 0", .{val_expr}),
-        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("std.fmt.parseInt(i64,{s},10) catch 0", .{val_expr}),
-        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("std.fmt.parseInt(u32,{s},10) catch 0", .{val_expr}),
-        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("std.fmt.parseInt(u64,{s},10) catch 0", .{val_expr}),
-        .TYPE_FLOAT => try verkisto.print("std.fmt.parseFloat(f32,{s}) catch 0.0", .{val_expr}),
-        .TYPE_DOUBLE => try verkisto.print("std.fmt.parseFloat(f64,{s}) catch 0.0", .{val_expr}),
-        .TYPE_BOOL => try verkisto.print("if (equal(u8, {s}, \"true\")) true else false", .{val_expr}),
-        .TYPE_ENUM => try verkisto.print("parseEnumValue({s}, {s}) catch (std.meta.intToEnum({s}, 0) catch unreachable)", .{ field_zig_type, val_expr, field_zig_type }),
-        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("allocator.dupe(u8, {s}) catch \"\"", .{val_expr}),
+        .TYPE_INT32, .TYPE_SINT32, .TYPE_SFIXED32 => try verkisto.print("std.fmt.parseInt(i32,{s},10)", .{val_expr}),
+        .TYPE_INT64, .TYPE_SINT64, .TYPE_SFIXED64 => try verkisto.print("std.fmt.parseInt(i64,{s},10)", .{val_expr}),
+        .TYPE_UINT32, .TYPE_FIXED32 => try verkisto.print("std.fmt.parseInt(u32,{s},10)", .{val_expr}),
+        .TYPE_UINT64, .TYPE_FIXED64 => try verkisto.print("std.fmt.parseInt(u64,{s},10)", .{val_expr}),
+        .TYPE_FLOAT => try verkisto.print("std.fmt.parseFloat(f32,{s})", .{val_expr}),
+        .TYPE_DOUBLE => try verkisto.print("std.fmt.parseFloat(f64,{s})", .{val_expr}),
+        .TYPE_BOOL => try verkisto.print("parseBoolValue({s})", .{val_expr}),
+        .TYPE_ENUM => try verkisto.print("parseEnumValue({s}, {s})", .{ field_zig_type, val_expr }),
+        .TYPE_STRING, .TYPE_BYTES => try verkisto.print("allocator.dupe(u8, {s})", .{val_expr}),
         else => try verkisto.print("{s}", .{val_expr}),
     };
 }

@@ -595,15 +595,15 @@ pub const EstMeteo = struct {
                 continue;
             }
             if( equal(u8, tok, "temp" ) ) {
-                mia_Mesagho.temp =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.temp =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "v_viento" ) ) {
-                mia_Mesagho.v_viento =  std.fmt.parseFloat(f32,val) catch 0.0;
+                mia_Mesagho.v_viento =  try std.fmt.parseFloat(f32,val);
                 continue;
             }
             if( equal(u8, tok, "dir_viento" ) ) {
-                mia_Mesagho.dir_viento =  std.fmt.parseFloat(f32,val) catch 0.0;
+                mia_Mesagho.dir_viento =  try std.fmt.parseFloat(f32,val);
                 continue;
             }
         }
@@ -773,15 +773,15 @@ pub const SnrTrafico = struct {
                 continue;
             }
             if( equal(u8, tok, "carriles" ) ) {
-                mia_Mesagho.carriles =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.carriles =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "vel_media" ) ) {
-                try vel_media_list.append(allocator, std.fmt.parseFloat(f32,val) catch 0.0);
+                try vel_media_list.append(allocator, try std.fmt.parseFloat(f32,val));
                 continue;
             }
             if( equal(u8, tok, "vehiculos_min" ) ) {
-                try vehiculos_min_list.append(allocator, std.fmt.parseFloat(f32,val) catch 0.0);
+                try vehiculos_min_list.append(allocator, try std.fmt.parseFloat(f32,val));
                 continue;
             }
         }
@@ -1218,7 +1218,7 @@ pub const PanelBase = struct {
                 continue;
             }
             if( equal(u8, tok, "tipo" ) ) {
-                mia_Mesagho.tipo = parseEnumValue(TipoPanel, val) catch (std.meta.intToEnum(TipoPanel, 0) catch unreachable);
+                mia_Mesagho.tipo = try parseEnumValue(TipoPanel, val);
                 continue;
             }
             if( equal(u8, tok, "senial" ) ) {
@@ -1236,7 +1236,7 @@ pub const PanelBase = struct {
                 continue;
             }
             if( equal(u8, tok, "numero" ) ) {
-                const datos_numero_val = std.fmt.parseInt(u32,val,10) catch 0;
+                const datos_numero_val = try std.fmt.parseInt(u32,val,10);
                 mia_Mesagho.deinitDatos(allocator);
                 mia_Mesagho.datos = .{ .numero = datos_numero_val };
                 continue;
@@ -1254,7 +1254,7 @@ pub const PanelBase = struct {
                 continue;
             }
             if( equal(u8, tok, "tp" ) ) {
-                const datos_tp_val = parseEnumValue(TipoPanel, val) catch (std.meta.intToEnum(TipoPanel, 0) catch unreachable);
+                const datos_tp_val = try parseEnumValue(TipoPanel, val);
                 mia_Mesagho.deinitDatos(allocator);
                 mia_Mesagho.datos = .{ .tp = datos_tp_val };
                 continue;
@@ -1883,8 +1883,14 @@ const zon = std.zon;
 
 fn parseEnumValue(comptime E: type, tok: []const u8) !E {
     if (std.meta.stringToEnum(E, tok)) |v| return v;
-    const n = try std.fmt.parseInt(u64, tok, 10);
-    return try std.meta.intToEnum(E, n);
+    const n = std.fmt.parseInt(u64, tok, 10) catch return error.InvalidEnumValue;
+    return std.meta.intToEnum(E, n) catch error.InvalidEnumValue;
+}
+
+fn parseBoolValue(tok: []const u8) !bool {
+    if (std.ascii.eqlIgnoreCase(tok, "true")) return true;
+    if (std.ascii.eqlIgnoreCase(tok, "false")) return false;
+    return error.InvalidBoolValue;
 }
 
 fn legiSubProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) ![]const u8 {

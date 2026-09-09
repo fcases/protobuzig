@@ -124,15 +124,15 @@ pub const AppConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "version" ) ) {
-                mia_Mesagho.version =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.version =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "activate_trace" ) ) {
-                mia_Mesagho.activate_trace =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.activate_trace =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "trace_level" ) ) {
-                mia_Mesagho.trace_level =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.trace_level =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "domains" ) ) {
@@ -379,15 +379,15 @@ pub const DomainConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "id" ) ) {
-                mia_Mesagho.id =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.id =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "activate_default_transport" ) ) {
-                mia_Mesagho.activate_default_transport =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.activate_default_transport =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "direct_dispatch_to_subs" ) ) {
-                mia_Mesagho.direct_dispatch_to_subs =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.direct_dispatch_to_subs =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "key_file" ) ) {
@@ -399,19 +399,19 @@ pub const DomainConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "binary_format" ) ) {
-                mia_Mesagho.binary_format = parseEnumValue(BinaryFormat, val) catch (std.meta.intToEnum(BinaryFormat, 0) catch unreachable);
+                mia_Mesagho.binary_format = try parseEnumValue(BinaryFormat, val);
                 continue;
             }
             if( equal(u8, tok, "start_at_init" ) ) {
-                mia_Mesagho.start_at_init =  if( equal(u8, val,"true") ) true else false;
+                mia_Mesagho.start_at_init =  try parseBoolValue(val);
                 continue;
             }
             if( equal(u8, tok, "dispatch_mode" ) ) {
-                mia_Mesagho.dispatch_mode = parseEnumValue(DispatchMode, val) catch (std.meta.intToEnum(DispatchMode, 0) catch unreachable);
+                mia_Mesagho.dispatch_mode = try parseEnumValue(DispatchMode, val);
                 continue;
             }
             if( equal(u8, tok, "dispatch_batch_time_ms" ) ) {
-                mia_Mesagho.dispatch_batch_time_ms =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.dispatch_batch_time_ms =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "transports" ) ) {
@@ -763,11 +763,11 @@ pub const TransportConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "kind" ) ) {
-                mia_Mesagho.kind = parseEnumValue(TransportKind, val) catch (std.meta.intToEnum(TransportKind, 0) catch unreachable);
+                mia_Mesagho.kind = try parseEnumValue(TransportKind, val);
                 continue;
             }
             if( equal(u8, tok, "encoding" ) ) {
-                mia_Mesagho.encoding = parseEnumValue(Encoding, val) catch (std.meta.intToEnum(Encoding, 0) catch unreachable);
+                mia_Mesagho.encoding = try parseEnumValue(Encoding, val);
                 continue;
             }
             if( equal(u8, tok, "loop" ) ) {
@@ -1050,7 +1050,7 @@ pub const LoopTransportConfig = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "delay_ms" ) ) {
-                mia_Mesagho.delay_ms =  std.fmt.parseInt(u32,val,10) catch 0;
+                mia_Mesagho.delay_ms =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
         }
@@ -1208,19 +1208,19 @@ pub const MCastConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "port" ) ) {
-                mia_Mesagho.port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "ttl" ) ) {
-                mia_Mesagho.ttl =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.ttl =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "receive_buffer" ) ) {
-                mia_Mesagho.receive_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.receive_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "send_buffer" ) ) {
-                mia_Mesagho.send_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.send_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -1423,15 +1423,15 @@ pub const BCastConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "port" ) ) {
-                mia_Mesagho.port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "receive_buffer" ) ) {
-                mia_Mesagho.receive_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.receive_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "send_buffer" ) ) {
-                mia_Mesagho.send_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.send_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -1636,7 +1636,7 @@ pub const UDPStarConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "port" ) ) {
-                mia_Mesagho.port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "end_point" ) ) {
@@ -1648,11 +1648,11 @@ pub const UDPStarConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "receive_buffer" ) ) {
-                mia_Mesagho.receive_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.receive_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "send_buffer" ) ) {
-                mia_Mesagho.send_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.send_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -1839,7 +1839,7 @@ pub const EndPointConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "port" ) ) {
-                mia_Mesagho.port =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.port =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -2014,11 +2014,11 @@ pub const UnixSocketStarConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "receive_buffer" ) ) {
-                mia_Mesagho.receive_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.receive_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
             if( equal(u8, tok, "send_buffer" ) ) {
-                mia_Mesagho.send_buffer =  std.fmt.parseInt(i32,val,10) catch 0;
+                mia_Mesagho.send_buffer =  try std.fmt.parseInt(i32,val,10);
                 continue;
             }
         }
@@ -2648,8 +2648,14 @@ const zon = std.zon;
 
 fn parseEnumValue(comptime E: type, tok: []const u8) !E {
     if (std.meta.stringToEnum(E, tok)) |v| return v;
-    const n = try std.fmt.parseInt(u64, tok, 10);
-    return try std.meta.intToEnum(E, n);
+    const n = std.fmt.parseInt(u64, tok, 10) catch return error.InvalidEnumValue;
+    return std.meta.intToEnum(E, n) catch error.InvalidEnumValue;
+}
+
+fn parseBoolValue(tok: []const u8) !bool {
+    if (std.ascii.eqlIgnoreCase(tok, "true")) return true;
+    if (std.ascii.eqlIgnoreCase(tok, "false")) return false;
+    return error.InvalidBoolValue;
 }
 
 fn legiSubProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) ![]const u8 {

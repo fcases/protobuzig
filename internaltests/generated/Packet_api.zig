@@ -1,14 +1,14 @@
 // ============================================================================
-// Ciudad_api.zig
+// Packet_api.zig
 // ============================================================================
 //
 // Fichero generado por ProtobuZig / kgenapi.zig.
 //
 // Proto base:
-//   Ciudad
+//   Packet
 //
 // Raw generado:
-//   Ciudad.zig
+//   Packet.zig
 //
 // Este fichero contiene wrappers/API segura sobre el raw generado.
 //
@@ -25,25 +25,25 @@
 
 const std = @import("std");
 
-const RawFile = @import("Ciudad.zig");
+const RawFile = @import("Packet.zig");
 
 pub const TekstaFormato = RawFile.TekstaFormato;
 pub const BinaraFormato = RawFile.BinaraFormato;
 
 // Alias al namespace raw generado.
 // En fase intermedia apunta al package actual del fichero raw.
-const Raw = RawFile.geo;
+const Raw = RawFile.k6bus.pkgpb;
 
 // Alias intencionadamente llamado *_impl aunque en fase intermedia
 // apunte al namespace raw actual.
 //
 // Fase intermedia:
-//   const Ciudad_impl = Raw;
+//   const Packet_impl = Raw;
 //
 // Fase final:
-//   const Ciudad_impl = RawFile.<package>_impl;
+//   const Packet_impl = RawFile.<package>_impl;
 
-const Ciudad_impl = Raw;
+const Packet_impl = Raw;
 
 // ============================================================================
 // API SEGURA
@@ -81,8 +81,7 @@ const Ciudad_impl = Raw;
 // Fase final:
 //   EstMeteoImpl = cctrol_impl.EstMeteo_impl
 //
-const EstacionImpl = Ciudad_impl.Estacion;
-const CiudadImpl = Ciudad_impl.Ciudad;
+const PacketImpl = Packet_impl.Packet;
 
 // ============================================================================
 // HELPERS PRIVADOS DE COPIA PROFUNDA
@@ -124,14 +123,14 @@ fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {
 //   - readFromText()
 //   - setters/getters/builders seguros
 //
-pub const Estacion = struct {
-    impl: EstacionImpl,
+pub const Packet = struct {
+    impl: PacketImpl,
 
     const Self = @This();
 
     pub fn initDefault(allocator: std.mem.Allocator) !Self {
         return .{
-            .impl = try EstacionImpl.initDefault(allocator),
+            .impl = try PacketImpl.initDefault(allocator),
         };
     }
 
@@ -142,240 +141,70 @@ pub const Estacion = struct {
     pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
         return .{
             .impl = try cloneImpl(
-                EstacionImpl,
+                PacketImpl,
                 allocator,
                 &self.impl,
             ),
         };
     }
 
-    pub fn setId(self: *Self, value: u32) void {
-        self.impl.id = value;
+    pub fn setOutOfBand(self: *Self, value: u64) void {
+        self.impl.OutOfBand = value;
     }
 
-    pub fn getId(self: *const Self) ?u32 {
-        return self.impl.id;
+    pub fn getOutOfBand(self: *const Self) ?u64 {
+        return self.impl.OutOfBand;
     }
 
-    pub fn hasId(self: *const Self) bool {
-        return self.impl.id != null;
+    pub fn hasOutOfBand(self: *const Self) bool {
+        return self.impl.OutOfBand != null;
     }
 
-    pub fn clearId(self: *Self) void {
-        self.impl.id = null;
+    pub fn clearOutOfBand(self: *Self) void {
+        self.impl.OutOfBand = null;
     }
 
-    pub fn setNombre(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) !void {
-        const tmp = try allocator.dupe(u8, value);
-        allocator.free(self.impl.nombre);
-        self.impl.nombre = tmp;
+    pub fn getMessagesCount(self: *const Self) usize {
+        return self.impl.messages.len;
     }
 
-    pub fn getNombre(self: *const Self) []const u8 {
-        return self.impl.nombre;
-    }
-
-    pub fn writeToText(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        format: TekstaFormato,
-    ) ![]const u8 {
-        return try self.impl.skribiAlTeksto(
-            allocator,
-            format,
-        );
-    }
-
-    pub fn writeToFile(
-        self: *Self,
-        allocator: std.mem.Allocator,
-        path: []const u8,
-        format: TekstaFormato,
-    ) !void {
-        try self.impl.skribiAlDosiero(
-            allocator,
-            path,
-            format,
-        );
-    }
-
-    pub fn readFromText(
-        allocator: std.mem.Allocator,
-        input: []const u8,
-        format: TekstaFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.legiElTeksto(
-                allocator,
-                input,
-                format,
-            ),
-        };
-    }
-
-    pub fn readFromFile(
-        allocator: std.mem.Allocator,
-        path: []const u8,
-        format: TekstaFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.legiElDosiero(
-                allocator,
-                path,
-                format,
-            ),
-        };
-    }
-
-    pub fn serializeToBin(
-        self: *const Self,
-        allocator: std.mem.Allocator,
-        format: BinaraFormato,
-    ) ![]const u8 {
-        return try self.impl.seriigiAlBin(
-            allocator,
-            format,
-        );
-    }
-
-    pub fn serializeToFile(
-        self: *const Self,
-        allocator: std.mem.Allocator,
-        path: []const u8,
-        format: BinaraFormato,
-    ) !void {
-        try self.impl.seriigiAlDosiero(
-            allocator,
-            path,
-            format,
-        );
-    }
-
-    pub fn deserializeFromBin(
-        allocator: std.mem.Allocator,
-        input: []const u8,
-        format: BinaraFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.deseriigiElBin(
-                allocator,
-                input,
-                format,
-            ),
-        };
-    }
-
-    pub fn deserializeFromFile(
-        allocator: std.mem.Allocator,
-        path: [:0]const u8,
-        format: BinaraFormato,
-    ) !Self {
-        return .{
-            .impl = try EstacionImpl.deseriigiElDosiero(
-                allocator,
-                path,
-                format,
-            ),
-        };
-    }
-};
-
-pub const Ciudad = struct {
-    impl: CiudadImpl,
-
-    const Self = @This();
-
-    pub fn initDefault(allocator: std.mem.Allocator) !Self {
-        return .{
-            .impl = try CiudadImpl.initDefault(allocator),
-        };
-    }
-
-    pub fn deinit(self: *const Self, allocator: std.mem.Allocator) void {
-        self.impl.deinit(allocator);
-    }
-
-    pub fn clone(self: *const Self, allocator: std.mem.Allocator) !Self {
-        return .{
-            .impl = try cloneImpl(
-                CiudadImpl,
-                allocator,
-                &self.impl,
-            ),
-        };
-    }
-
-    pub fn setNombre(self: *Self, allocator: std.mem.Allocator, value: []const u8) !void {
-        const tmp = try allocator.dupe(u8, value);
-
-        if (self.impl.nombre) |old| {
-            allocator.free(old);
-        }
-
-        self.impl.nombre = tmp;
-    }
-
-    pub fn getNombre(self: *const Self) ?[]const u8 {
-        return self.impl.nombre;
-    }
-
-    pub fn hasNombre(self: *const Self) bool {
-        return self.impl.nombre != null;
-    }
-
-    pub fn clearNombre(self: *Self, allocator: std.mem.Allocator) void {
-        if (self.impl.nombre) |old| {
-            allocator.free(old);
-        }
-
-        self.impl.nombre = null;
-    }
-
-    pub fn getEstacionesCount(self: *const Self) usize {
-        return self.impl.estaciones.len;
-    }
-
-    pub fn getEstacionesAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !Estacion {
-        if (index >= self.impl.estaciones.len) {
+    pub fn getMessagesAt(self: *const Self, allocator: std.mem.Allocator, index: usize) !k6bus.msg.Msg {
+        if (index >= self.impl.messages.len) {
             return error.IndexOutOfBounds;
         }
 
         return .{
             .impl = try cloneImpl(
-                EstacionImpl,
+                k6bus.msg.MsgImpl,
                 allocator,
-                &self.impl.estaciones[index],
+                &self.impl.messages[index],
             ),
         };
     }
 
-    pub fn appendEstaciones(self: *Self, allocator: std.mem.Allocator, value: *const Estacion) !void {
+    pub fn appendMessages(self: *Self, allocator: std.mem.Allocator, value: *const k6bus.msg.Msg) !void {
         const tmp_item = try cloneImpl(
-            EstacionImpl,
+            k6bus.msg.MsgImpl,
             allocator,
             &value.impl,
         );
         errdefer tmp_item.deinit(allocator);
 
-        const old_len = self.impl.estaciones.len;
-        self.impl.estaciones = try allocator.realloc(
-            self.impl.estaciones,
+        const old_len = self.impl.messages.len;
+        self.impl.messages = try allocator.realloc(
+            self.impl.messages,
             old_len + 1,
         );
 
-        self.impl.estaciones[old_len] = tmp_item;
+        self.impl.messages[old_len] = tmp_item;
     }
 
-    pub fn clearEstaciones(self: *Self, allocator: std.mem.Allocator) !void {
-        for (self.impl.estaciones) |*item| {
+    pub fn clearMessages(self: *Self, allocator: std.mem.Allocator) !void {
+        for (self.impl.messages) |*item| {
             item.deinit(allocator);
         }
-        allocator.free(self.impl.estaciones);
-        self.impl.estaciones = try allocator.alloc(EstacionImpl, 0);
+        allocator.free(self.impl.messages);
+        self.impl.messages = try allocator.alloc(k6bus.msg.MsgImpl, 0);
     }
 
     pub fn writeToText(
@@ -408,7 +237,7 @@ pub const Ciudad = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.legiElTeksto(
+            .impl = try PacketImpl.legiElTeksto(
                 allocator,
                 input,
                 format,
@@ -422,7 +251,7 @@ pub const Ciudad = struct {
         format: TekstaFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.legiElDosiero(
+            .impl = try PacketImpl.legiElDosiero(
                 allocator,
                 path,
                 format,
@@ -460,7 +289,7 @@ pub const Ciudad = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.deseriigiElBin(
+            .impl = try PacketImpl.deseriigiElBin(
                 allocator,
                 input,
                 format,
@@ -474,7 +303,7 @@ pub const Ciudad = struct {
         format: BinaraFormato,
     ) !Self {
         return .{
-            .impl = try CiudadImpl.deseriigiElDosiero(
+            .impl = try PacketImpl.deseriigiElDosiero(
                 allocator,
                 path,
                 format,
