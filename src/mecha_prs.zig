@@ -309,12 +309,30 @@ const package_parser = mecha.combine(.{
     }
 }.mapFn);
 
+/// Valor de option sin comillas (F2): token hasta espacio/tab o ';',
+/// aceptando letras, digitos, '_', '.', '/', '-', ':' (p. ej. SPEED,
+/// com.google.protobuf, rutas). Devuelve slice prestado.
+fn valoroNudaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
+    _ = gpa;
+    if (input.len == 0) return mecha.Result([]const u8).err(0);
+
+    var i: usize = 0;
+    while (i < input.len) {
+        const c = input[i];
+        if (c == ' ' or c == '\t' or c == '\n' or c == '\r' or c == ';') break;
+        i += 1;
+    }
+    if (i == 0) return mecha.Result([]const u8).err(0);
+    return mecha.Result([]const u8).ok(i, input[0..i]);
+}
+const valoro_nuda_parser = mecha.Parser([]const u8){ .parse = &valoroNudaFn };
+
 const option_parser = mecha.combine(.{
     ws, // 0
     mecha.string("option"), ws, // 1,2
     anu_parser, ws, // 3,4
     mecha.string("="), ws, // 5,6
-    mecha.ascii.alphanumeric.many(.{ .min = 1, .collect = true }).asStr(), ws, // 7,8
+    mecha.oneOf(.{ quoted_string, valoro_nuda_parser }), ws, // 7,8
     mecha.string(";").opt(), ws.discard(), // 9, _
 }).map(struct {
     pub fn mapFn(items: anytype) Respondo {
