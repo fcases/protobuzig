@@ -38,11 +38,6 @@ pub const TransportKind = enum(u64) {
    CUSTOM = 100,
 };
 
-pub const Encoding = enum(u64) {
-   RAW = 0,
-   BASE64 = 1,
-};
-
 pub const AppConfig = struct {
     version: ?u32 = 1 ,
     activate_trace: ?bool = false ,
@@ -625,7 +620,6 @@ pub const TransportConfig = struct {
 
     name: []const u8,
     kind: TransportKind = .MCAST ,
-    encoding: ?Encoding = .RAW ,
     params: Params,
 
     pub fn initDefault(allocator: all.Allocator) !TransportConfig {
@@ -634,7 +628,6 @@ pub const TransportConfig = struct {
         return TransportConfig {
             .name = mia_name,
             .kind = .MCAST,
-            .encoding = .RAW,
             .params = .{ .none = {} },
         };
     }
@@ -693,8 +686,6 @@ pub const TransportConfig = struct {
         defer allocator.free(name_esc);
         try bufro.print(allocator,"{s}name: \"{s}\"\n",.{ind, name_esc });
         try bufro.print(allocator, "{s}kind: {s}\n", .{ ind, @tagName(self.kind) });
-        if( self.encoding ) |val|  
-            try bufro.print(allocator, "{s}encoding: {s}\n", .{ ind, @tagName(val) });
         switch (self.params) {
             .none => {},
             .loop => |val| {
@@ -776,10 +767,6 @@ pub const TransportConfig = struct {
             }
             if( equal(u8, tok, "kind" ) ) {
                 mia_Mesagho.kind = try parseEnumValue(TransportKind, val);
-                continue;
-            }
-            if( equal(u8, tok, "encoding" ) ) {
-                mia_Mesagho.encoding = try parseEnumValue(Encoding, val);
                 continue;
             }
             if( equal(u8, tok, "loop" ) ) {
@@ -893,11 +880,6 @@ pub const TransportConfig = struct {
                 tuta_longo += try buffer.encodeVarint((@as(u32, 100) << 3) | 2);
             },
         }
-
-        if( self.encoding ) |val| {
-            tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
-            tuta_longo += try buffer.encodeVarint(24);
-        }   //1 opt - no def - no varlong
 
         if( self.kind != .MCAST )  {
             tuta_longo += try buffer.encodeVarint( @intFromEnum(self.kind) );
@@ -1021,9 +1003,7 @@ pub const TransportConfig = struct {
                 mia_Mesagho.name = tmp_name;
             }
             else if ( field_number == 2 and wire_type == 0 ) 
-                mia_Mesagho.kind = try std.meta.intToEnum(TransportKind, try buffer.decodeVarint() ) 
-            else if ( field_number == 3 and wire_type == 0 ) 
-                mia_Mesagho.encoding = try std.meta.intToEnum(Encoding, try buffer.decodeVarint() ) ;
+                mia_Mesagho.kind = try std.meta.intToEnum(TransportKind, try buffer.decodeVarint() ) ;
         }
 
 

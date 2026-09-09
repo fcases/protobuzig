@@ -25,11 +25,9 @@ message DomainConfig {
 }
 
 enum TransportKind { LOOP = 0; MCAST = 1; BCAST = 2; UDPSTAR = 3; USOXSTAR = 4; MATRIX = 5; CUSTOM = 100; }
-enum Encoding { RAW = 0; BASE64 = 1; }
 message TransportConfig {
     required string name = 1;
     required TransportKind kind = 2 [default = MCAST];
-    optional Encoding encoding = 3 [default = RAW];
     oneof params {
             LoopTransportConfig loop = 10;
             MCastConfig mcast = 11;

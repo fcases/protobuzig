@@ -60,7 +60,6 @@ const Config_impl = Raw;
 pub const BinaryFormat = Config_impl.BinaryFormat;
 pub const DispatchMode = Config_impl.DispatchMode;
 pub const TransportKind = Config_impl.TransportKind;
-pub const Encoding = Config_impl.Encoding;
 // ============================================================================
 // API SEGURA
 // ============================================================================
@@ -749,22 +748,6 @@ pub const TransportConfig = struct {
 
     pub fn getKind(self: *const Self) TransportKind {
         return self.impl.kind;
-    }
-
-    pub fn setEncoding(self: *Self, value: Encoding) void {
-        self.impl.encoding = value;
-    }
-
-    pub fn getEncoding(self: *const Self) ?Encoding {
-        return self.impl.encoding;
-    }
-
-    pub fn hasEncoding(self: *const Self) bool {
-        return self.impl.encoding != null;
-    }
-
-    pub fn clearEncoding(self: *Self) void {
-        self.impl.encoding = null;
     }
 
     pub fn setName(
