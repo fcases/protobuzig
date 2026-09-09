@@ -205,13 +205,30 @@ const qualified_name_parser = mecha.combine(.{
 
 fn quotedStringFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
     _ = gpa;
-    if (input.len == 0 or input[0] != '"') return error.OtherError;
+    // Sin '"' inicial: no aplica -> Result err (no-match), NO error duro.
+    if (input.len == 0 or input[0] != '"') return mecha.Result([]const u8).err(0);
 
+    // Escaneo consciente de escapes (F5, Pieza 2 - opcion A):
+    // - '\' + siguiente byte se saltan (\" no cierra el literal).
+    // - Solo una '"' NO escapada cierra.
+    // - Un salto de linea literal dentro del literal no es valido.
+    // Se devuelve el slice CON sus comillas y CON los escapes verbatim
+    // (convencion existente: el generador lo emite tal cual en un literal
+    // Zig, que interpreta los escapes comunes igual que proto).
     var i: usize = 1;
-    while (i < input.len and input[i] != '"') : (i += 1) {}
-    if (i >= input.len) return error.OtherError;
-
-    return mecha.Result([]const u8).ok(i + 1, input[0 .. i + 1]);
+    while (i < input.len) {
+        const c = input[i];
+        if (c == '\\') {
+            i += 2;
+            continue;
+        }
+        if (c == '"') {
+            return mecha.Result([]const u8).ok(i + 1, input[0 .. i + 1]);
+        }
+        if (c == '\n' or c == '\r') return mecha.Result([]const u8).err(0);
+        i += 1;
+    }
+    return mecha.Result([]const u8).err(0); // sin cierre
 }
 const quoted_string = mecha.Parser([]const u8){ .parse = &quotedStringFn };
 
