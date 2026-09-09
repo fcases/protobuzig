@@ -47,14 +47,17 @@ pub const Tipoj = enum {
 
 pub const Etikedo = enum { LABEL_OPTIONAL, LABEL_REQUIRED, LABEL_REPEATED };
 
-fn getFieldLabelEnum(label: []const u8) !Etikedo {
+fn getFieldLabelEnum(label: []const u8) Etikedo {
     if (equal(u8, label, "optional")) return .LABEL_OPTIONAL;
     if (equal(u8, label, "required")) return .LABEL_REQUIRED;
     if (equal(u8, label, "repeated")) return .LABEL_REPEATED;
-    return pbError.InvalidFieldLabel;
+    // Inalcanzable con la gramatica actual (el label solo puede ser
+    // optional/required/repeated); se usa el default proto2 por si la
+    // gramatica cambia en el futuro (F5: sin @panic).
+    return .LABEL_OPTIONAL;
 }
 
-pub fn getFieldTypeEnum(field_type: []const u8) !Tipoj {
+pub fn getFieldTypeEnum(field_type: []const u8) Tipoj {
     if (equal(u8, field_type, "message")) return .TYPE_MESSAGE;
     if (equal(u8, field_type, "enum")) return .TYPE_ENUM;
     if (equal(u8, field_type, "bool")) return .TYPE_BOOL;
@@ -72,8 +75,9 @@ pub fn getFieldTypeEnum(field_type: []const u8) !Tipoj {
     if (equal(u8, field_type, "float")) return .TYPE_FLOAT;
     if (equal(u8, field_type, "double")) return .TYPE_DOUBLE;
     if (equal(u8, field_type, "bytes")) return .TYPE_BYTES;
-    // return pbError.InvalidFieldType;
-    return .TYPE_UNRESOLVED; // para tipos de mensaje o enum";
+    // No es un escalar: mensaje/enum o typo. La resolucion por nombre
+    // decide; los restos los valida analizilo (F5, errores limpios).
+    return .TYPE_UNRESOLVED;
 }
 
 ///////////////////////////////////////////////////////
@@ -406,9 +410,9 @@ const field_parser = mecha.combine(.{
 
         return Respondo{ .Type = .FIELD, .Data = .{ .f = Field{
             .label = label,
-            .label_enum = getFieldLabelEnum(label) catch @panic("Invalid field label"),
+            .label_enum = getFieldLabelEnum(label),
             .field_type = field_type,
-            .field_type_enum = getFieldTypeEnum(field_type) catch @panic("Invalid field type"),
+            .field_type_enum = getFieldTypeEnum(field_type),
             .name = name,
             .number = number,
             .default_value = default_value,
@@ -436,7 +440,7 @@ const oneof_field_parser = mecha.combine(.{
 
         return OneOfField{
             .field_type = field_type,
-            .field_type_enum = getFieldTypeEnum(field_type) catch @panic("Invalid oneof field type"),
+            .field_type_enum = getFieldTypeEnum(field_type),
             .name = name,
             .number = number,
             .default_value = default_value,

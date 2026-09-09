@@ -32,13 +32,78 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
         .ok => |la_pf| {
             pf = &la_pf;
         },
-        .err => return error.ParseError,
+        .err => {
+            // F5: error de gramatica con posicion (linea:columna) en vez de
+            // un ParseError mudo.
+            const idx = @min(rezulto.index, nuda_enhavo.len);
+            var linio: usize = 1;
+            var kolumno: usize = 1;
+            for (nuda_enhavo[0..idx]) |c| {
+                if (c == '\n') {
+                    linio += 1;
+                    kolumno = 1;
+                } else {
+                    kolumno += 1;
+                }
+            }
+            std.debug.print(
+                "protobuzig: error de parseo en {s} (linea {d}, columna {d}). Usa --verbose para trazas del parser.\n",
+                .{ dosieroaNomo, linio, kolumno },
+            );
+            return error.ParseError;
+        },
     }
     if (presi) presiProtoDosieron(pf.*);
+
+    try validiNedifinitajnTipojn(pf.*, dosieroaNomo);
 
     return pf.*;
 }
 // Me faltan   extensions,
+
+/// F5: errores limpios para tipos no definidos. Tras la resolucion por
+/// nombre, cualquier campo cuyo tipo siga contando como "message asumido
+/// externo" (no definido localmente) es un typo o una referencia a otro
+/// fichero; sin imports en el proto no puede ser una referencia externa
+/// legitima -> error con contexto.
+fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
+    if (pf.imports.len > 0) return; // referencias cross-file: territorio R7
+
+    const esLocal = struct {
+        fn aplicar(la_pf: prs.ProtoFile, tipo: []const u8) bool {
+            for (la_pf.messages) |mm| {
+                if (std.mem.eql(u8, mm.name, tipo)) return true;
+            }
+            for (la_pf.enums) |en| {
+                if (std.mem.eql(u8, en.name, tipo)) return true;
+            }
+            return false;
+        }
+    }.aplicar;
+
+    for (pf.messages) |msg| {
+        for (msg.fields) |field| {
+            if (field.field_type_enum == .TYPE_MESSAGE and !esLocal(pf, field.field_type)) {
+                std.debug.print(
+                    "protobuzig: error: tipo no definido '{s}' en el campo '{s}' del mensaje '{s}' ({s}).\n",
+                    .{ field.field_type, field.name, msg.name, dosieroaNomo },
+                );
+                return error.UndefinedProtoType;
+            }
+        }
+        for (msg.oneofs) |oneof_decl| {
+            for (oneof_decl.fields) |field| {
+                if (field.field_type_enum == .TYPE_MESSAGE and !esLocal(pf, field.field_type)) {
+                    std.debug.print(
+                        "protobuzig: error: tipo no definido '{s}' en la alternativa '{s}' del oneof '{s}' del mensaje '{s}' ({s}).\n",
+                        .{ field.field_type, field.name, oneof_decl.name, msg.name, dosieroaNomo },
+                    );
+                    return error.UndefinedProtoType;
+                }
+            }
+        }
+    }
+}
 
 /// Diagnostico limpio de constructos que el generador NO soporta y que antes
 /// se descartaban en silencio (F5, parte):
