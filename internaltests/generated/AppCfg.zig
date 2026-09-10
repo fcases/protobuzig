@@ -102,6 +102,7 @@ pub const AppConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "Domains" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try DomainCfg.legiElProtobufTeksto(allocator, it); 
                 Domains_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -331,6 +332,7 @@ pub const DomainCfg = struct {
                 continue;
             }
             if( equal(u8, tok, "Transports" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try TransportDef.legiElProtobufTeksto(allocator, it); 
                 Transports_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -339,6 +341,7 @@ pub const DomainCfg = struct {
                 continue;
             }
             if( equal(u8, tok, "CrossConnector" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try CrossConnectorDef.legiElProtobufTeksto(allocator, it); 
                 mia_Mesagho.CrossConnector = sub_msg; 
                 continue;
@@ -609,16 +612,19 @@ pub const TransportDef = struct {
                 continue;
             }
             if( equal(u8, tok, "MCastParams" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try MCastDefConfig.legiElProtobufTeksto(allocator, it); 
                 mia_Mesagho.MCastParams = sub_msg; 
                 continue;
             }
             if( equal(u8, tok, "BCastParams" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try BCastDefConfig.legiElProtobufTeksto(allocator, it); 
                 mia_Mesagho.BCastParams = sub_msg; 
                 continue;
             }
             if( equal(u8, tok, "UDPStarParams" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try UDPStarDefConfig.legiElProtobufTeksto(allocator, it); 
                 mia_Mesagho.UDPStarParams = sub_msg; 
                 continue;
@@ -1255,6 +1261,7 @@ pub const UDPStarDefConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "EndPoint" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try EndPointDef.legiElProtobufTeksto(allocator, it); 
                 EndPoint_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);

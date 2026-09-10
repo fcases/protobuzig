@@ -89,6 +89,7 @@ pub const Packet = struct {
             const val = it.next() orelse return error.InvalidFormat;
 
             if( equal(u8, tok, "messages" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_text = try legiSubProtobufTeksto(allocator, it);
                 defer allocator.free(sub_text);
                 const sub_msg = try Msg.k6bus.msg.Msg.legiElTeksto(allocator, sub_text, .TF_PROTOBUF);

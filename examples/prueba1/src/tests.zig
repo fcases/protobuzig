@@ -1,11 +1,14 @@
 const std = @import("std");
 const t = std.testing;
 
-// tests.zig: un test round-trip (Protobuf Text + binario) por mensaje
-// externo del contrato. Generado por protobuzig --ws con el primer
-// mensaje; anade aqui un test por cada mensaje nuevo.
+// tests.zig: un test round-trip (Protobuf Text + binario) por cada
+// mensaje EXTERNO del contrato (2); los anidados no se testean
+// aqui. Generado por protobuzig --ws: si anades mensajes al .proto,
+// regenera el workspace.
 
-const Base = @import("runtime/Ciudad.zig");
+// API segura generada (Ciudad_api.zig), no el raw. Los wrappers viven
+// en el nivel superior del fichero (sin el paquete del proto).
+const Base = @import("runtime/Ciudad_api.zig");
 
 fn ronda(comptime T: type) !void {
     const a = t.allocator;
@@ -14,18 +17,22 @@ fn ronda(comptime T: type) !void {
     defer msg.deinit(a);
 
     // Protobuf Text: escribir y releer.
-    const teksto = try msg.skribiAlTeksto(a, .TF_PROTOBUF);
+    const teksto = try msg.writeToText(a, .TF_PROTOBUF);
     defer a.free(teksto);
-    var reteksto = try T.legiElTeksto(a, teksto, .TF_PROTOBUF);
+    var reteksto = try T.readFromText(a, teksto, .TF_PROTOBUF);
     defer reteksto.deinit(a);
 
     // Binario Protocol Buffers: escribir y releer.
-    const binara = try msg.seriigiAlBin(a, .BF_PROTOBUF);
+    const binara = try msg.serializeToBin(a, .BF_PROTOBUF);
     defer a.free(binara);
-    var rebinara = try T.deseriigiElBin(a, binara, .BF_PROTOBUF);
+    var rebinara = try T.deserializeFromBin(a, binara, .BF_PROTOBUF);
     defer rebinara.deinit(a);
 }
 
 test "Estacion: round-trip texto + binario" {
-    try ronda(Base.geo.Estacion);
+    try ronda(Base.Estacion);
+}
+
+test "Ciudad: round-trip texto + binario" {
+    try ronda(Base.Ciudad);
 }

@@ -242,6 +242,7 @@ pub const Ciudad = struct {
                 continue;
             }
             if( equal(u8, tok, "estaciones" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try Estacion.legiElProtobufTeksto(allocator, it); 
                 estaciones_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);

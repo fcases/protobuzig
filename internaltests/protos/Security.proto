@@ -1,16 +1,74 @@
 syntax = "proto2";
 package k6bus.security;
 option optimize_for = SPEED;
-enum CryptoMode { CRYPTO_NONE = 0; CRYPTO_AES_256_CBC = 1; CRYPTO_AES_256_GCM = 2; CRYPTO_CHACHA20_POLY1305 = 3; }
+
+// ---------------------------------------------------------------------
+// Algoritmos soportados
+// ---------------------------------------------------------------------
+// 2026-09-01: se descarto AES-256-CBC (maleable sin MAC y sin soporte en
+// std.crypto de Zig); el hueco 3 queda reservado. CRYPTO_CUSTOM permite
+// inyectar una implementacion propia compilada (misma convencion que
+// TransportKind.CUSTOM = 100), sin dlopen por ahora.
+// ---------------------------------------------------------------------
+enum CryptoMode {
+    CRYPTO_NONE              = 0;
+    CRYPTO_AES_256_GCM       = 1;
+    CRYPTO_CHACHA20_POLY1305 = 2;
+    // 3: reservado (AES-256-CBC descartado)
+    CRYPTO_CUSTOM            = 100;
+}
+
+// ---------------------------------------------------------------------
+// Registro de clave
+// ---------------------------------------------------------------------
+// version: contrato de formato (opcional; sin compatibilidad comercial).
+// mode: REQUIRED - explicito que cifra se uso (la app generadora lo escribe).
+// key_id: REQUIRED - identifica la clave (rotacion futura).
+// key: REQUIRED - siempre en texto Base64.
+// iv: eliminado - GCM/ChaCha usan nonce aleatorio por mensaje.
+//
+// Ciclo de vida (2026-09-07):
+// - Toda clave nace con una ventana de validez [created_on, expires_on].
+// - created_on: REQUIRED - inicio de validez, ISO 8601 UTC
+//   (p.ej. 2026-09-07T18:00:00Z). La clave NO es valida antes de ese instante.
+// - expires_on: REQUIRED - fin de validez, ISO 8601 UTC. La clave NO es valida
+//   desde ese instante. OBLIGATORIA: la rotacion se planifica al generar.
+// - Restricciones: expires_on > created_on; ambas en UTC. ISO 8601 en string:
+//   legible en el fichero y orden lexicografico = orden cronologico.
+// - La verificacion EN PROCESO (rechazar claves expiradas al cargar y avisar
+//   cerca de caducidad) se implementara en LoadCipher cuando exista el gestor
+//   de claves (R6). Sin revocacion manual (status/revoked_on) por ahora: la
+//   caducidad es la invalidacion automatica.
+// ---------------------------------------------------------------------
+
+message KeyRecord {
+    optional uint32 version = 1 	[default = 1];
+    optional string description = 2;
+    required CryptoMode mode = 3;
+    required uint32 key_id = 4;
+
+    // Siempre almacenada en texto Base64.
+    required string key = 5;
+
+    // Ventana de validez (ISO 8601 UTC).
+    required string created_on = 6;
+    required string expires_on = 7;
+}
+
+// ---------------------------------------------------------------------
+// Registro de claves (2026-09-10)
+// ---------------------------------------------------------------------
+// Un unico fichero de registro (formato ZON por ahora, p.ej.
+// sec/k6bus.lab.zon.keyreg) contiene N KeyRecord. El dominio elige cual usa
+// con DomainConfig.key_registry_file + key_id.
+// version y description son OBLIGATORIAS en el registro (en KeyRecord siguen
+// siendo opcionales): el registro declara su contrato de formato y para que
+// entorno es (lab / prod / ...).
+// Sin compatibilidad con versiones anteriores (seguimos en la v1).
+// ---------------------------------------------------------------------
+
 message KeyRegistry {
-    optional uint32 Version = 1 [default = 1];
-    required string Date = 2;
-    required string Time = 3;
-    required string Sender = 4;
-    optional string Phrase = 5;
-    optional string Salt = 6;
-    optional CryptoMode Mode = 7 [default = CRYPTO_AES_256_GCM];
-    optional uint32 KeyId = 8 [default = 0];
-    required bytes Key = 9;
-    optional bytes LegacyIV = 10;
+    required uint32 version = 1;
+    required string description = 2;
+    repeated KeyRecord keys = 3;
 }

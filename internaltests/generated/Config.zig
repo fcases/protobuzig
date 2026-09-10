@@ -132,6 +132,7 @@ pub const AppConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "domains" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try DomainConfig.legiElProtobufTeksto(allocator, it); 
                 domains_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -248,7 +249,8 @@ pub const DomainConfig = struct {
     id: u32,
     activate_default_transport: ?bool = true ,
     direct_dispatch_to_subs: ?bool = false ,
-    key_file: ?[]const u8 = null,
+    key_registry_file: ?[]const u8 = null,
+    key_id: ?u32 = null,
     binary_format: ?BinaryFormat = .BF_PROTOBUF ,
     start_at_init: ?bool = true ,
     dispatch_mode: ?DispatchMode = .IMMEDIATE ,
@@ -265,7 +267,8 @@ pub const DomainConfig = struct {
             .id = 0,
             .activate_default_transport = true,
             .direct_dispatch_to_subs = false,
-            .key_file = null,
+            .key_registry_file = null,
+            .key_id = null,
             .binary_format = .BF_PROTOBUF,
             .start_at_init = true,
             .dispatch_mode = .IMMEDIATE,
@@ -276,7 +279,7 @@ pub const DomainConfig = struct {
     }
 
     pub fn deinit(self: *const DomainConfig, allocator: all.Allocator) void {
-        if( self.key_file ) |f| {
+        if( self.key_registry_file ) |f| {
             allocator.free(f);
         }
         for (self.transports) |item| {
@@ -318,11 +321,13 @@ pub const DomainConfig = struct {
             try bufro.print(allocator,"{s}activate_default_transport: {any}\n",.{ ind, val });
         if( self.direct_dispatch_to_subs ) |val|  
             try bufro.print(allocator,"{s}direct_dispatch_to_subs: {any}\n",.{ ind, val });
-        if( self.key_file ) |val|  {
-            const key_file_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(key_file_esc);
-            try bufro.print(allocator,"{s}key_file: \"{s}\"\n",.{ ind, key_file_esc });
+        if( self.key_registry_file ) |val|  {
+            const key_registry_file_esc = try escapePbTextToken(allocator, val);
+            defer allocator.free(key_registry_file_esc);
+            try bufro.print(allocator,"{s}key_registry_file: \"{s}\"\n",.{ ind, key_registry_file_esc });
         }
+        if( self.key_id ) |val|  
+            try bufro.print(allocator,"{s}key_id: {any}\n",.{ ind, val });
         if( self.binary_format ) |val|  
             try bufro.print(allocator, "{s}binary_format: {s}\n", .{ ind, @tagName(val) });
         if( self.start_at_init ) |val|  
@@ -386,12 +391,16 @@ pub const DomainConfig = struct {
                 mia_Mesagho.direct_dispatch_to_subs =  try parseBoolValue(val);
                 continue;
             }
-            if( equal(u8, tok, "key_file" ) ) {
-                const tmp_key_file = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.key_file) |old| {
+            if( equal(u8, tok, "key_registry_file" ) ) {
+                const tmp_key_registry_file = try unescapePbTextToken(allocator, val);
+                if (mia_Mesagho.key_registry_file) |old| {
                     allocator.free(old);
                 }
-                mia_Mesagho.key_file = tmp_key_file;
+                mia_Mesagho.key_registry_file = tmp_key_registry_file;
+                continue;
+            }
+            if( equal(u8, tok, "key_id" ) ) {
+                mia_Mesagho.key_id =  try std.fmt.parseInt(u32,val,10);
                 continue;
             }
             if( equal(u8, tok, "binary_format" ) ) {
@@ -411,6 +420,7 @@ pub const DomainConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "transports" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try TransportConfig.legiElProtobufTeksto(allocator, it); 
                 transports_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -419,6 +429,7 @@ pub const DomainConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "cross_connectors" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try CrossConnectorConfig.legiElProtobufTeksto(allocator, it); 
                 cross_connectors_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -460,7 +471,7 @@ pub const DomainConfig = struct {
             const cross_connectors_longa = try item.seriigi( allocator, buffer );
             tuta_longo += cross_connectors_longa;
             tuta_longo += try buffer.encodeVarint(cross_connectors_longa);
-            tuta_longo += try buffer.encodeVarint(82);
+            tuta_longo += try buffer.encodeVarint(90);
         }  // 11  rept - no def - varlong
 
         var transports_i: usize = self.transports.len;
@@ -470,30 +481,35 @@ pub const DomainConfig = struct {
             const transports_longa = try item.seriigi( allocator, buffer );
             tuta_longo += transports_longa;
             tuta_longo += try buffer.encodeVarint(transports_longa);
-            tuta_longo += try buffer.encodeVarint(74);
+            tuta_longo += try buffer.encodeVarint(82);
         }  // 11  rept - no def - varlong
 
         if( self.dispatch_batch_time_ms ) |val| {
             tuta_longo += try buffer.encodeUint32( val );
-            tuta_longo += try buffer.encodeVarint(64);
+            tuta_longo += try buffer.encodeVarint(72);
         }   //1 opt - no def - no varlong
 
         if( self.dispatch_mode ) |val| {
             tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
-            tuta_longo += try buffer.encodeVarint(56);
+            tuta_longo += try buffer.encodeVarint(64);
         }   //1 opt - no def - no varlong
 
         if( self.start_at_init ) |val| {
             tuta_longo += try buffer.encodeBool( val );
-            tuta_longo += try buffer.encodeVarint(48);
+            tuta_longo += try buffer.encodeVarint(56);
         }   //1 opt - no def - no varlong
 
         if( self.binary_format ) |val| {
             tuta_longo += try buffer.encodeVarint( @intFromEnum(val) );
+            tuta_longo += try buffer.encodeVarint(48);
+        }   //1 opt - no def - no varlong
+
+        if( self.key_id ) |val| {
+            tuta_longo += try buffer.encodeUint32( val );
             tuta_longo += try buffer.encodeVarint(40);
         }   //1 opt - no def - no varlong
 
-        if ( self.key_file ) |val| {
+        if ( self.key_registry_file ) |val| {
             const st_longa = try buffer.encodeString( val );
             tuta_longo += st_longa;
             tuta_longo += try buffer.encodeVarint(st_longa);
@@ -559,28 +575,30 @@ pub const DomainConfig = struct {
                 mia_Mesagho.direct_dispatch_to_subs = try buffer.decodeBool()
             else if ( field_number == 4 and wire_type == 2 ) 
             {
-                const tmp_key_file = try buffer.decodeString(  try buffer.decodeVarint() );
-                if (mia_Mesagho.key_file) |old| {
+                const tmp_key_registry_file = try buffer.decodeString(  try buffer.decodeVarint() );
+                if (mia_Mesagho.key_registry_file) |old| {
                     allocator.free(old);
                 }
-                mia_Mesagho.key_file = tmp_key_file;
+                mia_Mesagho.key_registry_file = tmp_key_registry_file;
             }
             else if ( field_number == 5 and wire_type == 0 ) 
-                mia_Mesagho.binary_format = try std.meta.intToEnum(BinaryFormat, try buffer.decodeVarint() ) 
+                mia_Mesagho.key_id = try buffer.decodeUint32()
             else if ( field_number == 6 and wire_type == 0 ) 
-                mia_Mesagho.start_at_init = try buffer.decodeBool()
+                mia_Mesagho.binary_format = try std.meta.intToEnum(BinaryFormat, try buffer.decodeVarint() ) 
             else if ( field_number == 7 and wire_type == 0 ) 
-                mia_Mesagho.dispatch_mode = try std.meta.intToEnum(DispatchMode, try buffer.decodeVarint() ) 
+                mia_Mesagho.start_at_init = try buffer.decodeBool()
             else if ( field_number == 8 and wire_type == 0 ) 
+                mia_Mesagho.dispatch_mode = try std.meta.intToEnum(DispatchMode, try buffer.decodeVarint() ) 
+            else if ( field_number == 9 and wire_type == 0 ) 
                 mia_Mesagho.dispatch_batch_time_ms = try buffer.decodeUint32()
-            else if ( field_number == 9 and wire_type == 2 ) 
+            else if ( field_number == 10 and wire_type == 2 ) 
             { 
                 try transports_list.append( 
                     allocator, 
                     try TransportConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() )
                 );
             }
-            else if ( field_number == 10 and wire_type == 2 ) 
+            else if ( field_number == 11 and wire_type == 2 ) 
             { 
                 try cross_connectors_list.append( 
                     allocator, 
@@ -1656,6 +1674,7 @@ pub const UDPStarConfig = struct {
                 continue;
             }
             if( equal(u8, tok, "end_point" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try EndPointConfig.legiElProtobufTeksto(allocator, it); 
                 end_point_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -2148,6 +2167,441 @@ pub const UnixSocketStarConfig = struct {
     }
 };    // UnixSocketStarConfig
 
+pub const ProxyConfig = struct {
+    server: []const u8,
+    port: ?u32 = 8080 ,
+    user: ?[]const u8 = null,
+    password: ?[]const u8 = null,
+
+    pub fn initDefault(allocator: all.Allocator) !ProxyConfig {
+        const mia_server = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_server);
+        return ProxyConfig {
+            .server = mia_server,
+            .port = 8080,
+            .user = null,
+            .password = null,
+        };
+    }
+
+    pub fn deinit(self: *const ProxyConfig, allocator: all.Allocator) void {
+        allocator.free(self.server);
+        if( self.user ) |f| {
+            allocator.free(f);
+        }
+        if( self.password ) |f| {
+            allocator.free(f);
+        }
+    }
+
+    pub fn plenigiDefaultojn(self: *ProxyConfig, allocator: all.Allocator) !void {
+        _ = self;
+        _ = allocator;
+    }
+
+    pub fn skribiAlTeksto(self: *ProxyConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, ProxyConfig, @as(*ProxyConfig, self), t_formato);
+    }
+
+    pub fn skribiAlDosiero(self: *ProxyConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, ProxyConfig, @as(*ProxyConfig, self), path, t_formato);
+    }
+
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !ProxyConfig {
+        return try legiTiponElTeksto(allocator, ProxyConfig, input, t_formato);
+    }
+
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !ProxyConfig {
+        return try legiTiponElDosiero(allocator, ProxyConfig, path, t_formato);
+    }
+
+    fn skribiAlProtobufTeksto(self: *const ProxyConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
+
+        const server_esc = try escapePbTextToken(allocator, self.server);
+        defer allocator.free(server_esc);
+        try bufro.print(allocator,"{s}server: \"{s}\"\n",.{ind, server_esc });
+        if( self.port ) |val|  
+            try bufro.print(allocator,"{s}port: {any}\n",.{ ind, val });
+        if( self.user ) |val|  {
+            const user_esc = try escapePbTextToken(allocator, val);
+            defer allocator.free(user_esc);
+            try bufro.print(allocator,"{s}user: \"{s}\"\n",.{ ind, user_esc });
+        }
+        if( self.password ) |val|  {
+            const password_esc = try escapePbTextToken(allocator, val);
+            defer allocator.free(password_esc);
+            try bufro.print(allocator,"{s}password: \"{s}\"\n",.{ ind, password_esc });
+        }
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !ProxyConfig {
+        var mia_Mesagho = try ProxyConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "server" ) ) {
+                const tmp_server = try unescapePbTextToken(allocator, val);
+                allocator.free(mia_Mesagho.server);
+                mia_Mesagho.server = tmp_server;
+                continue;
+            }
+            if( equal(u8, tok, "port" ) ) {
+                mia_Mesagho.port =  try std.fmt.parseInt(u32,val,10);
+                continue;
+            }
+            if( equal(u8, tok, "user" ) ) {
+                const tmp_user = try unescapePbTextToken(allocator, val);
+                if (mia_Mesagho.user) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.user = tmp_user;
+                continue;
+            }
+            if( equal(u8, tok, "password" ) ) {
+                const tmp_password = try unescapePbTextToken(allocator, val);
+                if (mia_Mesagho.password) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.password = tmp_password;
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
+    }
+
+    pub fn seriigiAlBin(self: *const ProxyConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, ProxyConfig, self, b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *const ProxyConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, ProxyConfig, self, b_formato, path);
+    }
+
+    fn seriigi(self: *const ProxyConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        _ = allocator;
+        var tuta_longo: usize = 0;
+ 
+        if ( self.password ) |val| {
+            const st_longa = try buffer.encodeString( val );
+            tuta_longo += st_longa;
+            tuta_longo += try buffer.encodeVarint(st_longa);
+            tuta_longo += try buffer.encodeVarint(34);
+        }  //3  opt - no def - varlong
+
+        if ( self.user ) |val| {
+            const st_longa = try buffer.encodeString( val );
+            tuta_longo += st_longa;
+            tuta_longo += try buffer.encodeVarint(st_longa);
+            tuta_longo += try buffer.encodeVarint(26);
+        }  //3  opt - no def - varlong
+
+        if( self.port ) |val| {
+            tuta_longo += try buffer.encodeUint32( val );
+            tuta_longo += try buffer.encodeVarint(16);
+        }   //1 opt - no def - no varlong
+
+        const server_longa = try buffer.encodeString( self.server );
+        tuta_longo += server_longa;
+        tuta_longo += try buffer.encodeVarint(server_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+        //7  req - no def - varlong
+
+        return tuta_longo;
+    }
+
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !ProxyConfig {
+        return try deseriigiTiponElBin(allocator, ProxyConfig, input, b_formato);
+    }
+
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !ProxyConfig {
+        return try deseriigiTiponElDosiero(allocator, ProxyConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !ProxyConfig {
+        var mia_Mesagho = try ProxyConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = try buffer.decodeVarint();
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+            {
+                const tmp_server = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.server);
+                mia_Mesagho.server = tmp_server;
+            }
+            else if ( field_number == 2 and wire_type == 0 ) 
+                mia_Mesagho.port = try buffer.decodeUint32()
+            else if ( field_number == 3 and wire_type == 2 ) 
+            {
+                const tmp_user = try buffer.decodeString(  try buffer.decodeVarint() );
+                if (mia_Mesagho.user) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.user = tmp_user;
+            }
+            else if ( field_number == 4 and wire_type == 2 ) 
+            {
+                const tmp_password = try buffer.decodeString(  try buffer.decodeVarint() );
+                if (mia_Mesagho.password) |old| {
+                    allocator.free(old);
+                }
+                mia_Mesagho.password = tmp_password;
+            }
+        }
+
+
+        return mia_Mesagho;
+    }
+};    // ProxyConfig
+
+pub const MatrixTransportConfig = struct {
+    server: []const u8,
+    user: []const u8,
+    password: []const u8,
+    room: []const u8,
+    proxy: ?ProxyConfig = null,
+
+    pub fn initDefault(allocator: all.Allocator) !MatrixTransportConfig {
+        const mia_server = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_server);
+        const mia_user = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_user);
+        const mia_password = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_password);
+        const mia_room = try allocator.dupe(u8, "");
+        errdefer allocator.free(mia_room);
+        return MatrixTransportConfig {
+            .server = mia_server,
+            .user = mia_user,
+            .password = mia_password,
+            .room = mia_room,
+            .proxy = null,
+        };
+    }
+
+    pub fn deinit(self: *const MatrixTransportConfig, allocator: all.Allocator) void {
+        allocator.free(self.server);
+        allocator.free(self.user);
+        allocator.free(self.password);
+        allocator.free(self.room);
+        if (self.proxy) |item| {
+            item.deinit(allocator);
+        }
+    }
+
+    pub fn plenigiDefaultojn(self: *MatrixTransportConfig, allocator: all.Allocator) !void {
+        if (self.proxy) |*v| try v.plenigiDefaultojn(allocator);
+    }
+
+    pub fn skribiAlTeksto(self: *MatrixTransportConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
+        return try skribiTiponAlTeksto(allocator, MatrixTransportConfig, @as(*MatrixTransportConfig, self), t_formato);
+    }
+
+    pub fn skribiAlDosiero(self: *MatrixTransportConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
+        try skribiTiponAlDosiero(allocator, MatrixTransportConfig, @as(*MatrixTransportConfig, self), path, t_formato);
+    }
+
+    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !MatrixTransportConfig {
+        return try legiTiponElTeksto(allocator, MatrixTransportConfig, input, t_formato);
+    }
+
+    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !MatrixTransportConfig {
+        return try legiTiponElDosiero(allocator, MatrixTransportConfig, path, t_formato);
+    }
+
+    fn skribiAlProtobufTeksto(self: *const MatrixTransportConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
+        var bufro:std.ArrayList(u8)= .empty;
+
+        const server_esc = try escapePbTextToken(allocator, self.server);
+        defer allocator.free(server_esc);
+        try bufro.print(allocator,"{s}server: \"{s}\"\n",.{ind, server_esc });
+        const user_esc = try escapePbTextToken(allocator, self.user);
+        defer allocator.free(user_esc);
+        try bufro.print(allocator,"{s}user: \"{s}\"\n",.{ind, user_esc });
+        const password_esc = try escapePbTextToken(allocator, self.password);
+        defer allocator.free(password_esc);
+        try bufro.print(allocator,"{s}password: \"{s}\"\n",.{ind, password_esc });
+        const room_esc = try escapePbTextToken(allocator, self.room);
+        defer allocator.free(room_esc);
+        try bufro.print(allocator,"{s}room: \"{s}\"\n",.{ind, room_esc });
+        if( self.proxy ) |val|  {
+            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
+            defer allocator.free(indent);
+            const proxy_text = try val.skribiAlProtobufTeksto(allocator, indent);
+            defer allocator.free(proxy_text);
+
+            try bufro.print(allocator, "{s}proxy {{\n{s}{s}}}\n", .{ ind, proxy_text, ind });
+        }
+
+        return bufro.toOwnedSlice(allocator);
+    }
+
+    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !MatrixTransportConfig {
+        var mia_Mesagho = try MatrixTransportConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+
+        while (it.next()) |tok| {
+            if( equal(u8, tok, "}" ) ) break;
+            const val = it.next() orelse return error.InvalidFormat;
+
+            if( equal(u8, tok, "server" ) ) {
+                const tmp_server = try unescapePbTextToken(allocator, val);
+                allocator.free(mia_Mesagho.server);
+                mia_Mesagho.server = tmp_server;
+                continue;
+            }
+            if( equal(u8, tok, "user" ) ) {
+                const tmp_user = try unescapePbTextToken(allocator, val);
+                allocator.free(mia_Mesagho.user);
+                mia_Mesagho.user = tmp_user;
+                continue;
+            }
+            if( equal(u8, tok, "password" ) ) {
+                const tmp_password = try unescapePbTextToken(allocator, val);
+                allocator.free(mia_Mesagho.password);
+                mia_Mesagho.password = tmp_password;
+                continue;
+            }
+            if( equal(u8, tok, "room" ) ) {
+                const tmp_room = try unescapePbTextToken(allocator, val);
+                allocator.free(mia_Mesagho.room);
+                mia_Mesagho.room = tmp_room;
+                continue;
+            }
+            if( equal(u8, tok, "proxy" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
+                const sub_msg = try ProxyConfig.legiElProtobufTeksto(allocator, it); 
+                mia_Mesagho.proxy = sub_msg; 
+                continue;
+            }
+        }
+
+        return mia_Mesagho;
+    }
+
+    pub fn seriigiAlBin(self: *const MatrixTransportConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
+        return try seriigiTiponAlBin(allocator, MatrixTransportConfig, self, b_formato);
+    }
+
+    pub fn seriigiAlDosiero(self: *const MatrixTransportConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
+        return try seriigiTiponAlDosiero(allocator, MatrixTransportConfig, self, b_formato, path);
+    }
+
+    fn seriigi(self: *const MatrixTransportConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
+ 
+        var tuta_longo: usize = 0;
+ 
+        if ( self.proxy ) |val| {
+            const st_longa = try val.seriigi( allocator, buffer );
+            tuta_longo += st_longa;
+            tuta_longo += try buffer.encodeVarint(st_longa);
+            tuta_longo += try buffer.encodeVarint(42);
+        }  //3  opt - no def - varlong
+
+        const room_longa = try buffer.encodeString( self.room );
+        tuta_longo += room_longa;
+        tuta_longo += try buffer.encodeVarint(room_longa);
+        tuta_longo += try buffer.encodeVarint(34);
+        //7  req - no def - varlong
+
+        const password_longa = try buffer.encodeString( self.password );
+        tuta_longo += password_longa;
+        tuta_longo += try buffer.encodeVarint(password_longa);
+        tuta_longo += try buffer.encodeVarint(26);
+        //7  req - no def - varlong
+
+        const user_longa = try buffer.encodeString( self.user );
+        tuta_longo += user_longa;
+        tuta_longo += try buffer.encodeVarint(user_longa);
+        tuta_longo += try buffer.encodeVarint(18);
+        //7  req - no def - varlong
+
+        const server_longa = try buffer.encodeString( self.server );
+        tuta_longo += server_longa;
+        tuta_longo += try buffer.encodeVarint(server_longa);
+        tuta_longo += try buffer.encodeVarint(10);
+        //7  req - no def - varlong
+
+        return tuta_longo;
+    }
+
+    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !MatrixTransportConfig {
+        return try deseriigiTiponElBin(allocator, MatrixTransportConfig, input, b_formato);
+    }
+
+    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !MatrixTransportConfig {
+        return try deseriigiTiponElDosiero(allocator, MatrixTransportConfig, path, b_formato);
+    }
+
+    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !MatrixTransportConfig {
+        var mia_Mesagho = try MatrixTransportConfig.initDefault(allocator);
+        errdefer mia_Mesagho.deinit(allocator);
+
+        var end: usize = undefined;
+        if (data_length) |val|
+            end = buffer.read_index + val
+        else
+            end = buffer.buffer.len;
+
+
+        while (buffer.read_index < end) {
+            const key: u64 = try buffer.decodeVarint();
+            const wire_type = key & 0x7;  
+            const field_number = key >> 3;
+
+            if ( field_number == 1 and wire_type == 2 ) 
+            {
+                const tmp_server = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.server);
+                mia_Mesagho.server = tmp_server;
+            }
+            else if ( field_number == 2 and wire_type == 2 ) 
+            {
+                const tmp_user = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.user);
+                mia_Mesagho.user = tmp_user;
+            }
+            else if ( field_number == 3 and wire_type == 2 ) 
+            {
+                const tmp_password = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.password);
+                mia_Mesagho.password = tmp_password;
+            }
+            else if ( field_number == 4 and wire_type == 2 ) 
+            {
+                const tmp_room = try buffer.decodeString(  try buffer.decodeVarint() );
+                allocator.free(mia_Mesagho.room);
+                mia_Mesagho.room = tmp_room;
+            }
+            else if ( field_number == 5 and wire_type == 2 ) 
+                mia_Mesagho.proxy = try ProxyConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() );
+        }
+
+
+        return mia_Mesagho;
+    }
+};    // MatrixTransportConfig
+
 pub const CustomTransportConfig = struct {
     sub_type: []const u8,
     config: []const u8,
@@ -2487,440 +2941,6 @@ pub const CrossConnectorConfig = struct {
         return mia_Mesagho;
     }
 };    // CrossConnectorConfig
-
-pub const MatrixTransportConfig = struct {
-    server: []const u8,
-    user: []const u8,
-    password: []const u8,
-    room: []const u8,
-    proxy: ?ProxyConfig = null,
-
-    pub fn initDefault(allocator: all.Allocator) !MatrixTransportConfig {
-        const mia_server = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_server);
-        const mia_user = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_user);
-        const mia_password = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_password);
-        const mia_room = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_room);
-        return MatrixTransportConfig {
-            .server = mia_server,
-            .user = mia_user,
-            .password = mia_password,
-            .room = mia_room,
-            .proxy = null,
-        };
-    }
-
-    pub fn deinit(self: *const MatrixTransportConfig, allocator: all.Allocator) void {
-        allocator.free(self.server);
-        allocator.free(self.user);
-        allocator.free(self.password);
-        allocator.free(self.room);
-        if (self.proxy) |item| {
-            item.deinit(allocator);
-        }
-    }
-
-    pub fn plenigiDefaultojn(self: *MatrixTransportConfig, allocator: all.Allocator) !void {
-        if (self.proxy) |*v| try v.plenigiDefaultojn(allocator);
-    }
-
-    pub fn skribiAlTeksto(self: *MatrixTransportConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
-        return try skribiTiponAlTeksto(allocator, MatrixTransportConfig, @as(*MatrixTransportConfig, self), t_formato);
-    }
-
-    pub fn skribiAlDosiero(self: *MatrixTransportConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
-        try skribiTiponAlDosiero(allocator, MatrixTransportConfig, @as(*MatrixTransportConfig, self), path, t_formato);
-    }
-
-    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !MatrixTransportConfig {
-        return try legiTiponElTeksto(allocator, MatrixTransportConfig, input, t_formato);
-    }
-
-    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !MatrixTransportConfig {
-        return try legiTiponElDosiero(allocator, MatrixTransportConfig, path, t_formato);
-    }
-
-    fn skribiAlProtobufTeksto(self: *const MatrixTransportConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-        var bufro:std.ArrayList(u8)= .empty;
-
-        const server_esc = try escapePbTextToken(allocator, self.server);
-        defer allocator.free(server_esc);
-        try bufro.print(allocator,"{s}server: \"{s}\"\n",.{ind, server_esc });
-        const user_esc = try escapePbTextToken(allocator, self.user);
-        defer allocator.free(user_esc);
-        try bufro.print(allocator,"{s}user: \"{s}\"\n",.{ind, user_esc });
-        const password_esc = try escapePbTextToken(allocator, self.password);
-        defer allocator.free(password_esc);
-        try bufro.print(allocator,"{s}password: \"{s}\"\n",.{ind, password_esc });
-        const room_esc = try escapePbTextToken(allocator, self.room);
-        defer allocator.free(room_esc);
-        try bufro.print(allocator,"{s}room: \"{s}\"\n",.{ind, room_esc });
-        if( self.proxy ) |val|  {
-            const indent = std.mem.concatWithSentinel(allocator, u8, &[_][]const u8{ ind, "    " }, 0) catch unreachable;
-            defer allocator.free(indent);
-            const proxy_text = try val.skribiAlProtobufTeksto(allocator, indent);
-            defer allocator.free(proxy_text);
-
-            try bufro.print(allocator, "{s}proxy {{\n{s}{s}}}\n", .{ ind, proxy_text, ind });
-        }
-
-        return bufro.toOwnedSlice(allocator);
-    }
-
-    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !MatrixTransportConfig {
-        var mia_Mesagho = try MatrixTransportConfig.initDefault(allocator);
-        errdefer mia_Mesagho.deinit(allocator);
-
-
-        while (it.next()) |tok| {
-            if( equal(u8, tok, "}" ) ) break;
-            const val = it.next() orelse return error.InvalidFormat;
-
-            if( equal(u8, tok, "server" ) ) {
-                const tmp_server = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.server);
-                mia_Mesagho.server = tmp_server;
-                continue;
-            }
-            if( equal(u8, tok, "user" ) ) {
-                const tmp_user = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.user);
-                mia_Mesagho.user = tmp_user;
-                continue;
-            }
-            if( equal(u8, tok, "password" ) ) {
-                const tmp_password = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.password);
-                mia_Mesagho.password = tmp_password;
-                continue;
-            }
-            if( equal(u8, tok, "room" ) ) {
-                const tmp_room = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.room);
-                mia_Mesagho.room = tmp_room;
-                continue;
-            }
-            if( equal(u8, tok, "proxy" ) ) {
-                const sub_msg = try ProxyConfig.legiElProtobufTeksto(allocator, it); 
-                mia_Mesagho.proxy = sub_msg; 
-                continue;
-            }
-        }
-
-        return mia_Mesagho;
-    }
-
-    pub fn seriigiAlBin(self: *const MatrixTransportConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, MatrixTransportConfig, self, b_formato);
-    }
-
-    pub fn seriigiAlDosiero(self: *const MatrixTransportConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, MatrixTransportConfig, self, b_formato, path);
-    }
-
-    fn seriigi(self: *const MatrixTransportConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
- 
-        var tuta_longo: usize = 0;
- 
-        if ( self.proxy ) |val| {
-            const st_longa = try val.seriigi( allocator, buffer );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(42);
-        }  //3  opt - no def - varlong
-
-        const room_longa = try buffer.encodeString( self.room );
-        tuta_longo += room_longa;
-        tuta_longo += try buffer.encodeVarint(room_longa);
-        tuta_longo += try buffer.encodeVarint(34);
-        //7  req - no def - varlong
-
-        const password_longa = try buffer.encodeString( self.password );
-        tuta_longo += password_longa;
-        tuta_longo += try buffer.encodeVarint(password_longa);
-        tuta_longo += try buffer.encodeVarint(26);
-        //7  req - no def - varlong
-
-        const user_longa = try buffer.encodeString( self.user );
-        tuta_longo += user_longa;
-        tuta_longo += try buffer.encodeVarint(user_longa);
-        tuta_longo += try buffer.encodeVarint(18);
-        //7  req - no def - varlong
-
-        const server_longa = try buffer.encodeString( self.server );
-        tuta_longo += server_longa;
-        tuta_longo += try buffer.encodeVarint(server_longa);
-        tuta_longo += try buffer.encodeVarint(10);
-        //7  req - no def - varlong
-
-        return tuta_longo;
-    }
-
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !MatrixTransportConfig {
-        return try deseriigiTiponElBin(allocator, MatrixTransportConfig, input, b_formato);
-    }
-
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !MatrixTransportConfig {
-        return try deseriigiTiponElDosiero(allocator, MatrixTransportConfig, path, b_formato);
-    }
-
-    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !MatrixTransportConfig {
-        var mia_Mesagho = try MatrixTransportConfig.initDefault(allocator);
-        errdefer mia_Mesagho.deinit(allocator);
-
-        var end: usize = undefined;
-        if (data_length) |val|
-            end = buffer.read_index + val
-        else
-            end = buffer.buffer.len;
-
-
-        while (buffer.read_index < end) {
-            const key: u64 = try buffer.decodeVarint();
-            const wire_type = key & 0x7;  
-            const field_number = key >> 3;
-
-            if ( field_number == 1 and wire_type == 2 ) 
-            {
-                const tmp_server = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.server);
-                mia_Mesagho.server = tmp_server;
-            }
-            else if ( field_number == 2 and wire_type == 2 ) 
-            {
-                const tmp_user = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.user);
-                mia_Mesagho.user = tmp_user;
-            }
-            else if ( field_number == 3 and wire_type == 2 ) 
-            {
-                const tmp_password = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.password);
-                mia_Mesagho.password = tmp_password;
-            }
-            else if ( field_number == 4 and wire_type == 2 ) 
-            {
-                const tmp_room = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.room);
-                mia_Mesagho.room = tmp_room;
-            }
-            else if ( field_number == 5 and wire_type == 2 ) 
-                mia_Mesagho.proxy = try ProxyConfig.deseriigi(allocator, buffer, try buffer.decodeVarint() );
-        }
-
-
-        return mia_Mesagho;
-    }
-};    // MatrixTransportConfig
-
-pub const ProxyConfig = struct {
-    server: []const u8,
-    port: ?u32 = 8080 ,
-    user: ?[]const u8 = null,
-    password: ?[]const u8 = null,
-
-    pub fn initDefault(allocator: all.Allocator) !ProxyConfig {
-        const mia_server = try allocator.dupe(u8, "");
-        errdefer allocator.free(mia_server);
-        return ProxyConfig {
-            .server = mia_server,
-            .port = 8080,
-            .user = null,
-            .password = null,
-        };
-    }
-
-    pub fn deinit(self: *const ProxyConfig, allocator: all.Allocator) void {
-        allocator.free(self.server);
-        if( self.user ) |f| {
-            allocator.free(f);
-        }
-        if( self.password ) |f| {
-            allocator.free(f);
-        }
-    }
-
-    pub fn plenigiDefaultojn(self: *ProxyConfig, allocator: all.Allocator) !void {
-        _ = self;
-        _ = allocator;
-    }
-
-    pub fn skribiAlTeksto(self: *ProxyConfig, allocator: all.Allocator, t_formato: TekstaFormato) ![]const u8 {
-        return try skribiTiponAlTeksto(allocator, ProxyConfig, @as(*ProxyConfig, self), t_formato);
-    }
-
-    pub fn skribiAlDosiero(self: *ProxyConfig, allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !void {
-        try skribiTiponAlDosiero(allocator, ProxyConfig, @as(*ProxyConfig, self), path, t_formato);
-    }
-
-    pub fn legiElTeksto(allocator: all.Allocator, input: []const u8, t_formato: TekstaFormato) !ProxyConfig {
-        return try legiTiponElTeksto(allocator, ProxyConfig, input, t_formato);
-    }
-
-    pub fn legiElDosiero(allocator: all.Allocator, path: []const u8, t_formato: TekstaFormato) !ProxyConfig {
-        return try legiTiponElDosiero(allocator, ProxyConfig, path, t_formato);
-    }
-
-    fn skribiAlProtobufTeksto(self: *const ProxyConfig, allocator: all.Allocator,ind: []const u8) ![]const u8 {
-        var bufro:std.ArrayList(u8)= .empty;
-
-        const server_esc = try escapePbTextToken(allocator, self.server);
-        defer allocator.free(server_esc);
-        try bufro.print(allocator,"{s}server: \"{s}\"\n",.{ind, server_esc });
-        if( self.port ) |val|  
-            try bufro.print(allocator,"{s}port: {any}\n",.{ ind, val });
-        if( self.user ) |val|  {
-            const user_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(user_esc);
-            try bufro.print(allocator,"{s}user: \"{s}\"\n",.{ ind, user_esc });
-        }
-        if( self.password ) |val|  {
-            const password_esc = try escapePbTextToken(allocator, val);
-            defer allocator.free(password_esc);
-            try bufro.print(allocator,"{s}password: \"{s}\"\n",.{ ind, password_esc });
-        }
-
-        return bufro.toOwnedSlice(allocator);
-    }
-
-    fn legiElProtobufTeksto(allocator: all.Allocator, it: *TokenIterType) !ProxyConfig {
-        var mia_Mesagho = try ProxyConfig.initDefault(allocator);
-        errdefer mia_Mesagho.deinit(allocator);
-
-
-        while (it.next()) |tok| {
-            if( equal(u8, tok, "}" ) ) break;
-            const val = it.next() orelse return error.InvalidFormat;
-
-            if( equal(u8, tok, "server" ) ) {
-                const tmp_server = try unescapePbTextToken(allocator, val);
-                allocator.free(mia_Mesagho.server);
-                mia_Mesagho.server = tmp_server;
-                continue;
-            }
-            if( equal(u8, tok, "port" ) ) {
-                mia_Mesagho.port =  try std.fmt.parseInt(u32,val,10);
-                continue;
-            }
-            if( equal(u8, tok, "user" ) ) {
-                const tmp_user = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.user) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.user = tmp_user;
-                continue;
-            }
-            if( equal(u8, tok, "password" ) ) {
-                const tmp_password = try unescapePbTextToken(allocator, val);
-                if (mia_Mesagho.password) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.password = tmp_password;
-                continue;
-            }
-        }
-
-        return mia_Mesagho;
-    }
-
-    pub fn seriigiAlBin(self: *const ProxyConfig, allocator: all.Allocator, b_formato: BinaraFormato) ![]const u8 {
-        return try seriigiTiponAlBin(allocator, ProxyConfig, self, b_formato);
-    }
-
-    pub fn seriigiAlDosiero(self: *const ProxyConfig, allocator: all.Allocator, path: []const u8, b_formato: BinaraFormato) !void {
-        return try seriigiTiponAlDosiero(allocator, ProxyConfig, self, b_formato, path);
-    }
-
-    fn seriigi(self: *const ProxyConfig, allocator: all.Allocator, buffer: *EncodeBuffer) !usize {
- 
-        _ = allocator;
-        var tuta_longo: usize = 0;
- 
-        if ( self.password ) |val| {
-            const st_longa = try buffer.encodeString( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(34);
-        }  //3  opt - no def - varlong
-
-        if ( self.user ) |val| {
-            const st_longa = try buffer.encodeString( val );
-            tuta_longo += st_longa;
-            tuta_longo += try buffer.encodeVarint(st_longa);
-            tuta_longo += try buffer.encodeVarint(26);
-        }  //3  opt - no def - varlong
-
-        if( self.port ) |val| {
-            tuta_longo += try buffer.encodeUint32( val );
-            tuta_longo += try buffer.encodeVarint(16);
-        }   //1 opt - no def - no varlong
-
-        const server_longa = try buffer.encodeString( self.server );
-        tuta_longo += server_longa;
-        tuta_longo += try buffer.encodeVarint(server_longa);
-        tuta_longo += try buffer.encodeVarint(10);
-        //7  req - no def - varlong
-
-        return tuta_longo;
-    }
-
-    pub fn deseriigiElBin(allocator: all.Allocator,input: []const u8, b_formato: BinaraFormato) !ProxyConfig {
-        return try deseriigiTiponElBin(allocator, ProxyConfig, input, b_formato);
-    }
-
-    pub fn deseriigiElDosiero(allocator: all.Allocator, path: [:0]const u8, b_formato: BinaraFormato) !ProxyConfig {
-        return try deseriigiTiponElDosiero(allocator, ProxyConfig, path, b_formato);
-    }
-
-    fn deseriigi(allocator: all.Allocator, buffer: *DecodeBuffer, data_length: ?usize) !ProxyConfig {
-        var mia_Mesagho = try ProxyConfig.initDefault(allocator);
-        errdefer mia_Mesagho.deinit(allocator);
-
-        var end: usize = undefined;
-        if (data_length) |val|
-            end = buffer.read_index + val
-        else
-            end = buffer.buffer.len;
-
-
-        while (buffer.read_index < end) {
-            const key: u64 = try buffer.decodeVarint();
-            const wire_type = key & 0x7;  
-            const field_number = key >> 3;
-
-            if ( field_number == 1 and wire_type == 2 ) 
-            {
-                const tmp_server = try buffer.decodeString(  try buffer.decodeVarint() );
-                allocator.free(mia_Mesagho.server);
-                mia_Mesagho.server = tmp_server;
-            }
-            else if ( field_number == 2 and wire_type == 0 ) 
-                mia_Mesagho.port = try buffer.decodeUint32()
-            else if ( field_number == 3 and wire_type == 2 ) 
-            {
-                const tmp_user = try buffer.decodeString(  try buffer.decodeVarint() );
-                if (mia_Mesagho.user) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.user = tmp_user;
-            }
-            else if ( field_number == 4 and wire_type == 2 ) 
-            {
-                const tmp_password = try buffer.decodeString(  try buffer.decodeVarint() );
-                if (mia_Mesagho.password) |old| {
-                    allocator.free(old);
-                }
-                mia_Mesagho.password = tmp_password;
-            }
-        }
-
-
-        return mia_Mesagho;
-    }
-};    // ProxyConfig
 
     };   // config
 };   // k6bus

@@ -28,13 +28,17 @@
 const std = @import("std");
 const prs = @import("mecha_prs.zig");
 
+// Nombres de los metodos de la API segura (setXxx/getXxx/appendXxx), para que
+// el ejemplo de main.zig llame exactamente a lo que genera kgenapi.
+const api_auks = @import("kgapi_auks.zig");
+
 const asignilo = std.heap.page_allocator;
 
 // encdec.zig vive junto a este modulo (src/encdec.zig) y se incrusta en el
 // binario de protobuzig: el workspace queda autocontenido.
 const encdec_enhavo = @embedFile("encdec.zig");
 
-const PLANTILO_BUILD = 
+const PLANTILO_BUILD =
     \\const std = @import("std");
     \\
     \\pub fn build(b: *std.Build) void {
@@ -97,13 +101,16 @@ const PLANTILO_MAIN_CON_MENSAJES =
     \\// poner la logica de tu problema: crear mensajes, rellenar campos,
     \\// escribir a fichero, cambiar de formato, etc.
     \\//
-    \\// Lo generado vive en src/runtime (X.zig + X_api.zig + encdec.zig);
-    \\// importalo desde aqui:
+    \\// Lo generado vive en src/runtime:
     \\//
-    \\//     const Base = @import("runtime/%%BASE%%.zig");
+    \\//     %%BASE%%.zig       implementacion RAW (uso interno; no la importes)
+    \\//     %%BASE%%_api.zig   API SEGURA sobre el raw: usa ESTA
+    \\//     encdec.zig         soporte de serializacion
     \\//
-    \\const Base = @import("runtime/%%BASE%%.zig");
-    \\const Ejemplo = Base.%%MSG%%;
+    \\//     const Base = @import("runtime/%%BASE%%_api.zig");
+    \\//
+    \\const Base = @import("runtime/%%BASE%%_api.zig");
+    \\const Ejemplo = Base.%%MSG_NOMO%%;
     \\
     \\pub fn main() !void {
     \\    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -117,17 +124,17 @@ const PLANTILO_MAIN_CON_MENSAJES =
     \\%%KAMPO%%
     \\
     \\    // 2) Escribelo a fichero como Protobuf Text y leelo de vuelta.
-    \\    try msg.skribiAlDosiero(a, "demo.txt", .TF_PROTOBUF);
-    \\    var desde_texto = try Ejemplo.legiElDosiero(a, "demo.txt", .TF_PROTOBUF);
+    \\    try msg.writeToFile(a, "demo.txt", .TF_PROTOBUF);
+    \\    var desde_texto = try Ejemplo.readFromFile(a, "demo.txt", .TF_PROTOBUF);
     \\    defer desde_texto.deinit(a);
     \\
     \\    // 3) Cambia de formato: binario Protocol Buffers, y leelo de vuelta.
-    \\    try msg.seriigiAlDosiero(a, "demo.pb", .BF_PROTOBUF);
-    \\    var desde_binario = try Ejemplo.deseriigiElDosiero(a, "demo.pb", .BF_PROTOBUF);
+    \\    try msg.serializeToFile(a, "demo.pb", .BF_PROTOBUF);
+    \\    var desde_binario = try Ejemplo.deserializeFromFile(a, "demo.pb", .BF_PROTOBUF);
     \\    defer desde_binario.deinit(a);
     \\
     \\    // 4) Muestra el contenido por consola.
-    \\    const texto = try msg.skribiAlTeksto(a, .TF_PROTOBUF);
+    \\    const texto = try msg.writeToText(a, .TF_PROTOBUF);
     \\    defer a.free(texto);
     \\    std.debug.print("{s}\n", .{texto});
     \\
@@ -151,16 +158,11 @@ const PLANTILO_MAIN_SIN_MENSAJES =
     \\
 ;
 
-const PLANTILO_TESTS =
-    \\const std = @import("std");
-    \\const t = std.testing;
-    \\
-    \\// tests.zig: un test round-trip (Protobuf Text + binario) por mensaje
-    \\// externo del contrato. Generado por protobuzig --ws con el primer
-    \\// mensaje; anade aqui un test por cada mensaje nuevo.
-    \\
-    \\const Base = @import("runtime/%%BASE%%.zig");
-    \\
+/// Cuerpo comun de los tests del workspace: helper de round-trip
+/// (Protobuf Text + binario). El fichero tests.zig completo lo construye
+/// konstruiTestsTekson(): un test por mensaje EXTERNO del contrato.
+/// Usa la API segura generada (X_api.zig), no el raw.
+const TESTS_RONDA =
     \\fn ronda(comptime T: type) !void {
     \\    const a = t.allocator;
     \\
@@ -168,20 +170,16 @@ const PLANTILO_TESTS =
     \\    defer msg.deinit(a);
     \\
     \\    // Protobuf Text: escribir y releer.
-    \\    const teksto = try msg.skribiAlTeksto(a, .TF_PROTOBUF);
+    \\    const teksto = try msg.writeToText(a, .TF_PROTOBUF);
     \\    defer a.free(teksto);
-    \\    var reteksto = try T.legiElTeksto(a, teksto, .TF_PROTOBUF);
+    \\    var reteksto = try T.readFromText(a, teksto, .TF_PROTOBUF);
     \\    defer reteksto.deinit(a);
     \\
     \\    // Binario Protocol Buffers: escribir y releer.
-    \\    const binara = try msg.seriigiAlBin(a, .BF_PROTOBUF);
+    \\    const binara = try msg.serializeToBin(a, .BF_PROTOBUF);
     \\    defer a.free(binara);
-    \\    var rebinara = try T.deseriigiElBin(a, binara, .BF_PROTOBUF);
+    \\    var rebinara = try T.deserializeFromBin(a, binara, .BF_PROTOBUF);
     \\    defer rebinara.deinit(a);
-    \\}
-    \\
-    \\test "%%MSG_NOMO%%: round-trip texto + binario" {
-    \\    try ronda(Base.%%MSG%%);
     \\}
     \\
 ;
@@ -298,18 +296,52 @@ fn kopiuDosieron(fonto: []const u8, celo: []const u8) !void {
     try skribiEnhavon(celo, enhavo);
 }
 
-/// Referencia Zig al primer mensaje del contrato, con su paquete si existe.
-fn referencoUnuaMensagho(proto: *const prs.ProtoFile) ?[2][]const u8 {
+/// Nombre del primer mensaje del contrato. Se usa el nombre SIMPLE (sin el
+/// paquete del proto) porque el andamiaje importa la API segura X_api.zig,
+/// cuyos wrappers viven en el nivel superior del fichero; el paquete solo
+/// aparece en el raw X.zig (Base.<paquete>.<Mensaje>).
+fn unuaMensaghoNomo(proto: *const prs.ProtoFile) ?[]const u8 {
     if (proto.messages.len == 0) return null;
 
-    const unua = proto.messages[0].name;
-    if (proto.package_name) |pkg| {
-        if (pkg.len > 0) {
-            const tuta = std.fmt.allocPrint(asignilo, "{s}.{s}", .{ pkg, unua }) catch return null;
-            return .{ unua, tuta };
-        }
+    return proto.messages[0].name;
+}
+
+/// Contenido de src/tests.zig: cabecera + ronda() + UN test round-trip por
+/// cada mensaje EXTERNO (top-level) del contrato. Los mensajes anidados no
+/// se testean aqui (viven dentro de su mensaje contenedor).
+fn konstruiTestsTekson(proto: *const prs.ProtoFile, basa: []const u8) ![]const u8 {
+    var bufro: std.ArrayList(u8) = .empty;
+    errdefer bufro.deinit(asignilo);
+
+    try bufro.print(asignilo,
+        \\const std = @import("std");
+        \\const t = std.testing;
+        \\
+        \\// tests.zig: un test round-trip (Protobuf Text + binario) por cada
+        \\// mensaje EXTERNO del contrato ({d}); los anidados no se testean
+        \\// aqui. Generado por protobuzig --ws: si anades mensajes al .proto,
+        \\// regenera el workspace.
+        \\
+        \\// API segura generada ({s}_api.zig), no el raw. Los wrappers viven
+        \\// en el nivel superior del fichero (sin el paquete del proto).
+        \\const Base = @import("runtime/{s}_api.zig");
+        \\
+        \\
+    , .{ proto.messages.len, basa, basa });
+
+    try bufro.appendSlice(asignilo, TESTS_RONDA);
+
+    for (proto.messages) |msg| {
+        try bufro.print(asignilo,
+            \\
+            \\test "{s}: round-trip texto + binario" {{
+            \\    try ronda(Base.{s});
+            \\}}
+            \\
+        , .{ msg.name, msg.name });
     }
-    return .{ unua, unua };
+
+    return try bufro.toOwnedSlice(asignilo);
 }
 
 /// Bloque de ejemplo para el main: rellena el primer campo del primer
@@ -330,51 +362,60 @@ fn konstruiKampanMontron(proto: *const prs.ProtoFile) ![]const u8 {
         .TYPE_BOOL,
         .TYPE_STRING,
         .TYPE_BYTES,
-        .TYPE_INT32, .TYPE_INT64, .TYPE_SINT32, .TYPE_SINT64,
-        .TYPE_SFIXED32, .TYPE_SFIXED64,
-        .TYPE_UINT32, .TYPE_UINT64, .TYPE_FIXED32, .TYPE_FIXED64,
-        .TYPE_FLOAT, .TYPE_DOUBLE,
+        .TYPE_INT32,
+        .TYPE_INT64,
+        .TYPE_SINT32,
+        .TYPE_SINT64,
+        .TYPE_SFIXED32,
+        .TYPE_SFIXED64,
+        .TYPE_UINT32,
+        .TYPE_UINT64,
+        .TYPE_FIXED32,
+        .TYPE_FIXED64,
+        .TYPE_FLOAT,
+        .TYPE_DOUBLE,
         => true,
         else => false,
     };
 
     if (!es_literal_simple) {
         try bufro.appendSlice(asignilo,
-            \\    // TODO: rellena aqui tus campos (consulta los generados en
-            \\    // src/runtime). Por ejemplo:
-            \\    //     a.free(msg.mi_string);              // libera el default ""
-            \\    //     msg.mi_string = try a.dupe(u8, "valor");
-            \\    //     msg.mi_numero = 7;
+            \\    // TODO: rellena aqui tus campos con la API segura (X_api.zig en
+            \\    // src/runtime, no el raw). Por ejemplo:
+            \\    //     try msg.setMiString(a, "valor");     // []const u8: copia
+            \\    //     msg.setMiNumero(7);                  // escalares
+            \\    //     try msg.appendMiLista(a, &elemento); // repeated
             \\
         );
         return try bufro.toOwnedSlice(asignilo);
     }
 
+    // Mismo nombre de setter que genera kgenapi (set + PascalCase del campo).
+    const metodo_nomo = try api_auks.skribiSetNomon(asignilo, nomo);
+    defer asignilo.free(metodo_nomo);
+
     try bufro.print(asignilo,
-        \\    // Muestra en el primer campo ("{s}"): quita esto y pon tu logica.
+        \\    // Muestra en el primer campo ("{s}") usando la API segura: quita
+        \\    // esto y pon tu logica.
         \\
     , .{nomo});
 
     switch (f.field_type_enum) {
         .TYPE_STRING, .TYPE_BYTES => {
-            if (f.label_enum == .LABEL_REQUIRED) {
-                try bufro.print(asignilo, "    a.free(msg.{s});\n", .{nomo});
-            } else {
-                try bufro.print(asignilo, "    if (msg.{s}) |v| a.free(v);\n", .{nomo});
-            }
-            try bufro.print(asignilo,
-                "    msg.{s} = try a.dupe(u8, \"valor de ejemplo\");\n",
-                .{nomo},
+            try bufro.print(
+                asignilo,
+                "    try msg.{s}(a, \"valor de ejemplo\");\n",
+                .{metodo_nomo},
             );
         },
         .TYPE_BOOL => {
-            try bufro.print(asignilo, "    msg.{s} = true;\n", .{nomo});
+            try bufro.print(asignilo, "    msg.{s}(true);\n", .{metodo_nomo});
         },
         .TYPE_FLOAT, .TYPE_DOUBLE => {
-            try bufro.print(asignilo, "    msg.{s} = 3.5;\n", .{nomo});
+            try bufro.print(asignilo, "    msg.{s}(3.5);\n", .{metodo_nomo});
         },
         else => {
-            try bufro.print(asignilo, "    msg.{s} = 42;\n", .{nomo});
+            try bufro.print(asignilo, "    msg.{s}(42);\n", .{metodo_nomo});
         },
     }
 
@@ -419,18 +460,17 @@ pub fn generiWorkshop(
         &paroj_base,
     );
 
-    // Main y tests: referencian el primer mensaje del contrato.
-    if (referencoUnuaMensagho(proto)) |ref| {
-        const msg_nomo = ref[0];
-        const msg_ref = ref[1];
-
+    // Main y tests: main referencia el primer mensaje; tests genera UN test
+    // round-trip por cada mensaje EXTERNO del contrato.
+    // Main y tests van contra la API segura (X_api.zig): referencian el
+    // nombre simple del mensaje, no el del raw (que lleva el paquete).
+    if (unuaMensaghoNomo(proto)) |msg_nomo| {
         const kampo_montro = try konstruiKampanMontron(proto);
         defer asignilo.free(kampo_montro);
 
         const paroj_msg = [_][2][]const u8{
             .{ "%%WS%%", ws_nomo },
             .{ "%%BASE%%", basa },
-            .{ "%%MSG%%", msg_ref },
             .{ "%%MSG_NOMO%%", msg_nomo },
             .{ "%%KAMPO%%", kampo_montro },
         };
@@ -441,10 +481,12 @@ pub fn generiWorkshop(
             &paroj_msg,
         );
 
-        try skribiPlantilon(
+        const tests_enhavo = try konstruiTestsTekson(proto, basa);
+        defer asignilo.free(tests_enhavo);
+
+        try skribiEnhavon(
             try std.fs.path.join(asignilo, &.{ ws, "src", "tests.zig" }),
-            PLANTILO_TESTS,
-            &paroj_msg,
+            tests_enhavo,
         );
     } else {
         const paroj_msg = [_][2][]const u8{

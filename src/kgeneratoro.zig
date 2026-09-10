@@ -2035,6 +2035,16 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
         , .{ ind, field.name });
 
         if (field.field_type_enum == .TYPE_MESSAGE) {
+            // F7: para un campo de tipo mensaje el "val" leido antes de la rama
+            // es la llave de apertura del sub-mensaje, y hasta ahora no se
+            // usaba: si el mensaje SOLO tenia campos de tipo mensaje, el
+            // generado no compilaba ("unused local constant"). Se valida aqui,
+            // igual que ya hacia el parser de texto de los oneof.
+            try verkisto.print(
+                \\{s}            if( ! equal(u8, val, "{{" ) ) return error.InvalidFormat;
+                \\
+            , .{ind});
+
             if (estasImportitaTipo(field.field_type)) {
                 try verkisto.print(
                     \\{s}            const sub_text = try legiSubProtobufTeksto(allocator, it);
@@ -3319,6 +3329,32 @@ fn skribiRepeatedNoDefaultVarLong(
 /// Konstruktoriloj
 /////////////////////////////////////
 ///
+/// ¿El temporal de initDefault() de este campo usa allocator?
+///
+/// ESPEJO EXACTO de las condiciones del bucle de temporales de abajo: si se
+/// cambia una, cambiar la otra (si no, el generado puede quedar con
+/// `allocator` sin usar = error de compilacion). Defecto detectado
+/// 2026-09-10 con un mensaje de solo campos opcionales: la deteccion antigua
+/// contaba cualquier string/bytes/message como uso de allocator, pero un
+/// campo OPTIONAL se inicializa a null (no asigna nada).
+fn kampoUzasAsignilonInitDefault(f: prs.Field) bool {
+    if (f.label_enum == .LABEL_REPEATED) return true;
+
+    const es_teksto =
+        f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES;
+
+    if (es_teksto) {
+        // default explicito owned, o required sin default (dupe de "").
+        return f.default_value != null or f.label_enum != .LABEL_OPTIONAL;
+    }
+    if (f.field_type_enum == .TYPE_MESSAGE) {
+        // Solo el mensaje required se construye en initDefault; el optional
+        // queda a null.
+        return f.label_enum != .LABEL_OPTIONAL;
+    }
+    return false;
+}
+
 fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
 
     // -----------------------------------------
@@ -3331,15 +3367,11 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     , .{ ind, msg.name });
 
     // -----------------------------------------
-    // Detectar si se usa allocator
+    // Detectar si se usa allocator (espejo del bucle de temporales)
     // -----------------------------------------
     var uses_allocator = false;
     for (msg.fields) |f| {
-        if (f.label_enum == .LABEL_REPEATED or
-            f.field_type_enum == .TYPE_STRING or
-            f.field_type_enum == .TYPE_BYTES or
-            f.field_type_enum == .TYPE_MESSAGE)
-        {
+        if (kampoUzasAsignilonInitDefault(f)) {
             uses_allocator = true;
             break;
         }

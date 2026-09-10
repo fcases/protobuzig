@@ -99,7 +99,8 @@ protobuzig --ws miws --proto_dir internaltests/protos Ciudad.proto
 
 - `examples/prueba1` — a test `--ws` workspace (Ciudad.proto):
   `src/main.zig` with an example (create a message, write to a file, read it
-  back, switch format) and `src/tests.zig` with a round-trip test.
+  back, switch format) and `src/tests.zig` with one round-trip test per
+  EXTERNAL message of the contract (nested ones are not tested there).
 - `internaltests/` — the internal test suite: `testo2.zig`, `testo3.zig`
   (round-trips with GPA) and `testo_main.zig` (5 tests). Regeneration is part
   of the daily flow; if you change the generator, regenerate these files.

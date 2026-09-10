@@ -100,7 +100,8 @@ protobuzig --ws miws --proto_dir internaltests/protos Ciudad.proto
 
 - `examples/prueba1` — workspace `--ws` de prueba (Ciudad.proto):
   `src/main.zig` con ejemplo (crear mensaje, escribir a fichero, releer,
-  cambiar de formato) y `src/tests.zig` con round-trip.
+  cambiar de formato) y `src/tests.zig` con un round-trip por CADA mensaje
+  externo del contrato (los anidados no se testean ahí).
 - `internaltests/` — la batería interna: `testo2.zig`, `testo3.zig`
   (round-trips con GPA) y `testo_main.zig` (5 tests). La regeneración es
   parte del flujo diario; si cambias el generador, regenera estos ficheros.

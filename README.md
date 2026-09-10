@@ -98,7 +98,8 @@ protobuzig --ws miws --proto_dir internaltests/protos Ciudad.proto
 
 - `examples/prueba1` — laborspaco `--ws` de prova (Ciudad.proto): `src/main.zig`
   kun ekzemplo (krei mesaĝon, skribi al dosiero, relegi, ŝanĝi formaton) kaj
-  `src/tests.zig` kun rondvoja testo.
+  `src/tests.zig` kun po unu rondvoja testo por ĉiu EXTERNA mesaĝo (la
+  aniditaj ne estas testitaj tie).
 - `internaltests/` — la interna testaro: `testo2.zig`, `testo3.zig` (rondvojoj
   kun GPA) kaj `testo_main.zig` (5 testoj). Regenerado estas parto de la
   ĉiutaga fluo; se vi ŝanĝas la generatoron, regeneru ĉi tiujn dosierojn.

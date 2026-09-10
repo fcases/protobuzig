@@ -104,6 +104,7 @@ pub const CCtrol = struct {
                 continue;
             }
             if( equal(u8, tok, "remotas" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try EstRemCtrol.legiElProtobufTeksto(allocator, it); 
                 remotas_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -339,6 +340,7 @@ pub const EstRemCtrol = struct {
                 continue;
             }
             if( equal(u8, tok, "meteos" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try EstMeteo.legiElProtobufTeksto(allocator, it); 
                 meteos_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -347,6 +349,7 @@ pub const EstRemCtrol = struct {
                 continue;
             }
             if( equal(u8, tok, "datos_tr" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try SnrTrafico.legiElProtobufTeksto(allocator, it); 
                 datos_tr_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -355,6 +358,7 @@ pub const EstRemCtrol = struct {
                 continue;
             }
             if( equal(u8, tok, "paneles" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try PanelInfoV.legiElProtobufTeksto(allocator, it); 
                 paneles_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);
@@ -982,6 +986,7 @@ pub const PanelInfoV = struct {
                 continue;
             }
             if( equal(u8, tok, "elementos" ) ) {
+                if( ! equal(u8, val, "{" ) ) return error.InvalidFormat;
                 const sub_msg = try PanelBase.legiElProtobufTeksto(allocator, it); 
                 elementos_list.append(allocator, sub_msg) catch |err| {
                     sub_msg.deinit(allocator);

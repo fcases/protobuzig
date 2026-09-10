@@ -15,13 +15,14 @@ message DomainConfig {
     required uint32 id = 1;
     optional bool activate_default_transport = 2  [default = true];
     optional bool direct_dispatch_to_subs = 3      [default = false];
-    optional string key_file = 4;
-    optional BinaryFormat binary_format = 5   [default = BF_PROTOBUF];
-    optional bool start_at_init  = 6              [default=true];    
-    optional DispatchMode dispatch_mode = 7   [default=IMMEDIATE];
-    optional uint32 dispatch_batch_time_ms = 8	[default=0]; 
-    repeated TransportConfig transports = 9;
-    repeated CrossConnectorConfig cross_connectors = 10;
+    optional string key_registry_file = 4;
+    optional uint32 key_id = 5;
+    optional BinaryFormat binary_format = 6   [default = BF_PROTOBUF];
+    optional bool start_at_init  = 7              [default=true];    
+    optional DispatchMode dispatch_mode = 8   [default=IMMEDIATE];
+    optional uint32 dispatch_batch_time_ms = 9	[default=0]; 
+    repeated TransportConfig transports = 10;
+    repeated CrossConnectorConfig cross_connectors = 11;
 }
 
 enum TransportKind { LOOP = 0; MCAST = 1; BCAST = 2; UDPSTAR = 3; USOXSTAR = 4; MATRIX = 5; CUSTOM = 100; }
@@ -80,14 +81,11 @@ message UnixSocketStarConfig {
     optional int32 send_buffer = 4         [default = 134217727];
 }
 
-message CustomTransportConfig { 
-	required string sub_type = 1; 
-	required bytes config = 2;
-	required string plug_in_lib = 30; 
-}
-
-message CrossConnectorConfig { 
-	repeated string transports = 1; 
+message ProxyConfig {
+    required string server = 1;
+    optional uint32 port = 2 [default = 8080];
+    optional string user = 3;
+    optional string password = 4;
 }
 
 message MatrixTransportConfig {
@@ -98,9 +96,14 @@ message MatrixTransportConfig {
     optional ProxyConfig proxy = 5;
 }
 
-message ProxyConfig {
-    required string server = 1;
-    optional uint32 port = 2 [default = 8080];
-    optional string user = 3;
-    optional string password = 4;
+message CustomTransportConfig { 
+	required string sub_type = 1; 
+	required bytes config = 2;
+	required string plug_in_lib = 30; 
 }
+
+message CrossConnectorConfig { 
+	repeated string transports = 1; 
+}
+
+
