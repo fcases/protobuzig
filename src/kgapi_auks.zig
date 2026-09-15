@@ -338,3 +338,98 @@ pub fn skribiPascalNomon(
 
     return try out.toOwnedSlice(allocator);
 }
+
+// ============================================================================
+// IDENTIFICADORES DERIVADOS DEL NOMBRE DEL FICHERO .proto (F9)
+// ============================================================================
+//
+// El nombre base del fichero .proto no siempre vale como identificador Zig:
+// "my-proto" (guion), "2fa" (empieza por digito) o "test"/"error" (palabra
+// reservada) generaban codigo que no compila (const my-proto_impl = Raw;).
+// Estas funciones sanan el nombre para usarlo como identificador, tanto en la
+// API segura (*_impl) como en el andamiaje --ws (namespace del contrato).
+
+/// Palabras que no sirven como nombre de declaracion en Zig: palabras
+/// reservadas del lenguaje y nombres de tipos primitivos (que no se pueden
+/// sombrear). La lista va de sobra: si alguna se escapa, el generado falla con
+/// un error de Zig claro y se anade aqui.
+const REZERVITAJ = [_][]const u8{
+    "addrspace",      "align",       "allowzero", "and",      "anyframe",
+    "anytype",        "asm",         "async",     "await",    "break",
+    "callconv",       "catch",       "comptime",  "const",    "continue",
+    "defer",          "else",        "enum",      "errdefer", "error",
+    "export",         "extern",      "fn",        "for",      "if",
+    "inline",         "linksection", "noalias",   "noinline", "nosuspend",
+    "opaque",         "or",          "orelse",    "packed",   "pub",
+    "resume",         "return",      "struct",    "suspend",  "switch",
+    "test",           "threadlocal", "try",       "union",    "unreachable",
+    "usingnamespace", "var",         "volatile",  "while",    "bool",
+    "void",           "noreturn",    "type",      "anyerror", "undefined",
+    "null",           "true",        "false",     "self",     "isize",
+    "usize",
+};
+
+pub fn estasRezervita(nomo: []const u8) bool {
+    for (REZERVITAJ) |rezervita| {
+        if (std.mem.eql(u8, nomo, rezervita)) return true;
+    }
+
+    // Tipos primitivos con tamano (u8, i32, f64...).
+    if (nomo.len >= 2 and (nomo[0] == 'u' or nomo[0] == 'i' or nomo[0] == 'f')) {
+        var nur_ciferoj = true;
+        for (nomo[1..]) |c| {
+            if (!std.ascii.isDigit(c)) nur_ciferoj = false;
+        }
+        if (nur_ciferoj) return true;
+    }
+
+    return false;
+}
+
+/// ¿Se puede usar `nomo` tal cual como nombre de declaracion en Zig?
+pub fn uzeblaKielIdent(nomo: []const u8) bool {
+    if (nomo.len == 0) return false;
+    if (std.ascii.isDigit(nomo[0])) return false;
+
+    for (nomo) |c| {
+        if (!std.ascii.isAlphanumeric(c) and c != '_') return false;
+    }
+
+    return !estasRezervita(nomo);
+}
+
+/// Nombre derivado del nombre base del .proto que SI vale como identificador
+/// Zig: los caracteres que no valen pasan a '_', no puede empezar por digito y
+/// no puede ser palabra reservada (se le anade el sufijo "_proto").
+pub fn nomoIdentebla(
+    allocator: std.mem.Allocator,
+    basa: []const u8,
+) ![]const u8 {
+    var bufro: std.ArrayList(u8) = .empty;
+    errdefer bufro.deinit(allocator);
+
+    for (basa, 0..) |c, i| {
+        if (std.ascii.isAlphanumeric(c) or c == '_') {
+            if (i == 0 and std.ascii.isDigit(c)) try bufro.append(allocator, '_');
+            try bufro.append(allocator, c);
+        } else {
+            try bufro.append(allocator, '_');
+        }
+    }
+
+    if (bufro.items.len == 0) try bufro.appendSlice(allocator, "proto");
+    if (estasRezervita(bufro.items)) try bufro.appendSlice(allocator, "_proto");
+
+    return try bufro.toOwnedSlice(allocator);
+}
+
+/// Nombre del alias interno a los tipos raw: `<base saneada>_impl` (F9).
+pub fn implNomon(
+    allocator: std.mem.Allocator,
+    basa: []const u8,
+) ![]const u8 {
+    const sana = try nomoIdentebla(allocator, basa);
+    defer allocator.free(sana);
+
+    return try std.fmt.allocPrint(allocator, "{s}_impl", .{sana});
+}

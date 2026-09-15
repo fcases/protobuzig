@@ -107,10 +107,12 @@ const PLANTILO_MAIN_CON_MENSAJES =
     \\//     %%BASE%%_api.zig   API SEGURA sobre el raw: usa ESTA
     \\//     encdec.zig         soporte de serializacion
     \\//
-    \\//     const Base = @import("runtime/%%BASE%%_api.zig");
+    \\//     const %%NS%% = @import("runtime/%%BASE%%_api.zig");
     \\//
-    \\const Base = @import("runtime/%%BASE%%_api.zig");
-    \\const Ejemplo = Base.%%MSG_NOMO%%;
+    \\// El namespace lleva el nombre del CONTRATO (el del fichero .proto) y el
+    \\// mensaje de ejemplo es el PRIMER mensaje definido en el.
+    \\const %%NS%% = @import("runtime/%%BASE%%_api.zig");
+    \\%%ALIAS_LINIO%%
     \\
     \\pub fn main() !void {
     \\    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -118,19 +120,19 @@ const PLANTILO_MAIN_CON_MENSAJES =
     \\    const a = gpa.allocator();
     \\
     \\    // 1) Crea un objeto del mensaje del contrato.
-    \\    var msg = try Ejemplo.initDefault(a);
+    \\    var msg = try %%MSG%%.initDefault(a);
     \\    defer msg.deinit(a);
     \\
     \\%%KAMPO%%
     \\
     \\    // 2) Escribelo a fichero como Protobuf Text y leelo de vuelta.
     \\    try msg.writeToFile(a, "demo.txt", .TF_PROTOBUF);
-    \\    var desde_texto = try Ejemplo.readFromFile(a, "demo.txt", .TF_PROTOBUF);
+    \\    var desde_texto = try %%MSG%%.readFromFile(a, "demo.txt", .TF_PROTOBUF);
     \\    defer desde_texto.deinit(a);
     \\
     \\    // 3) Cambia de formato: binario Protocol Buffers, y leelo de vuelta.
     \\    try msg.serializeToFile(a, "demo.pb", .BF_PROTOBUF);
-    \\    var desde_binario = try Ejemplo.deserializeFromFile(a, "demo.pb", .BF_PROTOBUF);
+    \\    var desde_binario = try %%MSG%%.deserializeFromFile(a, "demo.pb", .BF_PROTOBUF);
     \\    defer desde_binario.deinit(a);
     \\
     \\    // 4) Muestra el contenido por consola.
@@ -309,7 +311,7 @@ fn unuaMensaghoNomo(proto: *const prs.ProtoFile) ?[]const u8 {
 /// Contenido de src/tests.zig: cabecera + ronda() + UN test round-trip por
 /// cada mensaje EXTERNO (top-level) del contrato. Los mensajes anidados no
 /// se testean aqui (viven dentro de su mensaje contenedor).
-fn konstruiTestsTekson(proto: *const prs.ProtoFile, basa: []const u8) ![]const u8 {
+fn konstruiTestsTekson(proto: *const prs.ProtoFile, basa: []const u8, ns_nomo: []const u8) ![]const u8 {
     var bufro: std.ArrayList(u8) = .empty;
     errdefer bufro.deinit(asignilo);
 
@@ -323,11 +325,12 @@ fn konstruiTestsTekson(proto: *const prs.ProtoFile, basa: []const u8) ![]const u
         \\// regenera el workspace.
         \\
         \\// API segura generada ({s}_api.zig), no el raw. Los wrappers viven
-        \\// en el nivel superior del fichero (sin el paquete del proto).
-        \\const Base = @import("runtime/{s}_api.zig");
+        \\// en el nivel superior del fichero (sin el paquete del proto) y el
+        \\// namespace lleva el nombre del CONTRATO (el del fichero .proto).
+        \\const {s} = @import("runtime/{s}_api.zig");
         \\
         \\
-    , .{ proto.messages.len, basa, basa });
+    , .{ proto.messages.len, basa, ns_nomo, basa });
 
     try bufro.appendSlice(asignilo, TESTS_RONDA);
 
@@ -335,10 +338,10 @@ fn konstruiTestsTekson(proto: *const prs.ProtoFile, basa: []const u8) ![]const u
         try bufro.print(asignilo,
             \\
             \\test "{s}: round-trip texto + binario" {{
-            \\    try ronda(Base.{s});
+            \\    try ronda({s}.{s});
             \\}}
             \\
-        , .{ msg.name, msg.name });
+        , .{ msg.name, ns_nomo, msg.name });
     }
 
     return try bufro.toOwnedSlice(asignilo);
@@ -462,16 +465,44 @@ pub fn generiWorkshop(
 
     // Main y tests: main referencia el primer mensaje; tests genera UN test
     // round-trip por cada mensaje EXTERNO del contrato.
-    // Main y tests van contra la API segura (X_api.zig): referencian el
-    // nombre simple del mensaje, no el del raw (que lleva el paquete).
+    // Los dos van contra la API segura (X_api.zig) y usan como namespace el
+    // nombre del CONTRATO (el del fichero .proto, saneado a identificador Zig):
+    //   const r8 = @import("runtime/r8_api.zig");
+    //   const PackedMsg = r8.PackedMsg;      // alias del primer mensaje
+    const ns_nomo = try api_auks.nomoIdentebla(asignilo, basa);
+    defer asignilo.free(ns_nomo);
+
     if (unuaMensaghoNomo(proto)) |msg_nomo| {
         const kampo_montro = try konstruiKampanMontron(proto);
         defer asignilo.free(kampo_montro);
 
+        // Alias de comodidad para el mensaje de ejemplo del main: se declara
+        // solo si su nombre vale como identificador y no choca con el
+        // namespace. Si no, el cuerpo usa la referencia cualificada.
+        const kun_alias = api_auks.uzeblaKielIdent(msg_nomo) and !std.mem.eql(u8, msg_nomo, ns_nomo);
+
+        const alias_linio = if (kun_alias)
+            try std.fmt.allocPrint(
+                asignilo,
+                "const {s} = {s}.{s};   // el primer mensaje del contrato",
+                .{ msg_nomo, ns_nomo, msg_nomo },
+            )
+        else
+            try asignilo.dupe(u8, "");
+        defer asignilo.free(alias_linio);
+
+        const msg_expr = if (kun_alias)
+            try asignilo.dupe(u8, msg_nomo)
+        else
+            try std.fmt.allocPrint(asignilo, "{s}.{s}", .{ ns_nomo, msg_nomo });
+        defer asignilo.free(msg_expr);
+
         const paroj_msg = [_][2][]const u8{
             .{ "%%WS%%", ws_nomo },
             .{ "%%BASE%%", basa },
-            .{ "%%MSG_NOMO%%", msg_nomo },
+            .{ "%%NS%%", ns_nomo },
+            .{ "%%MSG%%", msg_expr },
+            .{ "%%ALIAS_LINIO%%", alias_linio },
             .{ "%%KAMPO%%", kampo_montro },
         };
 
@@ -481,7 +512,7 @@ pub fn generiWorkshop(
             &paroj_msg,
         );
 
-        const tests_enhavo = try konstruiTestsTekson(proto, basa);
+        const tests_enhavo = try konstruiTestsTekson(proto, basa, ns_nomo);
         defer asignilo.free(tests_enhavo);
 
         try skribiEnhavon(

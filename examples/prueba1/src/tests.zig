@@ -7,8 +7,9 @@ const t = std.testing;
 // regenera el workspace.
 
 // API segura generada (Ciudad_api.zig), no el raw. Los wrappers viven
-// en el nivel superior del fichero (sin el paquete del proto).
-const Base = @import("runtime/Ciudad_api.zig");
+// en el nivel superior del fichero (sin el paquete del proto) y el
+// namespace lleva el nombre del CONTRATO (el del fichero .proto).
+const Ciudad = @import("runtime/Ciudad_api.zig");
 
 fn ronda(comptime T: type) !void {
     const a = t.allocator;
@@ -30,9 +31,9 @@ fn ronda(comptime T: type) !void {
 }
 
 test "Estacion: round-trip texto + binario" {
-    try ronda(Base.Estacion);
+    try ronda(Ciudad.Estacion);
 }
 
 test "Ciudad: round-trip texto + binario" {
-    try ronda(Base.Ciudad);
+    try ronda(Ciudad.Ciudad);
 }

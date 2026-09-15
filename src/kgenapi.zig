@@ -264,6 +264,12 @@ fn skribiRawImportojn(
     );
     defer allocator.free(raw_namespace_expr);
 
+    // El nombre base del fichero .proto puede no valer como identificador Zig
+    // ("my-proto", "2fa", "test"...): el alias *_impl usa el nombre saneado, o
+    // el fichero api generado no compila (F9).
+    const impl_nomo = try api_auks.implNomon(allocator, proto_base_name);
+    defer allocator.free(impl_nomo);
+
     try buf.print(allocator,
         \\const std = @import("std");
         \\
@@ -280,20 +286,20 @@ fn skribiRawImportojn(
         \\// apunte al namespace raw actual.
         \\//
         \\// Fase intermedia:
-        \\//   const {s}_impl = Raw;
+        \\//   const {s} = Raw;
         \\//
         \\// Fase final:
-        \\//   const {s}_impl = RawFile.<package>_impl;
+        \\//   const {s} = RawFile.<package>_impl;
         \\
-        \\const {s}_impl = Raw;
+        \\const {s} = Raw;
         \\
         \\
     , .{
         raw_file_name,
         raw_namespace_expr,
-        proto_base_name,
-        proto_base_name,
-        proto_base_name,
+        impl_nomo,
+        impl_nomo,
+        impl_nomo,
     });
 }
 
@@ -323,13 +329,16 @@ fn skribiEnumAliases(
         \\
     , .{});
 
+    const impl_nomo = try api_auks.implNomon(allocator, proto_base_name);
+    defer allocator.free(impl_nomo);
+
     for (ast_proto_dosiero.enums) |enu| {
         try buf.print(allocator,
-            \\pub const {s} = {s}_impl.{s};
+            \\pub const {s} = {s}.{s};
             \\
         , .{
             enu.name,
-            proto_base_name,
+            impl_nomo,
             enu.name,
         });
     }
@@ -456,13 +465,16 @@ fn skribiImplAliases(
         \\
     , .{});
 
+    const impl_nomo = try api_auks.implNomon(allocator, proto_base_name);
+    defer allocator.free(impl_nomo);
+
     for (ast_proto_dosiero.messages) |msg| {
         try buf.print(allocator,
-            \\const {s}Impl = {s}_impl.{s};
+            \\const {s}Impl = {s}.{s};
             \\
         , .{
             msg.name,
-            proto_base_name,
+            impl_nomo,
             msg.name,
         });
     }
