@@ -144,6 +144,14 @@ fn parseArgs(args: []const []const u8) !CliOptions {
         }
 
         if (opts.proto_file != null) {
+            // Se dice QUE argumento sobra y cual se tomo antes: si el
+            // lanzador (debugger, script) pasa el ejecutable o el fichero dos
+            // veces, este mensaje lo delata en vez de dejar un
+            // TooManyProtoFiles a secas.
+            std.debug.print(
+                "protobuzig: error: mas de un fichero .proto: '{s}' (ya se indico '{s}').\n\n",
+                .{ arg, opts.proto_file.? },
+            );
             printHelp();
             return error.TooManyProtoFiles;
         }

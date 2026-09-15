@@ -217,17 +217,17 @@ fn skribiDosieranKaplinion(
 
 fn skribiRawNamespaceExpr(
     allocator: std.mem.Allocator,
-    proto_base_name: []const u8,
     ast_proto_dosiero: *const pf,
 ) ![]const u8 {
     const package_name = ast_proto_dosiero.package_name orelse "";
 
     if (package_name.len == 0) {
-        return try std.fmt.allocPrint(
-            allocator,
-            "RawFile.{s}",
-            .{proto_base_name},
-        );
+        // Sin package el raw NO abre namespace: sus tipos viven en el nivel
+        // superior del fichero raw (no en un namespace con el nombre del
+        // fichero). Referenciar RawFile.<fichero> generaba una api que no
+        // compilaba ("has no member named 'r8'"), y solo se veia con un proto
+        // sin package (F8, detectado con internaltests/protos/r8.proto).
+        return try allocator.dupe(u8, "RawFile");
     }
 
     var out: std.ArrayList(u8) = .empty;
@@ -260,7 +260,6 @@ fn skribiRawImportojn(
 ) !void {
     const raw_namespace_expr = try skribiRawNamespaceExpr(
         allocator,
-        proto_base_name,
         ast_proto_dosiero,
     );
     defer allocator.free(raw_namespace_expr);

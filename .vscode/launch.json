@@ -44,7 +44,18 @@
             "env": {},
             "console": "integratedTerminal",
             "preLaunchTask": "build test3", 
-        }
+        },
+        {
+            "name": "Debug protobuzig WS",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/protobuzig",
+            "args": ["--proto_dir", "internaltests/protos", "--ws", "examples/demo2", "r8.proto"],
+            "cwd": "${workspaceFolder}",
+            "env": {},
+            "console": "integratedTerminal",
+            "preLaunchTask": "build",
+        },
 
     ]
 }

@@ -32,7 +32,7 @@ pub const BinaraFormato = RawFile.BinaraFormato;
 
 // Alias al namespace raw generado.
 // En fase intermedia apunta al package actual del fichero raw.
-const Raw = RawFile.r8;
+const Raw = RawFile;
 
 // Alias intencionadamente llamado *_impl aunque en fase intermedia
 // apunte al namespace raw actual.
