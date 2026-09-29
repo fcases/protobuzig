@@ -3,3 +3,6 @@ token.txt
 zig-out/
 internaltests/protos/descriptor*
 internaltests/generated/descriptor*
+
+# Zig global cache (redirigida dentro del repo cuando el sandbox no deja escribir ~/.cache)
+.zig-global-cache/
