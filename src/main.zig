@@ -197,7 +197,7 @@ fn printHelp() void {
         \\                         behaviour). Without this flag those lines are
         \\                         an error and nothing is generated, because a
         \\                         dropped message would leave an empty
-        \\                         contract (see F5).
+        \\                         contract.
         \\
         \\  --help, -h             Show this help.
         \\

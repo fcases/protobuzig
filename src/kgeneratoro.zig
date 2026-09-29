@@ -278,7 +278,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
-            // free forigita - la generada areno (arenoFini) liberigas
+            // la generada areno (arenoFini) liberigas
             // la provizorajn valorojn; free meze de vico estus no-op tie.
 
         switch (field.field_type_enum) {
@@ -949,8 +949,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
                     field.default_value;
 
             var allocated_default_for_decl: ?[]const u8 = null;
-            // la defer, kiu liberigis s, forigigxis - la generada
-            // areno (arenoFini) liberigas cxiujn provizorajn valorojn.
+            // la generada areno (arenoFini) liberigas cxiujn provizorajn valorojn.
 
             if (default_for_decl != null and field.field_type_enum == .TYPE_ENUM) {
                 allocated_default_for_decl =
@@ -2676,9 +2675,9 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // free forigita - la generada areno (arenoFini)
-                    // liberigas la provizorajn valorojn; free meze de la
-                    // vico estus no-op en la areno.
+                    // la generada areno (arenoFini) liberigas la
+                    // provizorajn valorojn; free meze de la vico
+                    // estus no-op en la areno.
 
                     try verkisto.print(
                         \\{s}        {{
@@ -2769,9 +2768,9 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // free forigita - la generada areno (arenoFini)
-                    // liberigas la provizorajn valorojn; free meze de la
-                    // vico estus no-op en la areno.
+                    // la generada areno (arenoFini) liberigas la
+                    // provizorajn valorojn; free meze de la vico
+                    // estus no-op en la areno.
 
                     try verkisto.print(
                         \\{s}        {{

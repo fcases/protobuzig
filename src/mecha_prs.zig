@@ -211,7 +211,7 @@ fn quotedStringFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, 
     // Sen komenca '"': ne aplikas -> Result err (no-match), NE malmola eraro.
     if (input.len == 0 or input[0] != '"') return mecha.Result([]const u8).err(0);
 
-    // Skanado konscia pri eskapoj (Peco 2 - opcio A):
+    // Skanado konscia pri eskapoj:
     // - '\' + sekva bajto saltigxas (\" ne fermas la literalon).
     // - Nur ne-eskapita '"' fermas.
     // - Rekta linifino ene de la literalo ne validas.
@@ -430,7 +430,7 @@ const packed_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Generala kampa opcio (parto): englutas ajnan '[sxlosilo[ = valoro]]'
+/// Generala kampa opcio: englutas ajnan '[sxlosilo[ = valoro]]'
 /// (deprecated, jstype, ctype, lazy, komoj...), redonante la KOMPLETAN tekston
 /// inter krampoj, por distingi gxin de vera [default=...]/[packed=...].
 /// Respektas citilojn kaj strekojn ene de la krampo.
@@ -700,7 +700,7 @@ fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, Out
 }
 const other_line_parser = mecha.Parser(Respondo){ .parse = &otherLineFn };
 
-/// Ignoreblaj frazoj EN mesagxo (parto): 'reserved...;'
+/// Ignoreblaj frazoj EN mesagxo: 'reserved ...;'
 /// (numeroj, intervaloj '4 to max', nomoj kun citiloj), 'extensions ...;'
 /// (intervaloj kaj blokoj '[declaration = { ... }]' plurliniaj) kaj 'option
 /// ...;'. Skanas gxis la ';' je krampa profundo 0, respektante citilojn kaj

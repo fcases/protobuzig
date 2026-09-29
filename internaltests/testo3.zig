@@ -119,22 +119,22 @@ fn testOptionalString(allocator: std.mem.Allocator) !void {
     var cfg = try ConfigApi.DomainConfig.initDefault(allocator);
     defer cfg.deinit(allocator);
 
-    try std.testing.expect(!cfg.hasKeyFile());
+    try std.testing.expect(!cfg.hasKeyRegistryFile());
 
-    try cfg.setKeyFile(allocator, "keys/demo.key");
+    try cfg.setKeyRegistryFile(allocator, "keys/demo.key");
     try std.testing.expectEqualStrings(
         "keys/demo.key",
-        cfg.getKeyFile().?,
+        cfg.getKeyRegistryFile().?,
     );
 
-    try cfg.setKeyFile(allocator, "keys/updated.key");
+    try cfg.setKeyRegistryFile(allocator, "keys/updated.key");
     try std.testing.expectEqualStrings(
         "keys/updated.key",
-        cfg.getKeyFile().?,
+        cfg.getKeyRegistryFile().?,
     );
 
-    cfg.clearKeyFile(allocator);
-    try std.testing.expect(!cfg.hasKeyFile());
+    cfg.clearKeyRegistryFile(allocator);
+    try std.testing.expect(!cfg.hasKeyRegistryFile());
 
     std.debug.print("testo3: optional string OK\n", .{});
 }
@@ -1312,7 +1312,7 @@ fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
 fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
     // JSON kun du brancxoj de la oneof -> ERARO (std.json malakceptas
     // duplikatojn; ne ekzistas last-one-wins en JSON, oni dokumentas gxin).
-    // solvita: la erarvojo de la generita JSON-analizo ne plu fugetas
+    // La erarvojo de la generita JSON-analizo estas senfuga
     // (parseFromSlice kun areno + kopio); la rekta analizo devas resti pura.
     const json = "{\"nombre\":\"n\",\"tipo\":\"NUMERO\",\"datos\":{\"numero\":7,\"tp\":\"TEXTO\"}}";
     if (Api.PanelBase.readFromText(allocator, json, .TF_JSON)) |_| {

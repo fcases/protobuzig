@@ -10,7 +10,7 @@ const MAKSIMUMA_KAMPO: u32 = 536870911;
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-/// legas kaj analizas la.proto-dosieron. `malstrikta` (--lenient) elektas
+/// Legas kaj analizas la .proto-dosieron. `malstrikta` (--lenient) elektas
 /// la malnovan konduton "averto kaj dauxrigi" por la linioj, kiujn la sintaksa
 /// analizilo ne rekonis; sen gxi tiuj linioj estas ERARO (vidu
 /// kontroliIgnoratajnLinojn).
@@ -118,12 +118,12 @@ fn kontroliIgnoratajnLinojn(
         eraro = true;
         if (numero_linio > 0) {
             std.debug.print(
-                "protobuzig: error: {s}: line {d}: '{s}' was not understood and would be discarded (see F5: a dropped message generates an empty contract). Use --lenient to ignore it as before.\n",
+                "protobuzig: error: {s}: line {d}: '{s}' was not understood and would be discarded (a dropped message would leave an empty contract). Use --lenient to ignore it as before.\n",
                 .{ dosieroaNomo, numero_linio, fragmento },
             );
         } else {
             std.debug.print(
-                "protobuzig: error: {s}: '{s}' was not understood and would be discarded (see F5). Use --lenient to ignore it as before.\n",
+                "protobuzig: error: {s}: '{s}' was not understood and would be discarded . Use --lenient to ignore it as before.\n",
                 .{ dosieroaNomo, fragmento },
             );
         }
@@ -239,7 +239,7 @@ fn validiMesagxon(msg: prs.Message, dosieroaNomo: []const u8) !void {
 /// tajperaro aux referenco al alia dosiero; sen import en la .proto gxi ne
 /// povas esti legxosxata ekstera referenco -> eraro kun kunteksto.
 fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
-    if (pf.imports.len > 0) return; // referencias cross-file: territorio
+    if (pf.imports.len > 0) return; // importitaj tipoj: eblas eksteraj referencoj
 
     const esLocal = struct {
         fn aplicar(la_pf: prs.ProtoFile, tipo: []const u8) bool {
@@ -277,8 +277,7 @@ fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
     }
 }
 
-/// Klara diagnozo de konstruoj, kiujn la generatoro NE subtenas kaj kiujn
-/// antauxe oni forjxetis silente (parto):
+/// Klara diagnozo de konstruoj, kiujn la generatoro NE subtenas:
 /// - syntax = "proto3"  -> eraro (la generatoro produktas proto2-kodon).
 /// - service / rpc / extend (nivelo de dosiero) -> eraro.
 /// La 'extensions 1000 to max;' EN mesagxoj (proto2, ekz. la fixtures
@@ -371,7 +370,7 @@ fn nudiKomentaijnLinojn(input: []const u8) []const u8 {
             continue;
         }
         if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '*') {
-            // Bloka komento (parto): forjxeti gxis '*''/', konservante la
+            // Bloka komento: forjxeti gxis '*''/', konservante la
             // '\n'-ojn por ne mislokigi la linio-numerojn de la diagnozoj.
             i += 2;
             while (i + 1 < input.len and !(input[i] == '*' and input[i + 1] == '/')) {

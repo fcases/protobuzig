@@ -339,10 +339,6 @@ pub fn skribiPascalNomon(
     return try out.toOwnedSlice(allocator);
 }
 
-// ============================================================================
-// IDENTIGILOJ DERIVITAJ DE LA NOMO DE LA DOSIERO.proto
-// ============================================================================
-//
 // La baza nomo de la .proto-dosiero ne cxiam validas kiel Zig-identigilo:
 // "my-proto" (streko), "2fa" (komencigxas per cifero) aux "test"/"error"
 // (rezervita vorto) generis kodon, kiu ne kompilas (const my-proto_impl =
