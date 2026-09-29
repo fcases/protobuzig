@@ -10,7 +10,7 @@ const MAKSIMUMA_KAMPO: u32 = 536870911;
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-/// F5: legas kaj analizas la .proto-dosieron. `malstrikta` (--lenient) elektas
+/// legas kaj analizas la.proto-dosieron. `malstrikta` (--lenient) elektas
 /// la malnovan konduton "averto kaj dauxrigi" por la linioj, kiujn la sintaksa
 /// analizilo ne rekonis; sen gxi tiuj linioj estas ERARO (vidu
 /// kontroliIgnoratajnLinojn).
@@ -41,7 +41,7 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool, malstrikta: bool) 
             pf = &la_pf;
         },
         .err => {
-            // F5: gramatika eraro kun pozicio (linio:kolumno) anstataux muta
+            // gramatika eraro kun pozicio (linio:kolumno) anstataux muta
             // ParseError.
             const idx = @min(rezulto.index, nuda_enhavo.len);
             var linio: usize = 1;
@@ -63,7 +63,7 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool, malstrikta: bool) 
     }
     if (presi) presiProtoDosieron(pf.*);
 
-    // F5: la sinsekvo gravas - unue la linioj forjxetitaj de la sintaksa
+    // la sinsekvo gravas - unue la linioj forjxetitaj de la sintaksa
     // analizilo (povas esti tuta mesagxo), poste la AST-kontroloj.
     try kontroliIgnoratajnLinojn(pf.*, nuda_enhavo, malstrikta, dosieroaNomo);
 
@@ -75,7 +75,7 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool, malstrikta: bool) 
 }
 // Ankoraux mankas   extensions,
 
-/// F5: linioj de nivelo de dosiero, kiujn la sintaksa analizilo ne rekonis kaj
+/// linioj de nivelo de dosiero, kiujn la sintaksa analizilo ne rekonis kaj
 /// forjxetis (other_line). Antauxe oni nur averis pri ili kaj dauxrigis, sed
 /// tia linio povas esti MESAGXO tuta (eraro de sintakso, kampo sen nomo): la
 /// kontrakto restus malplena kaj la generita kodo mensogus pri la datumoj.
@@ -132,7 +132,7 @@ fn kontroliIgnoratajnLinojn(
     if (eraro) return error.IgnoredProtoLine;
 }
 
-/// F5: kontrolo de la kampoj de la AST, antaux ol skribi ion ajn:
+/// kontrolo de la kampoj de la AST, antaux ol skribi ion ajn:
 ///   - numero ekster 1..536870911 (la sintaksa analizilo faras 0 el '= -1' kaj
 ///     el nelegeblaj numeroj, kaj 0 aux tro granda numero perdigxas la kampon
 ///     en la drato: la malcxifrilo neniam trovos gxin);
@@ -234,12 +234,12 @@ fn validiMesagxon(msg: prs.Message, dosieroaNomo: []const u8) !void {
     }
 }
 
-/// F5: klaraj eraroj por ne difinitaj tipoj. Post la rekonado laux nomo, cxiu
+/// klaraj eraroj por ne difinitaj tipoj. Post la rekonado laux nomo, cxiu
 /// kampo, kiu ankoraux estas "ekstera mesagxo supozita" (ne difinita loke), es
 /// tajperaro aux referenco al alia dosiero; sen import en la .proto gxi ne
 /// povas esti legxosxata ekstera referenco -> eraro kun kunteksto.
 fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
-    if (pf.imports.len > 0) return; // referencias cross-file: territorio R7
+    if (pf.imports.len > 0) return; // referencias cross-file: territorio
 
     const esLocal = struct {
         fn aplicar(la_pf: prs.ProtoFile, tipo: []const u8) bool {
@@ -278,7 +278,7 @@ fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
 }
 
 /// Klara diagnozo de konstruoj, kiujn la generatoro NE subtenas kaj kiujn
-/// antauxe oni forjxetis silente (F5, parto):
+/// antauxe oni forjxetis silente (parto):
 /// - syntax = "proto3"  -> eraro (la generatoro produktas proto2-kodon).
 /// - service / rpc / extend (nivelo de dosiero) -> eraro.
 /// La 'extensions 1000 to max;' EN mesagxoj (proto2, ekz. la fixtures
@@ -371,7 +371,7 @@ fn nudiKomentaijnLinojn(input: []const u8) []const u8 {
             continue;
         }
         if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '*') {
-            // Bloka komento (F5, parto): forjxeti gxis '*''/', konservante la
+            // Bloka komento (parto): forjxeti gxis '*''/', konservante la
             // '\n'-ojn por ne mislokigi la linio-numerojn de la diagnozoj.
             i += 2;
             while (i + 1 < input.len and !(input[i] == '*' and input[i + 1] == '/')) {

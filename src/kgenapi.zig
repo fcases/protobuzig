@@ -226,7 +226,7 @@ fn skribiRawNamespaceExpr(
         // supra nivelo de la raw-dosiero (ne en nomspaco kun la nomo de la
         // dosiero). Referenci RawFile.<dosiero> generis api-on kiu ne
         // kompilis ("has no member named 'r8'"), kaj tio vidigxis nur per
-        // proto sen package (F8, detektita per internaltests/protos/r8.proto).
+        // proto sen package (detektita per internaltests/protos/r8.proto).
         return try allocator.dupe(u8, "RawFile");
     }
 
@@ -266,7 +266,7 @@ fn skribiRawImportojn(
 
     // La baza nomo de la .proto-dosiero povas ne validi kiel Zig-identigilo
     // ("my-proto", "2fa", "test"...): la aliaso *_impl uzas la saneigitan
-    // nomon, aux la generita api-dosiero ne kompilas (F9).
+    // nomon, aux la generita api-dosiero ne kompilas.
     const impl_nomo = try api_auks.implNomon(allocator, proto_base_name);
     defer allocator.free(impl_nomo);
 

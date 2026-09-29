@@ -59,7 +59,7 @@ pub fn main() !void {
         opts.output_dir;
     defer if (opts.ws_dir != null) allocator.free(output_dir);
 
-    // L2: generada areno. shpa (kgen_auks) montras al gxi dum la generado:
+    // generada areno. shpa (kgen_auks) montras al gxi dum la generado:
     // rezervi portempajnxojn estas bump (rapida) kaj arenoFini() liberigas
     // CXION samtempe je la fino (nulaj likoj). arenoReset() reuzas la bufrojn
     // inter la kruda fazo kaj la API-fazo (retain_capacity).

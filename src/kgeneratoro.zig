@@ -278,7 +278,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
-            // L2: free forigita - la generada areno (arenoFini) liberigas
+            // free forigita - la generada areno (arenoFini) liberigas
             // la provizorajn valorojn; free meze de vico estus no-op tie.
 
         switch (field.field_type_enum) {
@@ -949,7 +949,7 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
                     field.default_value;
 
             var allocated_default_for_decl: ?[]const u8 = null;
-            // L2: la defer, kiu liberigis s, forigigxis - la generada
+            // la defer, kiu liberigis s, forigigxis - la generada
             // areno (arenoFini) liberigas cxiujn provizorajn valorojn.
 
             if (default_for_decl != null and field.field_type_enum == .TYPE_ENUM) {
@@ -1390,7 +1390,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            }};
         \\        }},
         \\        .TF_JSON => {{
-        \\            // L1: parseFromSlice kun areno estas error-clean;
+        \\            // parseFromSlice kun areno estas error-clean;
         \\            // cxe sukceso oni kopias la valoron al memoro de la
         \\            // vokanto per binara round-trip, antaux ol liberigi la
         \\            // arenon (parseFromSliceLeaky likis parte erare).
@@ -2035,7 +2035,7 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
         , .{ ind, field.name });
 
         if (field.field_type_enum == .TYPE_MESSAGE) {
-            // F7: por kampo de tipo mesagxo la "val" legita antaux la brancxo
+            // por kampo de tipo mesagxo la "val" legita antaux la brancxo
             // estas la malferma krampo de la sub-mesagxo, kaj gxis nun ne
             // uzatis: se la mesagxo havis NUR kampojn de tipo mesagxo,
             // la generita kodo ne kompilis ("unused local constant"). Oni
@@ -2676,7 +2676,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // L2: free forigita - la generada areno (arenoFini)
+                    // free forigita - la generada areno (arenoFini)
                     // liberigas la provizorajn valorojn; free meze de la
                     // vico estus no-op en la areno.
 
@@ -2769,7 +2769,7 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // L2: free forigita - la generada areno (arenoFini)
+                    // free forigita - la generada areno (arenoFini)
                     // liberigas la provizorajn valorojn; free meze de la
                     // vico estus no-op en la areno.
 
@@ -3385,7 +3385,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Provizoraj valoroj kun errdefer (L1): cxiu posedata kampo preparigxas
+    // Provizoraj valoroj kun errdefer: cxiu posedata kampo preparigxas
     // en loka variablo ANTAUX la literalo, kun sia errdefer, por ke se
     // posta asigno malsukcesas, la antauxaj ne fughu (ene de struct-
     // literalo ne povas esti errdefer-oj).

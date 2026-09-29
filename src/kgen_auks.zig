@@ -6,7 +6,7 @@ const prs = @import("mecha_prs.zig");
 const tpj = prs.Tipoj;
 
 // ============================================================================
-// L2 (2026-09-07): generada areno anstataux disa page_allocator.
+// generada areno anstataux disa page_allocator.
 //
 // Antauxe cxiu helpilo rezervis signojn per page_allocator (mmap po unu
 // signo) kaj la plimulto neniam liberigis ilin: fugetoj nevideblaj en la CLI

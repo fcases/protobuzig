@@ -340,7 +340,7 @@ pub fn skribiPascalNomon(
 }
 
 // ============================================================================
-// IDENTIGILOJ DERIVITAJ DE LA NOMO DE LA DOSIERO .proto (F9)
+// IDENTIGILOJ DERIVITAJ DE LA NOMO DE LA DOSIERO.proto
 // ============================================================================
 //
 // La baza nomo de la .proto-dosiero ne cxiam validas kiel Zig-identigilo:
@@ -423,7 +423,7 @@ pub fn nomoIdentebla(
     return try bufro.toOwnedSlice(allocator);
 }
 
-/// Nomo de la interna aliaso al la krudaj tipoj: `<purigita bazo>_impl` (F9).
+/// Nomo de la interna aliaso al la krudaj tipoj: `<purigita bazo>_impl`.
 pub fn implNomon(
     allocator: std.mem.Allocator,
     basa: []const u8,

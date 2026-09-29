@@ -53,7 +53,7 @@ fn getFieldLabelEnum(label: []const u8) Etikedo {
     if (equal(u8, label, "repeated")) return .LABEL_REPEATED;
     // Neatingebla kun la nuna gramatiko (la label povas esti nur
     // optional/required/repeated); oni uzas la proto2-default por okazo, se
-    // la gramatiko sxangxigxos estonte (F5: sen @panic).
+    // la gramatiko sxangxigxos estonte (sen @panic).
     return .LABEL_OPTIONAL;
 }
 
@@ -76,7 +76,7 @@ pub fn getFieldTypeEnum(field_type: []const u8) Tipoj {
     if (equal(u8, field_type, "double")) return .TYPE_DOUBLE;
     if (equal(u8, field_type, "bytes")) return .TYPE_BYTES;
     // Ne estas skalaro: mesagxo/enumo aux tajperaro. La solvo laux nomo
-    // decidas; la reston validas analizilo (F5, puraj eraroj).
+    // decidas; la reston validas analizilo (puraj eraroj).
     return .TYPE_UNRESOLVED;
 }
 
@@ -145,7 +145,7 @@ pub const ProtoFile = struct {
     messages: []Message,
     enums: []Enum, // enumoj ekster mesagxoj
     // Nerekonitaj dosiernivelaj linioj (other_line): ili ignorigxas sed
-    // konservigxas, por ke analizilo avertu (F5: averto, ne eraro).
+    // konservigxas, por ke analizilo avertu (averto, ne eraro).
     ignorataj: [][]const u8 = &.{},
 };
 
@@ -211,7 +211,7 @@ fn quotedStringFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, 
     // Sen komenca '"': ne aplikas -> Result err (no-match), NE malmola eraro.
     if (input.len == 0 or input[0] != '"') return mecha.Result([]const u8).err(0);
 
-    // Skanado konscia pri eskapoj (F5, Peco 2 - opcio A):
+    // Skanado konscia pri eskapoj (Peco 2 - opcio A):
     // - '\' + sekva bajto saltigxas (\" ne fermas la literalon).
     // - Nur ne-eskapita '"' fermas.
     // - Rekta linifino ene de la literalo ne validas.
@@ -309,7 +309,7 @@ const package_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Valoro de option sen citiloj (F2): tokeno gxis spaco/tab aux ';',
+/// Valoro de option sen citiloj: tokeno gxis spaco/tab aux ';',
 /// akceptante literojn, ciferojn, '_', '.', '/', '-', ':' (ekz. SPEED,
 /// com.google.protobuf, vojoj). Redonas pruntitan slice.
 fn valoroNudaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
@@ -430,7 +430,7 @@ const packed_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Generala kampa opcio (F5, parto): englutas ajnan '[sxlosilo[ = valoro]]'
+/// Generala kampa opcio (parto): englutas ajnan '[sxlosilo[ = valoro]]'
 /// (deprecated, jstype, ctype, lazy, komoj...), redonante la KOMPLETAN tekston
 /// inter krampoj, por distingi gxin de vera [default=...]/[packed=...].
 /// Respektas citilojn kaj strekojn ene de la krampo.
@@ -678,7 +678,7 @@ const message_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Nerekonita dosiernivela linio (F5): gxi konsumas gxin tute (gxis '\n'
+/// Nerekonita dosiernivela linio: gxi konsumas gxin tute (gxis '\n'
 /// inkluzive aux fino de enigo) kaj redonas gxin tondita, por ke analizilo
 /// avertu; malplena linio ne aplikas (no-match).
 fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result(Respondo) {
@@ -700,7 +700,7 @@ fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, Out
 }
 const other_line_parser = mecha.Parser(Respondo){ .parse = &otherLineFn };
 
-/// Ignoreblaj frazoj EN mesagxo (F5, parto): 'reserved ...;'
+/// Ignoreblaj frazoj EN mesagxo (parto): 'reserved...;'
 /// (numeroj, intervaloj '4 to max', nomoj kun citiloj), 'extensions ...;'
 /// (intervaloj kaj blokoj '[declaration = { ... }]' plurliniaj) kaj 'option
 /// ...;'. Skanas gxis la ';' je krampa profundo 0, respektante citilojn kaj

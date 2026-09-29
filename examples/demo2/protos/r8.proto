@@ -1,4 +1,4 @@
-// Fixture R8: packed repeated (binario) y control no-packed.
+// Fixture: packed repeated (binara) kaj kontrolo ne-packed.
 message PackedMsg {
   repeated int32 path = 1 [packed = true];
   repeated int32 simple = 2;

@@ -1151,7 +1151,7 @@ fn testRepeatedScalar(allocator: std.mem.Allocator) !void {
 }
 
 fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
-    // R2: rondvojo de REPEATED per Protobuf Text (>=2 elementoj, GPA).
+    // rondvojo de REPEATED per Protobuf Text (>=2 elementoj, GPA).
     // La antauxaj testoj kovris repeated nur en binara formato.
     // Cxi tie oni kovras repeated message kaj repeated string; la skalara
     // float en teksto ankaux analizigxas (lasita ekstere pro mallongeco).
@@ -1245,7 +1245,7 @@ fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
 }
 
 fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
-    // R8: oneof kun skalara membro (numero) kaj enum (tp) en teksto kaj JSON.
+    // oneof kun skalara membro (numero) kaj enum (tp) en teksto kaj JSON.
     var panel = try Api.PanelBase.initDefault(allocator);
     defer panel.deinit(allocator);
     try panel.setNombre(allocator, "r8-oneof");
@@ -1285,7 +1285,7 @@ fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
 }
 
 fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
-    // R8: BF_BASE64 kun granda repeated (500 float) kaj GPA.
+    // BF_BASE64 kun granda repeated (500 float) kaj GPA.
     var trafico = try Api.SnrTrafico.initDefault(allocator);
     defer trafico.deinit(allocator);
     try trafico.setSeccion(allocator, "R8-B64");
@@ -1310,9 +1310,9 @@ fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
 }
 
 fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
-    // R8: JSON kun du brancxoj de la oneof -> ERARO (std.json malakceptas
+    // JSON kun du brancxoj de la oneof -> ERARO (std.json malakceptas
     // duplikatojn; ne ekzistas last-one-wins en JSON, oni dokumentas gxin).
-    // L1 solvita: la erarvojo de la generita JSON-analizo ne plu fugetas
+    // solvita: la erarvojo de la generita JSON-analizo ne plu fugetas
     // (parseFromSlice kun areno + kopio); la rekta analizo devas resti pura.
     const json = "{\"nombre\":\"n\",\"tipo\":\"NUMERO\",\"datos\":{\"numero\":7,\"tp\":\"TEXTO\"}}";
     if (Api.PanelBase.readFromText(allocator, json, .TF_JSON)) |_| {
@@ -1322,7 +1322,7 @@ fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
 }
 
 fn testPackedRepeated(allocator: std.mem.Allocator) !void {
-    // R8: repeated [packed = true] (path/vals) kaj kontrolo ne-packed (simple).
+    // repeated [packed = true] (path/vals) kaj kontrolo ne-packed (simple).
     var m = try R8Raw.PackedMsg.initDefault(allocator);
     defer m.deinit(allocator);
 
@@ -1353,7 +1353,7 @@ fn testPackedRepeated(allocator: std.mem.Allocator) !void {
 }
 
 fn testFormatosNegativos(allocator: std.mem.Allocator) !void {
-    // R8: JSON/ZON-enigoj nevalidaj -> eraro (ne silento) kaj pura GPA.
+    // JSON/ZON-enigoj nevalidaj -> eraro (ne silento) kaj pura GPA.
     if (ConfigApi.AppConfig.readFromText(allocator, "{ no es json", .TF_JSON)) |_| {
         return error.ShouldFailJson;
     } else |_| {}
