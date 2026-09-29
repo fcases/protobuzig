@@ -11,6 +11,7 @@ const CliOptions = struct {
     ws_dir: ?[]const u8 = null,
     proto_file: ?[]const u8 = null,
     verbose: bool = false,
+    lenient: bool = false,
     help: bool = false,
 };
 
@@ -22,7 +23,7 @@ pub fn main() !void {
 
     const opts = try parseArgs(args);
 
-    // Sin parametros o con --help/-h: mostrar ayuda y salir sin error.
+    // Sen parametroj aux kun --help/-h: montri helpon kaj eliri sen eraro.
     if (args.len == 1 or opts.help) {
         printHelp();
         return;
@@ -46,21 +47,22 @@ pub fn main() !void {
     var ast_proto_dosiero = try analizilo.analiziDosieron(
         proto_path,
         opts.verbose,
+        opts.lenient,
     );
     defer analizilo.liberiProtoDosieron(&ast_proto_dosiero);
 
-    // Con --ws <dir> el andamiaje dirige la generacion a <dir>/src/runtime
-    // (ignora --output_dir); sin --ws se escribe en --output_dir.
+    // Kun --ws <dir> la skafaldado direktas la generadon al <dir>/src/runtime
+    // (ignoras --output_dir); sen --ws oni skribas en --output_dir.
     const output_dir = if (opts.ws_dir) |ws_dir|
         try std.fs.path.join(allocator, &.{ ws_dir, "src", "runtime" })
     else
         opts.output_dir;
     defer if (opts.ws_dir != null) allocator.free(output_dir);
 
-    // L2: arena de generacion. shpa (kgen_auks) apunta a el durante la
-    // generacion: reservar temporales es un bump (rapido) y arenoFini()
-    // libera TODO de golpe al terminar (cero fugas). arenoReset() reutiliza
-    // los buffers entre la fase raw y la fase API (retain_capacity).
+    // L2: generada areno. shpa (kgen_auks) montras al gxi dum la generado:
+    // rezervi portempajnxojn estas bump (rapida) kaj arenoFini() liberigas
+    // CXION samtempe je la fino (nulaj likoj). arenoReset() reuzas la bufrojn
+    // inter la kruda fazo kaj la API-fazo (retain_capacity).
     auks.arenoInici();
     defer auks.arenoFini();
 
@@ -78,8 +80,8 @@ pub fn main() !void {
         &ast_proto_dosiero,
     );
 
-    // Andamiaje de workspace: copia del .proto, encdec, main/root/tests de
-    // ejemplo, build.zig y .vscode (los generados ya estan en src/runtime).
+    // Skafaldado de laborspaco: kopio de la .proto, encdec, main/root/tests de
+    // ekzemplo, build.zig kaj .vscode (la generitoj jam estas en src/runtime).
     if (opts.ws_dir) |ws_dir| {
         const nuda = std.fs.path.basename(proto_path);
         const punkta_indekso = std.mem.lastIndexOfScalar(u8, nuda, '.') orelse nuda.len;
@@ -109,6 +111,12 @@ fn parseArgs(args: []const []const u8) !CliOptions {
 
         if (std.mem.eql(u8, arg, "--verbose") or std.mem.eql(u8, arg, "-v")) {
             opts.verbose = true;
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--lenient")) {
+            opts.lenient = true;
             i += 1;
             continue;
         }
@@ -144,12 +152,12 @@ fn parseArgs(args: []const []const u8) !CliOptions {
         }
 
         if (opts.proto_file != null) {
-            // Se dice QUE argumento sobra y cual se tomo antes: si el
-            // lanzador (debugger, script) pasa el ejecutable o el fichero dos
-            // veces, este mensaje lo delata en vez de dejar un
-            // TooManyProtoFiles a secas.
+            // Oni diras KIU argumento superfluas kaj kiu estis prenita antauxe:
+            // se la lancxilo (debugger, skripto) pasas la ruligilon aux la
+            // dosieron dufoje, cxi tiu mesagxo malkasxas gxin anstataux lasi
+            // nudan TooManyProtoFiles.
             std.debug.print(
-                "protobuzig: error: mas de un fichero .proto: '{s}' (ya se indico '{s}').\n\n",
+                "protobuzig: error: more than one .proto file: '{s}' (already got '{s}').\n\n",
                 .{ arg, opts.proto_file.? },
             );
             printHelp();
@@ -183,6 +191,13 @@ fn printHelp() void {
         \\                         .vscode (settings/tasks/launch).
         \\
         \\  --verbose, -v          Print parser/analyzer traces.
+        \\
+        \\  --lenient              Do not fail on file-level lines the parser
+        \\                         does not understand: warn and go on (the old
+        \\                         behaviour). Without this flag those lines are
+        \\                         an error and nothing is generated, because a
+        \\                         dropped message would leave an empty
+        \\                         contract (see F5).
         \\
         \\  --help, -h             Show this help.
         \\

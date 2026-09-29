@@ -6,37 +6,37 @@ const prs = @import("mecha_prs.zig");
 const tpj = prs.Tipoj;
 
 // ============================================================================
-// L2 (2026-09-07): arena de generacion en vez de page_allocator disperso.
+// L2 (2026-09-07): generada areno anstataux disa page_allocator.
 //
-// Antes cada helper reservaba strings con page_allocator (mmap por string) y
-// la mayoria nunca se liberaba: fugas invisibles en el CLI (el proceso sale)
-// pero reales si el generador se reutiliza en proceso, y lentas (syscall por
-// asignacion). Ahora shpa apunta al allocator de un ArenaAllocator: reservar
-// es un bump (rapido) y arenoFini() libera TODO de golpe al terminar la
-// generacion (cero fugas). Los free sueltos de temporales ya no hacen falta
-// (el arena los libera al final; un free no-cola es no-op).
+// Antauxe cxiu helpilo rezervis signojn per page_allocator (mmap po unu
+// signo) kaj la plimulto neniam liberigis ilin: fugetoj nevideblaj en la CLI
+// (la procezo finigxas), sed realaj se oni reuzas la generatoron enproceze,
+// kaj malrapidaj (syscall po rezervo). Nun shpa montras al la allocator de
+// ArenaAllocator: rezervi estas bump (rapida) kaj arenoFini() liberigas CXION
+// fine de la generado (nul fugetoj). Solaj free de provizorajoj ne plu
+// necesas (la areno liberigas ilin; ne-vosta free estas no-op).
 // ============================================================================
 var areno_buf: std.heap.ArenaAllocator = undefined;
 
-/// shpa: allocator de los temporales de generacion (arena). Mutable para
-/// poder apuntarlo al arena en arenoInici().
+/// shpa: allocator de la generadaj provizorajoj (areno). Mutable por
+/// povi direkti gxin al la areno en arenoInici().
 pub var shpa: std.mem.Allocator = std.heap.page_allocator;
 
-/// Inicia el arena de generacion y apunta shpa a el.
+/// Startigas la generadan arenon kaj direktas shpa al gxi.
 pub fn arenoInici() void {
     areno_buf = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     shpa = areno_buf.allocator();
 }
 
-/// Libera TODO lo reservado en el arena y restaura shpa.
+/// Liberigas CXION rezervitan en la areno kaj restauxras shpa.
 pub fn arenoFini() void {
     areno_buf.deinit();
     shpa = std.heap.page_allocator;
 }
 
-/// Rebobina el arena (retain_capacity: reutiliza los buffers, casi cero
-/// llamadas al allocator tras el primer ciclo). Solo cuando nada del arena
-/// siga referenciado (p. ej. entre la generacion raw y la API).
+/// Rebobenigas la arenon (retain_capacity: reuzas la bufrojn, preskaux nul
+/// vokoj al la allocator post la unua ciklo). Nur kiam nenio de la areno
+/// restas referencata (ekz. inter la kruda generado kaj la API).
 pub fn arenoReset() void {
     _ = areno_buf.reset(.retain_capacity);
 }
@@ -98,10 +98,10 @@ pub fn mapiZigType(protoType: []const u8, label: []const u8, default_value: ?[]c
     if (default_value != null) {
         finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s} = {s} ", .{ opt, rep, baseType, dfv }) catch unreachable;
     } else if (bRep) {
-        // repeated sin default: slice vacio ESTATICO como default de
-        // declaracion, para que ZON/JSON rellenen el campo ausente en vez de
-        // fallar con MissingField. deinit libera slices con guard de longitud
-        // (if len > 0) para no liberar el literal estatico.
+        // repeated sen default: STATIKA malplena slice kiel default de
+        // deklaracio, por ke ZON/JSON plenigu la forestantan kampon anstataux
+        // malsukcesi per MissingField. deinit liberigas slice-ojn kun longa
+        // gvardio (if len > 0) por ne liberigi la statikan literalon.
         finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s} = &.{{}}", .{ rep, baseType }) catch unreachable;
     } else finalBaseTypo = std.fmt.allocPrint(shpa, "{s}{s}{s}{s}", .{ opt, rep, baseType, nul }) catch unreachable;
 
@@ -143,14 +143,14 @@ pub fn mapiProtoTiponAlZig(protoType: []const u8) []const u8 {
         baseType = "[]const u8";
     }
 
-    // Tipo cualificado/importado, por ejemplo:
+    // Kvalifikita/importita tipo, ekzemple:
     //     k6bus.msg.Msg
-    // Si Packet.zig importa Msg.zig como:
+    // Se Packet.zig importas Msg.zig kiel:
     //     const Msg = @import("Msg.zig");
-    // el tipo usable es:
+    // la uzebla tipo estas:
     //     Msg.k6bus.msg.Msg
-    // Heuristica temporal: si el tipo contiene puntos, el ultimo segmento
-    // se usa como alias del modulo importado.
+    // Provizora heuristiko: se la tipo enhavas punktojn, la lasta segmento
+    // uzigxas kiel aliaso de la importita modulo.
     if (std.mem.lastIndexOfScalar(u8, baseType, '.')) |last_dot| {
         const alias = baseType[last_dot + 1 ..];
         baseType = std.fmt.allocPrint(
@@ -205,38 +205,38 @@ pub fn mapiOneOfNomonAlZigTipo(oneof_name: []const u8) []const u8 {
     return out.toOwnedSlice(shpa) catch &[_]u8{};
 }
 
-/// Devuelve el tipo Zig de una alternativa de oneof.
+/// Redonas la Zig-tipon de oneof-alternativo.
 ///
-/// Ejemplo:
+/// Ekzemplo:
 ///     MCastConfig mcast = 10;
 ///
-/// Devuelve:
+/// Redonas:
 ///     MCastConfig
 ///
-/// Si el tipo esta cualificado/importado, reutiliza la misma logica que los
-/// campos normales.
+/// Se la tipo estas kvalifikita/importita, gxi reuzas la saman logikon kiel
+/// la normalaj kampoj.
 pub fn mapiOneOfFieldTiponAlZig(field: prs.OneOfField) []const u8 {
     return mapiProtoTiponAlZig(field.field_type);
 }
 
-/// Devuelve el wire type protobuf de una alternativa oneof.
+/// Redonas la protobuf wire type de oneof-alternativo.
 ///
-/// Importante:
-/// - oneof NO tiene wire type propio.
-/// - Cada alternativa usa el wire type de su tipo real.
+/// Grava:
+/// - oneof NE havas propran wire type.
+/// - Cxiu alternativo uzas la wire type de sia reala tipo.
 pub fn getOneOfWireType(field: prs.OneOfField) u3 {
     return getWireType(field.field_type_enum);
 }
 
-/// Indica si una alternativa de oneof requiere limpieza explicita.
+/// Indikas cxu oneof-alternativo postulas eksplicitan purigadon.
 ///
-/// Casos que requieren deinit/free:
-/// - message: debe llamar a deinit(allocator)
-/// - string: debe liberar memoria si ha sido duplicada
-/// - bytes: debe liberar memoria si ha sido duplicada
+/// Kazoj postulantaj deinit/free:
+/// - message: devas voki deinit(allocator)
+/// - string: devas liberigi memoron se gxi estis duobligita
+/// - bytes: devas liberigi memoron se gxi estis duobligita
 ///
-/// En TransportConfig.params todos los casos actuales son mensajes, por tanto
-/// todos necesitan deinit.
+/// En TransportConfig.params cxiuj nunaj kazoj estas mesagxoj, do cxiuj
+/// bezonas deinit.
 pub fn oneOfFieldNeedsDeinit(field: prs.OneOfField) bool {
     return switch (field.field_type_enum) {
         .TYPE_MESSAGE,
@@ -248,9 +248,9 @@ pub fn oneOfFieldNeedsDeinit(field: prs.OneOfField) bool {
     };
 }
 
-/// Indica si un oneof completo necesita allocator durante deinit.
+/// Indikas cxu kompleta oneof bezonas allocator dum deinit.
 ///
-/// Se usara para decidir si el deinit generado debe marcar allocator como usado.
+/// Uzigxos por decidi cxu la generita deinit devas marki allocator kiel uzata.
 pub fn oneOfNeedsAllocator(oneof_decl: prs.OneOfDecl) bool {
     for (oneof_decl.fields) |field| {
         if (oneOfFieldNeedsDeinit(field)) {
@@ -261,7 +261,7 @@ pub fn oneOfNeedsAllocator(oneof_decl: prs.OneOfDecl) bool {
     return false;
 }
 
-/// Indica si algun oneof de un mensaje necesita allocator en deinit.
+/// Indikas cxu iu oneof de mesagxo bezonas allocator en deinit.
 pub fn anyOneOfNeedsAllocator(oneofs: []prs.OneOfDecl) bool {
     for (oneofs) |oneof_decl| {
         if (oneOfNeedsAllocator(oneof_decl)) {
@@ -272,13 +272,13 @@ pub fn anyOneOfNeedsAllocator(oneofs: []prs.OneOfDecl) bool {
     return false;
 }
 
-// Wire Type        Valor   Descripción Tipos Lógicos Mapeados
-// Varint           0       El valor es una secuencia de bytes de longitud variable: int32, int64, uint32, uint64, sint32, sint64, bool, enum
-// 64-bit           1       El valor es un entero de 8 bytes (64 bits) de longitud fija: fixed64, sfixed64, double
-// Length-delimited 2       El valor está precedido por su longitud codificada como Varint: string, bytes, message, repeated (packed)
-// Start group      3       Marca el inicio de un grupo (Obsoleto): group
-// End group        4       Marca el final de un grupo (Obsoleto): group
-// 32-bit           5       El valor es un entero de 4 bytes (32 bits) de longitud fija: fixed32, sfixed32, float
+// Wire Type        Valoro  Priskribo / mapitaj logikaj tipoj
+// Varint           0       La valoro estas bajtosekvenco de varia longo: int32, int64, uint32, uint64, sint32, sint64, bool, enum
+// 64-bit           1       La valoro estas entjero de 8 bajtoj (64 bitoj) fiks-longa: fixed64, sfixed64, double
+// Length-delimited 2       La valoron antauxas gxia longo kodita kiel Varint: string, bytes, message, repeated (packed)
+// Start group      3       Markas la komencon de grupo (malaktuala): group
+// End group        4       Markas la finon de grupo (malaktuala): group
+// 32-bit           5       La valoro estas entjero de 4 bajtoj (32 bitoj) fiks-longa: fixed32, sfixed32, float
 pub fn getWireType(field_type: tpj) u3 {
     return switch (field_type) {
         .TYPE_FLOAT, .TYPE_FIXED32, .TYPE_SFIXED32 => 5,

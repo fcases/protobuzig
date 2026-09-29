@@ -42,7 +42,7 @@ pub const Tipoj = enum {
     TYPE_FLOAT,
     TYPE_DOUBLE,
     TYPE_BYTES,
-    TYPE_UNRESOLVED, // para tipos de mensaje o enum no resueltos aún
+    TYPE_UNRESOLVED, // por mesagxaj aux enumaj tipoj ankoraux nesolvitaj
 };
 
 pub const Etikedo = enum { LABEL_OPTIONAL, LABEL_REQUIRED, LABEL_REPEATED };
@@ -51,9 +51,9 @@ fn getFieldLabelEnum(label: []const u8) Etikedo {
     if (equal(u8, label, "optional")) return .LABEL_OPTIONAL;
     if (equal(u8, label, "required")) return .LABEL_REQUIRED;
     if (equal(u8, label, "repeated")) return .LABEL_REPEATED;
-    // Inalcanzable con la gramatica actual (el label solo puede ser
-    // optional/required/repeated); se usa el default proto2 por si la
-    // gramatica cambia en el futuro (F5: sin @panic).
+    // Neatingebla kun la nuna gramatiko (la label povas esti nur
+    // optional/required/repeated); oni uzas la proto2-default por okazo, se
+    // la gramatiko sxangxigxos estonte (F5: sen @panic).
     return .LABEL_OPTIONAL;
 }
 
@@ -75,8 +75,8 @@ pub fn getFieldTypeEnum(field_type: []const u8) Tipoj {
     if (equal(u8, field_type, "float")) return .TYPE_FLOAT;
     if (equal(u8, field_type, "double")) return .TYPE_DOUBLE;
     if (equal(u8, field_type, "bytes")) return .TYPE_BYTES;
-    // No es un escalar: mensaje/enum o typo. La resolucion por nombre
-    // decide; los restos los valida analizilo (F5, errores limpios).
+    // Ne estas skalaro: mesagxo/enumo aux tajperaro. La solvo laux nomo
+    // decidas; la reston validas analizilo (F5, puraj eraroj).
     return .TYPE_UNRESOLVED;
 }
 
@@ -133,19 +133,19 @@ pub const Message = struct {
     name: []const u8,
     fields: []Field,
     oneofs: []OneOfDecl,
-    internal_enums: []Enum, // enums dentro de mensajes
-    internal_msgs: []Message, // Messages dentro de mensajes
+    internal_enums: []Enum, // enumoj ene de mesagxoj
+    internal_msgs: []Message, // Mesagxoj ene de mesagxoj
 };
 
 pub const ProtoFile = struct {
-    syntax: []const u8 = "proto2", // "proto3" o "proto2"
+    syntax: []const u8 = "proto2", // "proto3" aux "proto2"
     package_name: ?[]const u8 = "",
     imports: [][]const u8 = &.{},
     options: []Option,
     messages: []Message,
-    enums: []Enum, // enums fuera de mensajes
-    // Lineas de nivel fichero no reconocidas (other_line): se ignoran pero
-    // se guardan para que analizilo avise (F5: aviso, no error).
+    enums: []Enum, // enumoj ekster mesagxoj
+    // Nerekonitaj dosiernivelaj linioj (other_line): ili ignorigxas sed
+    // konservigxas, por ke analizilo avertu (F5: averto, ne eraro).
     ignorataj: [][]const u8 = &.{},
 };
 
@@ -153,10 +153,10 @@ pub const ProtoFile = struct {
 ///////////////////////////////////////////////////////
 
 const ws = mecha.oneOf(.{
-    mecha.string(" "), // espacio
+    mecha.string(" "), // spaco
     mecha.string("\t"), // tab
     mecha.string("\r"), // tab
-    mecha.string("\n"), // salto de línea
+    mecha.string("\n"), // linifino
 }).many(.{ .collect = false });
 
 const anu_parser = mecha.combine(.{
@@ -182,9 +182,9 @@ const anu_parser = mecha.combine(.{
     }
 }.mapFn);
 
-// Nombre de tipo posiblemente cualificado: Msg, k6bus.msg.Msg, foo.bar.Baz.
-// Se usa para tipos de campo; no sustituye a anu_parser para nombres simples
-// como field.name, enum.name, package parts, etc.
+// Eble kvalifikita tipnomo: Msg, k6bus.msg.Msg, foo.bar.Baz.
+// Uzigxas por kampaj tipoj; gxi ne anstatauxas anu_parser por simplaj nomoj
+// kiel field.name, enum.name, package parts, ktp.
 const qualified_name_parser = mecha.combine(.{
     anu_parser,
     mecha.combine(.{
@@ -198,7 +198,7 @@ const qualified_name_parser = mecha.combine(.{
             full_name.appendSlice(shpa, items[0]) catch {};
             for (more) |part| {
                 full_name.appendSlice(shpa, part[0]) catch {}; // "."
-                full_name.appendSlice(shpa, part[1]) catch {}; // siguiente parte
+                full_name.appendSlice(shpa, part[1]) catch {}; // sekva parto
             }
             return full_name.toOwnedSlice(shpa) catch &[_]u8{};
         }
@@ -208,16 +208,16 @@ const qualified_name_parser = mecha.combine(.{
 
 fn quotedStringFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
     _ = gpa;
-    // Sin '"' inicial: no aplica -> Result err (no-match), NO error duro.
+    // Sen komenca '"': ne aplikas -> Result err (no-match), NE malmola eraro.
     if (input.len == 0 or input[0] != '"') return mecha.Result([]const u8).err(0);
 
-    // Escaneo consciente de escapes (F5, Pieza 2 - opcion A):
-    // - '\' + siguiente byte se saltan (\" no cierra el literal).
-    // - Solo una '"' NO escapada cierra.
-    // - Un salto de linea literal dentro del literal no es valido.
-    // Se devuelve el slice CON sus comillas y CON los escapes verbatim
-    // (convencion existente: el generador lo emite tal cual en un literal
-    // Zig, que interpreta los escapes comunes igual que proto).
+    // Skanado konscia pri eskapoj (F5, Peco 2 - opcio A):
+    // - '\' + sekva bajto saltigxas (\" ne fermas la literalon).
+    // - Nur ne-eskapita '"' fermas.
+    // - Rekta linifino ene de la literalo ne validas.
+    // Oni redonas la slice KUN gxiaj citiloj kaj KUN la eskapoj verbatim
+    // (ekzistanta konvencio: la generatoro eligas gxin tiel en Zig-literalo,
+    // kiu interpretas la komunajn eskapojn same kiel proto).
     var i: usize = 1;
     while (i < input.len) {
         const c = input[i];
@@ -231,16 +231,16 @@ fn quotedStringFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, 
         if (c == '\n' or c == '\r') return mecha.Result([]const u8).err(0);
         i += 1;
     }
-    return mecha.Result([]const u8).err(0); // sin cierre
+    return mecha.Result([]const u8).err(0); // sen fermo
 }
 const quoted_string = mecha.Parser([]const u8){ .parse = &quotedStringFn };
 
 fn isNotNewline(c: u8) bool {
-    // Retorna true si el byte NO es un salto de línea (ASCII 10)
+    // Redonas true se la bajto NE estas linifino (ASCII 10)
     return c != '\n';
 }
 
-// Parser que coincide con UN SOLO byte que no sea un salto de línea.
+// Parsilo kongruanta kun UNU NUNA bajto, kiu ne estas linifino.
 const non_newline_char = mecha.ascii.wrap(isNotNewline);
 
 //////////////////////////////////////////////
@@ -309,9 +309,9 @@ const package_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Valor de option sin comillas (F2): token hasta espacio/tab o ';',
-/// aceptando letras, digitos, '_', '.', '/', '-', ':' (p. ej. SPEED,
-/// com.google.protobuf, rutas). Devuelve slice prestado.
+/// Valoro de option sen citiloj (F2): tokeno gxis spaco/tab aux ';',
+/// akceptante literojn, ciferojn, '_', '.', '/', '-', ':' (ekz. SPEED,
+/// com.google.protobuf, vojoj). Redonas pruntitan slice.
 fn valoroNudaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
     _ = gpa;
     if (input.len == 0) return mecha.Result([]const u8).err(0);
@@ -347,7 +347,7 @@ const option_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Numero de valor de enum: decimal o hexadecimal (0x/0X), p. ej.
+/// Numero de enum-valoro: dekuma aux deksesuma (0x/0X), ekz.
 /// EDITION_MAX = 0x7FFFFFFF.
 fn parseEnumNumero(teksto: []const u8) u32 {
     if (teksto.len > 2 and teksto[0] == '0' and (teksto[1] == 'x' or teksto[1] == 'X')) {
@@ -366,7 +366,7 @@ const enum_parser = mecha.combine(.{
             ws, // 7: 0
             anu_parser, ws, // 7: 1, 2
             mecha.string("="), ws, // 7: 3, 4
-            anu_parser, ws, // 7: 5, 6  (tambien hex: EDITION_MAX = 0x7FFFFFFF)
+            anu_parser, ws, // 7: 5, 6  (ankaux hex: EDITION_MAX = 0x7FFFFFFF)
             mecha.string(";").opt(), ws, // 7: 7, 8
         }).map(struct {
             pub fn mapFn(items: anytype) EnumValue {
@@ -430,13 +430,13 @@ const packed_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Opcion de campo generica (F5, parte): traga cualquier '[clave[ = valor]]'
-/// (deprecated, jstype, ctype, lazy, comas...), devolviendo el texto COMPLETO
-/// entre corchetes para distinguirlo de un [default=...]/[packed=...] real.
-/// Respeta comillas y barras dentro del corchete.
+/// Generala kampa opcio (F5, parto): englutas ajnan '[sxlosilo[ = valoro]]'
+/// (deprecated, jstype, ctype, lazy, komoj...), redonante la KOMPLETAN tekston
+/// inter krampoj, por distingi gxin de vera [default=...]/[packed=...].
+/// Respektas citilojn kaj strekojn ene de la krampo.
 fn opcioAliaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result([]const u8) {
     _ = gpa;
-    // Sin '[' inicial: no aplica -> Result err (no-match), NO error duro.
+    // Sen komenca '[': ne aplikas -> Result err (no-match), NE malmola eraro.
     if (input.len == 0 or input[0] != '[') return mecha.Result([]const u8).err(0);
 
     var i: usize = 1;
@@ -461,13 +461,13 @@ fn opcioAliaFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, Out
         }
         i += 1;
     }
-    // Corchete sin cerrar: no-match.
+    // Krampo sen fermo: no-match.
     return mecha.Result([]const u8).err(0);
 }
 const opcio_alia = mecha.Parser([]const u8){ .parse = &opcioAliaFn };
 
 const field_parser = mecha.combine(.{
-    ws.discard(), // ojo con esto
+    ws.discard(), // atentu pri cxi tio
     mecha.oneOf(.{
         mecha.string("optional"),
         mecha.string("required"),
@@ -488,8 +488,8 @@ const field_parser = mecha.combine(.{
         const name = shpa.dupe(u8, items[4]) catch &[_]u8{};
         const number = std.fmt.parseInt(u32, items[8], 10) catch 0;
 
-        // Un resultado que empieza por '[' es una opcion generica tragada
-        // (deprecated, jstype...), no un default/packed real.
+        // Rezulto komencigxanta per '[' estas englutita generala opcio
+        // (deprecated, jstype...), ne vera default/packed.
         const default_value = if (items[10]) |def|
             (if (def.len > 0 and def[0] == '[') null else shpa.dupe(u8, def) catch &[_]u8{})
         else
@@ -678,9 +678,9 @@ const message_parser = mecha.combine(.{
     }
 }.mapFn);
 
-/// Linea de nivel fichero no reconocida (F5): la consume entera (hasta '\n'
-/// inclusive o fin de entrada) y la devuelve recortada para que analizilo
-/// avise; una linea vacia no aplica (no-match).
+/// Nerekonita dosiernivela linio (F5): gxi konsumas gxin tute (gxis '\n'
+/// inkluzive aux fino de enigo) kaj redonas gxin tondita, por ke analizilo
+/// avertu; malplena linio ne aplikas (no-match).
 fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result(Respondo) {
     _ = gpa;
     if (input.len == 0 or input[0] == '\n') return mecha.Result(Respondo).err(0);
@@ -690,9 +690,9 @@ fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, Out
 
     const texto = std.mem.trim(u8, input[0..i], " \t\r");
 
-    if (i < input.len) i += 1; // consumir el '\n'
+    if (i < input.len) i += 1; // konsumi la '\n'
 
-    // Linea solo-espacios: se consume pero sin contenido (no se avisa).
+    // Nur-spaca linio: konsumigxas sed sen enhavo (oni ne avertas).
     if (texto.len == 0) {
         return mecha.Result(Respondo).ok(i, .{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } });
     }
@@ -700,11 +700,11 @@ fn otherLineFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, Out
 }
 const other_line_parser = mecha.Parser(Respondo){ .parse = &otherLineFn };
 
-/// Sentencias ignorables DENTRO de un mensaje (F5, parte): 'reserved ...;'
-/// (numeros, rangos '4 to max', nombres con comillas), 'extensions ...;'
-/// (rangos y bloques '[declaration = { ... }]' multilinea) y 'option ...;'.
-/// Escanea hasta el ';' a profundidad de llaves 0, respetando comillas y
-/// barras; sin esos prefijos devuelve no-match (Result.err).
+/// Ignoreblaj frazoj EN mesagxo (F5, parto): 'reserved ...;'
+/// (numeroj, intervaloj '4 to max', nomoj kun citiloj), 'extensions ...;'
+/// (intervaloj kaj blokoj '[declaration = { ... }]' plurliniaj) kaj 'option
+/// ...;'. Skanas gxis la ';' je krampa profundo 0, respektante citilojn kaj
+/// strekojn; sen tiuj prefiksoj gxi redonas no-match (Result.err).
 fn sentencoIgnorataFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherError, OutOfMemory }!mecha.Result(Respondo) {
     _ = gpa;
 
@@ -733,7 +733,7 @@ fn sentencoIgnorataFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherErr
             } else if (c == '{') {
                 profundo += 1;
             } else if (c == '}') {
-                if (profundo == 0) return mecha.Result(Respondo).err(0); // cerraria el mensaje
+                if (profundo == 0) return mecha.Result(Respondo).err(0); // fermus la mesagxon
                 profundo -= 1;
             } else if (c == ';' and profundo == 0) {
                 return mecha.Result(Respondo).ok(i + 1, .{ .Type = .LINIO, .Data = .{ .l = &[_]u8{} } });
@@ -750,7 +750,7 @@ fn sentencoIgnorataFn(gpa: std.mem.Allocator, input: []const u8) error{ OtherErr
         }
         i += 1;
     }
-    return mecha.Result(Respondo).err(0); // sin ';' final
+    return mecha.Result(Respondo).err(0); // sen fina ';'
 }
 const sentenco_ignorata_parser = mecha.Parser(Respondo){ .parse = &sentencoIgnorataFn };
 
@@ -775,8 +775,8 @@ pub const protofile_parser = mecha.oneOf(.{
         for (items) |it| {
             switch (it.Type) {
                 .LINIO => {
-                    // Linea de nivel fichero no reconocida: se conserva para
-                    // que analizilo avise (no se pierde del todo en silencio).
+                    // Nerekonita dosiernivela linio: gxi konservigxas, por
+                    // ke analizilo avertu (ne perditajxas tute silente).
                     if (it.Data.l.len > 0) {
                         mia_ignorataj.append(shpa, it.Data.l) catch {};
                     }
@@ -803,7 +803,7 @@ pub const protofile_parser = mecha.oneOf(.{
             }
         }
 
-        // Por ciuj tipojn .TYPE_UNRESOLVED
+        // Por cxiuj tipoj .TYPE_UNRESOLVED
 
         for (mia_messages.items) |*msg| {
             dbgPrint("msg {s}\n", .{msg.name});

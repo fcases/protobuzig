@@ -4,39 +4,39 @@ const std = @import("std");
 // testo3.zig
 // -----------------------------------------------------------------------------
 //
-// Test minimo para validar la primera capa API generada por kgenapi.zig.
+// Minimuma testo por validi la unuan API-tavolon generitan de kgenapi.zig.
 //
-// Suposicion de directorio:
+// Supozo pri dosierujo:
 //
 //   testo3.zig
 //   generated/cctrol.zig
 //   generated/cctrol_api.zig
 //   generated/encdec.zig
 //
-// Es decir, todos los ficheros necesarios estan en el mismo directorio.
+// Tio estas, cxiuj necesaj dosieroj estas en la sama dosierujo.
 //
-// Compilacion manual desde ese directorio:
+// Permana kompilado el tiu dosierujo:
 //
 //   zig build-exe testo3.zig
 //   ./testo3
 //
-// O con salida explicita:
+// Aux kun eksplicita eligo:
 //
 //   zig build-exe testo3.zig -femit-bin=testo3
 //   ./testo3
 //
-// Objetivo:
+// Celo:
 //
-//   - Crear un EstMeteo usando cctrol_api.zig.
-//   - Serializarlo a binario protobuf.
-//   - Deserializarlo de vuelta.
-//   - Escribirlo a Protobuf Text.
-//   - Leerlo de vuelta desde Protobuf Text.
-//   - Cerrar todo sin leaks.
+//   - Krei EstMeteo per cctrol_api.zig.
+//   - Seriigi gxin al binara protobuf.
+//   - Deseriigi gxin returne.
+//   - Skribi gxin al Protobuf Text.
+//   - Legi gxin returne el Protobuf Text.
+//   - Fermi cxion sen fugetoj.
 //
-// De momento NO se usan setters de campo en la API, porque todavia no los hemos
-// generado en cctrol_api.zig. Para rellenar campos se toca api.impl directamente.
-// Esto es temporal y justamente es lo que eliminaremos cuando generemos setters.
+// Momente oni NE uzas kampajn setter-ojn en la API, cxar ni ankoraux ne generis
+// ilin en cctrol_api.zig. Por plenigi kampojn oni tusxas api.impl rekte.
+// Tio estas provizora kaj gxuste tion ni forigos kiam ni generos setter-ojn.
 //
 // -----------------------------------------------------------------------------
 
@@ -641,7 +641,7 @@ fn testRepeatedMessage(allocator: std.mem.Allocator) !void {
         90.0,
     );
 
-    // Modificamos el original para comprobar que appendMeteos hizo copia profunda.
+    // Ni modifas la originalon por kontroli, ke appendMeteos kopiis profunde.
     try meteo.setNombre(allocator, "meteo-original-modificada");
     meteo.setTemp(99);
     meteo.setVViento(99.5);
@@ -759,16 +759,16 @@ fn testOptionalDefaultPresencia(allocator: std.mem.Allocator) !void {
     var cfg = try ConfigApi.AppConfig.initDefault(allocator);
     defer cfg.deinit(allocator);
 
-    // optional con default explicito:
-    // initDefault() materializa el default como valor presente.
+    // optional kun eksplicita defauxlto:
+    // initDefault() materialigas la defauxlton kiel cxeestan valoron.
     try std.testing.expect(cfg.hasActivateTrace());
     try std.testing.expectEqual(
         @as(?bool, false),
         cfg.getActivateTrace(),
     );
 
-    // Lo seteamos de nuevo al mismo valor default para validar que
-    // optional presente con valor default se serializa igualmente.
+    // Ni resetas gxin al la sama defauxlta valoro por validi, ke
+    // cxeesta optional kun defauxlta valoro serialigxas same.
     cfg.setActivateTrace(false);
 
     try std.testing.expect(cfg.hasActivateTrace());
@@ -820,7 +820,7 @@ fn testOptionalDefaultPresencia(allocator: std.mem.Allocator) !void {
         cfg3.getActivateTrace(),
     );
 
-    // clearX() si debe llevarlo a null.
+    // clearX() ja devas konduki gxin al null.
     cfg3.clearActivateTrace();
 
     try std.testing.expect(!cfg3.hasActivateTrace());
@@ -1151,12 +1151,12 @@ fn testRepeatedScalar(allocator: std.mem.Allocator) !void {
 }
 
 fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
-    // R2: round-trip de REPEATED via Protobuf Text (>=2 elementos, GPA).
-    // Los tests anteriores solo cubrian repeated en binario.
-    // Aqui se cubren repeated message y repeated string; el scalar float
-    // en texto tambien parsea (se deja fuera por brevedad).
+    // R2: rondvojo de REPEATED per Protobuf Text (>=2 elementoj, GPA).
+    // La antauxaj testoj kovris repeated nur en binara formato.
+    // Cxi tie oni kovras repeated message kaj repeated string; la skalara
+    // float en teksto ankaux analizigxas (lasita ekstere pro mallongeco).
 
-    // 1) repeated MESSAGE: EstRemCtrol.meteos con 2 EstMeteo.
+    // 1) repeated MESSAGE: EstRemCtrol.meteos kun 2 EstMeteo.
     var remota = try Api.EstRemCtrol.initDefault(allocator);
     defer remota.deinit(allocator);
     try remota.setNombre(allocator, "remota-txt-1");
@@ -1204,7 +1204,7 @@ fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
     defer meteo_txt_b.deinit(allocator);
     try expectEstMeteo(meteo_txt_b, "meteo-txt-b", 22, 6.5, 20.0);
 
-    // 2) repeated STRING: UnixSocketStarConfig.remote_socket_paths con 2 rutas.
+    // 2) repeated STRING: UnixSocketStarConfig.remote_socket_paths kun 2 vojoj.
     var usox = try ConfigApi.UnixSocketStarConfig.initDefault(allocator);
     defer usox.deinit(allocator);
     try usox.setLocalSocketPath(allocator, "/tmp/local.sock");
@@ -1245,12 +1245,12 @@ fn testRepeatedProtobufTexto(allocator: std.mem.Allocator) !void {
 }
 
 fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
-    // R8: oneof con miembro scalar (numero) y enum (tp) en Protobuf Text + JSON.
+    // R8: oneof kun skalara membro (numero) kaj enum (tp) en teksto kaj JSON.
     var panel = try Api.PanelBase.initDefault(allocator);
     defer panel.deinit(allocator);
     try panel.setNombre(allocator, "r8-oneof");
 
-    // Rama scalar: uint32 numero (Protobuf Text roundtrip).
+    // Skalara brancxo: uint32 numero (Protobuf Text rondvojo).
     panel.setDatosNumero(allocator, 1234);
     try std.testing.expect(panel.hasDatosNumero());
     try std.testing.expectEqual(@as(u32, 1234), try panel.getDatosNumero());
@@ -1262,7 +1262,7 @@ fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
     try std.testing.expect(p1.hasDatosNumero());
     try std.testing.expectEqual(@as(u32, 1234), try p1.getDatosNumero());
 
-    // Cambio de rama scalar -> enum (libera la anterior; GPA lo verifica).
+    // Sxangxo skalara -> enum (liberigas la antauxan brancxon; GPA kontrolas).
     panel.setDatosTp(allocator, .NUMERO);
     try std.testing.expect(panel.hasDatosTp());
     try std.testing.expectEqual(Api.TipoPanel.NUMERO, try panel.getDatosTp());
@@ -1274,7 +1274,7 @@ fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
     try std.testing.expect(p2.hasDatosTp());
     try std.testing.expectEqual(Api.TipoPanel.NUMERO, try p2.getDatosTp());
 
-    // JSON roundtrip con la rama enum.
+    // JSON-rondvojo kun la enum-brancxo.
     const json = try panel.writeToText(allocator, .TF_JSON);
     defer allocator.free(json);
     var p3 = try Api.PanelBase.readFromText(allocator, json, .TF_JSON);
@@ -1285,7 +1285,7 @@ fn testOneofTextoScalarYEnum(allocator: std.mem.Allocator) !void {
 }
 
 fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
-    // R8: BF_BASE64 con repeated grande (500 floats) y GPA.
+    // R8: BF_BASE64 kun granda repeated (500 float) kaj GPA.
     var trafico = try Api.SnrTrafico.initDefault(allocator);
     defer trafico.deinit(allocator);
     try trafico.setSeccion(allocator, "R8-B64");
@@ -1310,10 +1310,10 @@ fn testRepeatedBase64Grande(allocator: std.mem.Allocator) !void {
 }
 
 fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
-    // R8: JSON con dos ramas del oneof -> ERROR (std.json rechaza duplicados;
-    // no hay last-one-wins en JSON, se documenta).
-    // L1 resuelto: la ruta de error del parseo JSON generado ya no filtra
-    // (parseFromSlice con arena + copia); el parse directo debe quedar limpio.
+    // R8: JSON kun du brancxoj de la oneof -> ERARO (std.json malakceptas
+    // duplikatojn; ne ekzistas last-one-wins en JSON, oni dokumentas gxin).
+    // L1 solvita: la erarvojo de la generita JSON-analizo ne plu fugetas
+    // (parseFromSlice kun areno + kopio); la rekta analizo devas resti pura.
     const json = "{\"nombre\":\"n\",\"tipo\":\"NUMERO\",\"datos\":{\"numero\":7,\"tp\":\"TEXTO\"}}";
     if (Api.PanelBase.readFromText(allocator, json, .TF_JSON)) |_| {
         return error.ShouldRejectDuplicates;
@@ -1322,7 +1322,7 @@ fn testOneofJsonDuplicados(allocator: std.mem.Allocator) !void {
 }
 
 fn testPackedRepeated(allocator: std.mem.Allocator) !void {
-    // R8: repeated con [packed = true] (path/vals) y control no-packed (simple).
+    // R8: repeated [packed = true] (path/vals) kaj kontrolo ne-packed (simple).
     var m = try R8Raw.PackedMsg.initDefault(allocator);
     defer m.deinit(allocator);
 
@@ -1353,7 +1353,7 @@ fn testPackedRepeated(allocator: std.mem.Allocator) !void {
 }
 
 fn testFormatosNegativos(allocator: std.mem.Allocator) !void {
-    // R8: entradas JSON/ZON invalidas -> error (no silencio) y GPA limpio.
+    // R8: JSON/ZON-enigoj nevalidaj -> eraro (ne silento) kaj pura GPA.
     if (ConfigApi.AppConfig.readFromText(allocator, "{ no es json", .TF_JSON)) |_| {
         return error.ShouldFailJson;
     } else |_| {}

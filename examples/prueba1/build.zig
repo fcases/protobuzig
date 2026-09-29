@@ -4,12 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Sin libreria ni modulo raiz en el supuesto solo-Zig: main y tests
-    // importan src/runtime por ruta relativa. Un root.zig/paquete (y la
-    // libreria .a) se reintroducira cuando exista un consumidor externo
-    // (escenario C: fachada sobre la API segura generada).
+    // Sen biblioteko nek radika modulo en la supozo nur-Zig: main
+    // kaj tests importas src/runtime per relativa vojo. root.zig/pakajxo
+    // (kaj la .a-biblioteko) revenos kiam ekzistos ekstera konsumanto
+    // (scenaro C: fasado super la generita sekura API).
 
-    // Ejecutable de ejemplo (src/main.zig): codigo de usuario.
+    // Ekzempla plenumeblo (src/main.zig): uzanta kodo.
     const main_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    // Run: ejecuta el ejemplo.
+    // Run: plenumas la ekzemplon.
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_cmd.addArgs(args);
@@ -31,11 +31,11 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Ejecuta el ejemplo de src/main.zig");
     run_step.dependOn(&run_cmd.step);
 
-    // Check: compila el exe sin ejecutar.
+    // Check: kompilas la exe sen plenumi.
     const check_step = b.step("check", "Compila sin ejecutar");
     check_step.dependOn(&exe.step);
 
-    // Test: round-trip por mensaje (src/tests.zig).
+    // Test: rondvoja testo por cxiu mesagxo (src/tests.zig).
     const tests_mod = b.createModule(.{
         .root_source_file = b.path("src/tests.zig"),
         .target = target,

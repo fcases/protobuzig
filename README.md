@@ -116,6 +116,18 @@ la generitajn dosierojn.
 
 ---
 
+## Lingvaj reguloj (2026-09-29)
+
+- Komentoj de ProtobuZig: **Esperanto**. (K6Bus uzas la anglan por la siaj; la
+  konvencio estas skribita en `Directrices 14` de K6Bus.)
+- Identigiloj generitaj: la parto `_raw` en Esperanto kaj la parto `_api` en la
+  angla; oni NE tradukas ilin permane.
+- Tekstoj por la uzanto (helpo, eraroj, mesaĝoj de la ekzemploj): **la angla**.
+- La generitaj dosieroj kiuj estas enmetitaj en la deponejon regeneriĝas per la
+  nova generatoro, por ke iliaj komentoj sekvu tiun ĉi regulon.
+
+---
+
 ## Stato (mallonge)
 
 Pendaj aferoj kaj historio: vidu la TODO de K6Bus. La internaj testoj (GPA,

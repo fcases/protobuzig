@@ -1,51 +1,51 @@
 const std = @import("std");
 
-// main.zig: codigo de USUARIO.
+// main.zig: kodo de UZANTO.
 //
-// Ejemplo generado por protobuzig --ws. Modificalo libremente para
-// poner la logica de tu problema: crear mensajes, rellenar campos,
-// escribir a fichero, cambiar de formato, etc.
+// Ekzemplo generita de protobuzig --ws. Modifu gxin libere por
+// meti la logikon de via problemo: krei mesagxojn, plenigi kampojn,
+// skribi al dosiero, sxangxi formaton, ktp.
 //
-// Lo generado vive en src/runtime:
+// La generitajxo vivas en src/runtime:
 //
-//     r8.zig       implementacion RAW (uso interno; no la importes)
-//     r8_api.zig   API SEGURA sobre el raw: usa ESTA
-//     encdec.zig         soporte de serializacion
+//     r8.zig       RAW-implemento (interna uzo; ne importu gxin)
+//     r8_api.zig   SEKURA API super la raw: uzu CXI TIU
+//     encdec.zig         subteno de seriajxo
 //
 //     const r8 = @import("runtime/r8_api.zig");
 //
-// El namespace lleva el nombre del CONTRATO (el del fichero .proto) y el
-// mensaje de ejemplo es el PRIMER mensaje definido en el.
+// La nomspaco portas la nomon de la KONTRAKTO (tiun de la dosiero
+// .proto) kaj la ekzempla mesagxo estas la UNUA difinita en gxi.
 const r8 = @import("runtime/r8_api.zig");
-const PackedMsg = r8.PackedMsg;   // el primer mensaje del contrato
+const PackedMsg = r8.PackedMsg;   // la unua mesagxo de la kontrakto
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const a = gpa.allocator();
 
-    // 1) Crea un objeto del mensaje del contrato.
+    // 1) Kreu objekton de la mesagxo de la kontrakto.
     var msg = try PackedMsg.initDefault(a);
     defer msg.deinit(a);
 
-    // TODO: rellena aqui tus campos con la API segura (X_api.zig en
-    // src/runtime, no el raw). Por ejemplo:
-    //     try msg.setMiString(a, "valor");     // []const u8: copia
-    //     msg.setMiNumero(7);                  // escalares
+    // TODO: plenigu cxi tie viajn kampojn per la sekura API (X_api.zig
+    // en src/runtime, ne la raw). Ekzemple:
+    //     try msg.setMiString(a, "valor");     // []const u8: kopio
+    //     msg.setMiNumero(7);                  // skalaroj
     //     try msg.appendMiLista(a, &elemento); // repeated
 
 
-    // 2) Escribelo a fichero como Protobuf Text y leelo de vuelta.
+    // 2) Skribu gxin al dosiero kiel Protobuf Text kaj relegu gxin.
     try msg.writeToFile(a, "demo.txt", .TF_PROTOBUF);
     var desde_texto = try PackedMsg.readFromFile(a, "demo.txt", .TF_PROTOBUF);
     defer desde_texto.deinit(a);
 
-    // 3) Cambia de formato: binario Protocol Buffers, y leelo de vuelta.
+    // 3) Sxangxu formaton: binara Protocol Buffers, kaj relegu gxin.
     try msg.serializeToFile(a, "demo.pb", .BF_PROTOBUF);
     var desde_binario = try PackedMsg.deserializeFromFile(a, "demo.pb", .BF_PROTOBUF);
     defer desde_binario.deinit(a);
 
-    // 4) Muestra el contenido por consola.
+    // 4) Montru la enhavon sur la konzolo.
     const texto = try msg.writeToText(a, .TF_PROTOBUF);
     defer a.free(texto);
     std.debug.print("{s}\n", .{texto});

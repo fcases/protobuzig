@@ -6,21 +6,21 @@ const prs = @import("mecha_prs.zig");
 // kgapi_auks.zig
 // ============================================================================
 //
-// Helpers auxiliares para kgenapi.zig.
+// Auksiliaj helpiloj por kgenapi.zig.
 //
-// Este fichero contiene utilidades especificas de la API segura generada:
+// Cxi tiu dosiero enhavas utilajojn specifajn al la generita sekura API:
 //
-//   - deteccion de tipos de campo.
-//   - nombres de metodos publicos.
-//   - conversion snake_case -> PascalCase.
-//   - helpers futuros para append/get/clear.
+//   - detekto de kampaj tipoj.
+//   - nomoj de publikaj metodoj.
+//   - konverto snake_case -> PascalCase.
+//   - estontaj helpiloj por append/get/clear.
 //
-// No debe mezclarse con kgen_auks.zig, que pertenece al generador raw.
+// Gxi ne miksu kun kgen_auks.zig, kiu apartenas al la kruda generatoro.
 //
 // ============================================================================
 
 // ============================================================================
-// CLASIFICACION DE CAMPOS
+// KLASIFIKADO DE KAMPOJ
 // ============================================================================
 
 pub fn estasRequiredScalarOrEnum(field: prs.Field) bool {
@@ -131,7 +131,7 @@ pub fn estasRepeatedMessage(field: prs.Field) bool {
 }
 
 // ============================================================================
-// NOMBRES DE METODOS
+// NOMOJ DE METODOJ
 // ============================================================================
 pub fn skribiSetNomon(
     allocator: std.mem.Allocator,
@@ -282,7 +282,7 @@ pub fn skribiOneofFieldHasNomon(allocator: std.mem.Allocator, oneof_name: []cons
 }
 
 // ============================================================================
-// UTILIDADES DE NOMBRE
+// UTILAJOJ PRI NOMOJ
 // ============================================================================
 pub fn skribiMetodoNomon(
     allocator: std.mem.Allocator,
@@ -340,19 +340,19 @@ pub fn skribiPascalNomon(
 }
 
 // ============================================================================
-// IDENTIFICADORES DERIVADOS DEL NOMBRE DEL FICHERO .proto (F9)
+// IDENTIGILOJ DERIVITAJ DE LA NOMO DE LA DOSIERO .proto (F9)
 // ============================================================================
 //
-// El nombre base del fichero .proto no siempre vale como identificador Zig:
-// "my-proto" (guion), "2fa" (empieza por digito) o "test"/"error" (palabra
-// reservada) generaban codigo que no compila (const my-proto_impl = Raw;).
-// Estas funciones sanan el nombre para usarlo como identificador, tanto en la
-// API segura (*_impl) como en el andamiaje --ws (namespace del contrato).
+// La baza nomo de la .proto-dosiero ne cxiam validas kiel Zig-identigilo:
+// "my-proto" (streko), "2fa" (komencigxas per cifero) aux "test"/"error"
+// (rezervita vorto) generis kodon, kiu ne kompilas (const my-proto_impl =
+// Raw;). Cxi tiuj funkcioj sanigas la nomon por uzi gxin kiel identigilon,
+// kaj en la sekura API (*_impl) kaj en la skafaldo --ws (nomspaco).
 
-/// Palabras que no sirven como nombre de declaracion en Zig: palabras
-/// reservadas del lenguaje y nombres de tipos primitivos (que no se pueden
-/// sombrear). La lista va de sobra: si alguna se escapa, el generado falla con
-/// un error de Zig claro y se anade aqui.
+/// Vortoj, kiuj ne servas kiel deklaracia nomo en Zig: rezervitaj vortoj de
+/// la lingvo kaj nomoj de primitivaj tipoj (kiujn oni ne povas ombri). La
+/// listo estas pli ol suficxa: se iu eskapas, la generitajxo malsukcesas per
+/// klara Zig-eraro kaj oni aldonas gxin cxi tie.
 const REZERVITAJ = [_][]const u8{
     "addrspace",      "align",       "allowzero", "and",      "anyframe",
     "anytype",        "asm",         "async",     "await",    "break",
@@ -374,7 +374,7 @@ pub fn estasRezervita(nomo: []const u8) bool {
         if (std.mem.eql(u8, nomo, rezervita)) return true;
     }
 
-    // Tipos primitivos con tamano (u8, i32, f64...).
+    // Primitivaj tipoj kun grando (u8, i32, f64...).
     if (nomo.len >= 2 and (nomo[0] == 'u' or nomo[0] == 'i' or nomo[0] == 'f')) {
         var nur_ciferoj = true;
         for (nomo[1..]) |c| {
@@ -386,7 +386,7 @@ pub fn estasRezervita(nomo: []const u8) bool {
     return false;
 }
 
-/// ¿Se puede usar `nomo` tal cual como nombre de declaracion en Zig?
+/// CXu oni povas uzi `nomo` rekte kiel deklaracian nomon en Zig?
 pub fn uzeblaKielIdent(nomo: []const u8) bool {
     if (nomo.len == 0) return false;
     if (std.ascii.isDigit(nomo[0])) return false;
@@ -398,9 +398,9 @@ pub fn uzeblaKielIdent(nomo: []const u8) bool {
     return !estasRezervita(nomo);
 }
 
-/// Nombre derivado del nombre base del .proto que SI vale como identificador
-/// Zig: los caracteres que no valen pasan a '_', no puede empezar por digito y
-/// no puede ser palabra reservada (se le anade el sufijo "_proto").
+/// Nomo derivita de la baza nomo de la .proto, kiu JES validas kiel Zig-
+/// identigilo: nevalidaj signoj farigxas '_', gxi ne povas komencigxi per
+/// cifero kaj ne povas esti rezervita vorto (oni aldonas sufikson "_proto").
 pub fn nomoIdentebla(
     allocator: std.mem.Allocator,
     basa: []const u8,
@@ -423,7 +423,7 @@ pub fn nomoIdentebla(
     return try bufro.toOwnedSlice(allocator);
 }
 
-/// Nombre del alias interno a los tipos raw: `<base saneada>_impl` (F9).
+/// Nomo de la interna aliaso al la krudaj tipoj: `<purigita bazo>_impl` (F9).
 pub fn implNomon(
     allocator: std.mem.Allocator,
     basa: []const u8,

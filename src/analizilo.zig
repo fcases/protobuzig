@@ -3,11 +3,19 @@ const dbgPrint = std.debug.print;
 const shpa = std.heap.page_allocator;
 const prs = @import("mecha_prs.zig");
 
+/// Maksimuma numero de kampo laux la protobuf-speco (2^29 - 1). Pli granda
+/// numero trunkas la sxlosilon kaj la kampo neniam malcxifrigxos.
+const MAKSIMUMA_KAMPO: u32 = 536870911;
+
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
-    // Conecta tambien las trazas internas de mecha_prs.zig al flag presi/verbose.
+/// F5: legas kaj analizas la .proto-dosieron. `malstrikta` (--lenient) elektas
+/// la malnovan konduton "averto kaj dauxrigi" por la linioj, kiujn la sintaksa
+/// analizilo ne rekonis; sen gxi tiuj linioj estas ERARO (vidu
+/// kontroliIgnoratajnLinojn).
+pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool, malstrikta: bool) !prs.ProtoFile {
+    // Konektas ankaux la internajn spurojn de mecha_prs.zig al la flagilo presi.
     prs.setVerbose(presi);
 
     const dosiero = try std.fs.cwd().openFile(dosieroaNomo, .{});
@@ -33,8 +41,8 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
             pf = &la_pf;
         },
         .err => {
-            // F5: error de gramatica con posicion (linea:columna) en vez de
-            // un ParseError mudo.
+            // F5: gramatika eraro kun pozicio (linio:kolumno) anstataux muta
+            // ParseError.
             const idx = @min(rezulto.index, nuda_enhavo.len);
             var linio: usize = 1;
             var kolumno: usize = 1;
@@ -47,7 +55,7 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
                 }
             }
             std.debug.print(
-                "protobuzig: error de parseo en {s} (linea {d}, columna {d}). Usa --verbose para trazas del parser.\n",
+                "protobuzig: parse error in {s} (line {d}, column {d}). Use --verbose for parser traces.\n",
                 .{ dosieroaNomo, linio, kolumno },
             );
             return error.ParseError;
@@ -55,51 +63,181 @@ pub fn analiziDosieron(dosieroaNomo: []const u8, presi: bool) !prs.ProtoFile {
     }
     if (presi) presiProtoDosieron(pf.*);
 
-    try avertiIgnoratajnLinojn(pf.*, nuda_enhavo);
+    // F5: la sinsekvo gravas - unue la linioj forjxetitaj de la sintaksa
+    // analizilo (povas esti tuta mesagxo), poste la AST-kontroloj.
+    try kontroliIgnoratajnLinojn(pf.*, nuda_enhavo, malstrikta, dosieroaNomo);
 
     try validiNedifinitajnTipojn(pf.*, dosieroaNomo);
 
+    try validiKampojn(pf.*, dosieroaNomo);
+
     return pf.*;
 }
-// Me faltan   extensions,
+// Ankoraux mankas   extensions,
 
-/// F5: aviso (no error) por cada linea de nivel fichero que el parser no
-/// reconocio y descarto (other_line). El usuario del proto decide que hacer:
-/// modificarlo o asumirlo. Se calcula el numero de linea buscando el texto
-/// en el contenido (tras quitar comentarios) de forma secuencial.
-fn avertiIgnoratajnLinojn(pf: prs.ProtoFile, enhavo: []const u8) !void {
+/// F5: linioj de nivelo de dosiero, kiujn la sintaksa analizilo ne rekonis kaj
+/// forjxetis (other_line). Antauxe oni nur averis pri ili kaj dauxrigis, sed
+/// tia linio povas esti MESAGXO tuta (eraro de sintakso, kampo sen nomo): la
+/// kontrakto restus malplena kaj la generita kodo mensogus pri la datumoj.
+/// Nun: ERARO (eliro != 0, nenio generita) montrante CXIUJN koncernatajn
+/// liniojn; --lenient (malstrikta) reakiras la malnovan averton por kiu scias,
+/// kion gxi faras. La numero de linio estas kalkulita sercxante la tekston
+/// sinsekve en la enhavo (post forigo de komentoj).
+fn kontroliIgnoratajnLinojn(
+    pf: prs.ProtoFile,
+    enhavo: []const u8,
+    malstrikta: bool,
+    dosieroaNomo: []const u8,
+) !void {
     var cursor: usize = 0;
+    var eraro = false;
+
     for (pf.ignorataj) |linio| {
         if (linio.len == 0) continue;
 
-        const encontrada = std.mem.indexOf(u8, enhavo[cursor..], linio) orelse {
-            std.debug.print(
-                "protobuzig: aviso: linea ignorada: '{s}' (constructo no soportado o sintaxis desconocida).\n",
-                .{linio},
-            );
-            continue;
-        };
-        const pos = cursor + encontrada;
-        cursor = pos + linio.len;
-
-        var numero_linio: usize = 1;
-        for (enhavo[0..pos]) |c| {
-            if (c == '\n') numero_linio += 1;
+        var numero_linio: usize = 0;
+        if (std.mem.indexOf(u8, enhavo[cursor..], linio)) |encontrada| {
+            const pos = cursor + encontrada;
+            cursor = pos + linio.len;
+            numero_linio = 1;
+            for (enhavo[0..pos]) |c| {
+                if (c == '\n') numero_linio += 1;
+            }
         }
 
         const fragmento = if (linio.len > 70) linio[0..70] else linio;
-        std.debug.print(
-            "protobuzig: aviso: linea {d}: '{s}' (constructo no soportado o sintaxis desconocida; ignorada).\n",
-            .{ numero_linio, fragmento },
-        );
+
+        if (malstrikta) {
+            std.debug.print(
+                "protobuzig: warning: line ignored: '{s}' (unsupported construct or unknown syntax).\n",
+                .{fragmento},
+            );
+            continue;
+        }
+
+        eraro = true;
+        if (numero_linio > 0) {
+            std.debug.print(
+                "protobuzig: error: {s}: line {d}: '{s}' was not understood and would be discarded (see F5: a dropped message generates an empty contract). Use --lenient to ignore it as before.\n",
+                .{ dosieroaNomo, numero_linio, fragmento },
+            );
+        } else {
+            std.debug.print(
+                "protobuzig: error: {s}: '{s}' was not understood and would be discarded (see F5). Use --lenient to ignore it as before.\n",
+                .{ dosieroaNomo, fragmento },
+            );
+        }
+    }
+
+    if (eraro) return error.IgnoredProtoLine;
+}
+
+/// F5: kontrolo de la kampoj de la AST, antaux ol skribi ion ajn:
+///   - numero ekster 1..536870911 (la sintaksa analizilo faras 0 el '= -1' kaj
+///     el nelegeblaj numeroj, kaj 0 aux tro granda numero perdigxas la kampon
+///     en la drato: la malcxifrilo neniam trovos gxin);
+///   - duobla numero aux duobla nomo en la sama mesagxo (unu kampo kasxas la
+///     alian kaj la dua brancxo de la malcxifrilo estas morta kodo);
+///   - kampo sen nomo ('repeated Cia = 4;').
+/// Oni kontrolas ankaux la alternativojn de oneof (sama nomspaco kaj sama
+/// numero-spaco kiel la ordinaraj kampoj) kaj la internajn mesagxojn.
+fn validiKampojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
+    for (pf.messages) |msg| {
+        try validiMesagxon(msg, dosieroaNomo);
     }
 }
 
-/// F5: errores limpios para tipos no definidos. Tras la resolucion por
-/// nombre, cualquier campo cuyo tipo siga contando como "message asumido
-/// externo" (no definido localmente) es un typo o una referencia a otro
-/// fichero; sin imports en el proto no puede ser una referencia externa
-/// legitima -> error con contexto.
+/// Referenco al unu kampo de mesagxo (ordinara aux de oneof), por kontroli
+/// numerojn kaj nomojn en unu sola listo.
+const KampoRef = struct {
+    numero: u32,
+    nomo: []const u8,
+    tipo: []const u8,
+    oneof: ?[]const u8,
+};
+
+fn validiMesagxon(msg: prs.Message, dosieroaNomo: []const u8) !void {
+    var kampoj = std.ArrayList(KampoRef).empty;
+    defer kampoj.deinit(shpa);
+
+    for (msg.fields) |k| {
+        kampoj.append(shpa, .{
+            .numero = k.number,
+            .nomo = k.name,
+            .tipo = k.field_type,
+            .oneof = null,
+        }) catch return error.OutOfMemory;
+    }
+    for (msg.oneofs) |oneof_decl| {
+        for (oneof_decl.fields) |k| {
+            kampoj.append(shpa, .{
+                .numero = k.number,
+                .nomo = k.name,
+                .tipo = k.field_type,
+                .oneof = oneof_decl.name,
+            }) catch return error.OutOfMemory;
+        }
+    }
+
+    for (kampoj.items) |k| {
+        // Por la diagnozo: kie gxi precize estas (oneof aux ne).
+        const loko = if (k.oneof) |oo|
+            std.fmt.allocPrint(shpa, "in oneof '{s}'", .{oo}) catch return error.OutOfMemory
+        else
+            shpa.dupe(u8, "not in a oneof") catch return error.OutOfMemory;
+        defer shpa.free(loko);
+
+        if (k.numero == 0) {
+            std.debug.print(
+                "protobuzig: error: {s}: field '{s}' of message '{s}' has number 0 ({s}). Valid numbers are 1..{d}; the wire tag 0 is invalid and 'field = -1' is read as 0.\n",
+                .{ dosieroaNomo, k.nomo, msg.name, loko, MAKSIMUMA_KAMPO },
+            );
+            return error.InvalidFieldNumber;
+        }
+        if (k.numero > MAKSIMUMA_KAMPO) {
+            std.debug.print(
+                "protobuzig: error: {s}: field '{s}' of message '{s}' has number {d} ({s}); the maximum is {d} (a larger key is truncated and the field is never decoded).\n",
+                .{ dosieroaNomo, k.nomo, msg.name, k.numero, loko, MAKSIMUMA_KAMPO },
+            );
+            return error.InvalidFieldNumber;
+        }
+        if (k.nomo.len == 0) {
+            std.debug.print(
+                "protobuzig: error: {s}: a field of message '{s}' has no name (number {d}, {s}).\n",
+                .{ dosieroaNomo, msg.name, k.numero, loko },
+            );
+            return error.MissingFieldName;
+        }
+    }
+
+    for (kampoj.items, 0..) |a, i| {
+        for (kampoj.items[i + 1 ..]) |b| {
+            if (a.numero == b.numero) {
+                std.debug.print(
+                    "protobuzig: error: {s}: message '{s}' uses number {d} twice: field '{s}' and field '{s}'.\n",
+                    .{ dosieroaNomo, msg.name, a.numero, a.nomo, b.nomo },
+                );
+                return error.DuplicateFieldNumber;
+            }
+            if (std.mem.eql(u8, a.nomo, b.nomo)) {
+                std.debug.print(
+                    "protobuzig: error: {s}: message '{s}' uses the name '{s}' twice (numbers {d} and {d}).\n",
+                    .{ dosieroaNomo, msg.name, a.nomo, a.numero, b.numero },
+                );
+                return error.DuplicateFieldName;
+            }
+        }
+    }
+
+    for (msg.internal_msgs) |interna| {
+        try validiMesagxon(interna, dosieroaNomo);
+    }
+}
+
+/// F5: klaraj eraroj por ne difinitaj tipoj. Post la rekonado laux nomo, cxiu
+/// kampo, kiu ankoraux estas "ekstera mesagxo supozita" (ne difinita loke), es
+/// tajperaro aux referenco al alia dosiero; sen import en la .proto gxi ne
+/// povas esti legxosxata ekstera referenco -> eraro kun kunteksto.
 fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
     if (pf.imports.len > 0) return; // referencias cross-file: territorio R7
 
@@ -119,7 +257,7 @@ fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
         for (msg.fields) |field| {
             if (field.field_type_enum == .TYPE_MESSAGE and !esLocal(pf, field.field_type)) {
                 std.debug.print(
-                    "protobuzig: error: tipo no definido '{s}' en el campo '{s}' del mensaje '{s}' ({s}).\n",
+                    "protobuzig: error: undefined type '{s}' in field '{s}' of message '{s}' ({s}).\n",
                     .{ field.field_type, field.name, msg.name, dosieroaNomo },
                 );
                 return error.UndefinedProtoType;
@@ -129,7 +267,7 @@ fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
             for (oneof_decl.fields) |field| {
                 if (field.field_type_enum == .TYPE_MESSAGE and !esLocal(pf, field.field_type)) {
                     std.debug.print(
-                        "protobuzig: error: tipo no definido '{s}' en la alternativa '{s}' del oneof '{s}' del mensaje '{s}' ({s}).\n",
+                        "protobuzig: error: undefined type '{s}' in alternative '{s}' of oneof '{s}' of message '{s}' ({s}).\n",
                         .{ field.field_type, field.name, oneof_decl.name, msg.name, dosieroaNomo },
                     );
                     return error.UndefinedProtoType;
@@ -139,13 +277,13 @@ fn validiNedifinitajnTipojn(pf: prs.ProtoFile, dosieroaNomo: []const u8) !void {
     }
 }
 
-/// Diagnostico limpio de constructos que el generador NO soporta y que antes
-/// se descartaban en silencio (F5, parte):
-/// - syntax = "proto3"  -> error (el generador produce codigo proto2).
-/// - service / rpc / extend (nivel top) -> error.
-/// Los 'extensions 1000 to max;' DENTRO de mensajes (proto2, p. ej. los
-/// fixtures descriptor*.proto) se siguen ignorando: no afectan al wire de
-/// los campos propios del mensaje.
+/// Klara diagnozo de konstruoj, kiujn la generatoro NE subtenas kaj kiujn
+/// antauxe oni forjxetis silente (F5, parto):
+/// - syntax = "proto3"  -> eraro (la generatoro produktas proto2-kodon).
+/// - service / rpc / extend (nivelo de dosiero) -> eraro.
+/// La 'extensions 1000 to max;' EN mesagxoj (proto2, ekz. la fixtures
+/// descriptor*.proto) plu ignorigxas: ili ne tusxas la draton de la propraj
+/// kampoj de la mesagxo.
 fn kontroliNesubtenatajnKonstruojn(enhavo: []const u8) !void {
     var linio: usize = 1;
     var linioj = std.mem.splitScalar(u8, enhavo, '\n');
@@ -155,7 +293,7 @@ fn kontroliNesubtenatajnKonstruojn(enhavo: []const u8) !void {
         if (std.mem.startsWith(u8, nuda, "syntax")) {
             if (std.mem.indexOf(u8, linio_enhavo, "proto3") != null) {
                 std.debug.print(
-                    "protobuzig: error: syntax = \"proto3\" no soportado (linea {d}); el generador produce codigo proto2.\n",
+                    "protobuzig: error: syntax = \"proto3\" is not supported (line {d}); the generator emits proto2 code.\n",
                     .{linio},
                 );
                 return error.UnsupportedProto3Syntax;
@@ -166,7 +304,7 @@ fn kontroliNesubtenatajnKonstruojn(enhavo: []const u8) !void {
         for ([_][]const u8{ "service", "rpc", "extend" }) |konstruo| {
             if (komencePerVorto(nuda, konstruo)) {
                 std.debug.print(
-                    "protobuzig: error: constructo '{s}' no soportado (linea {d}).\n",
+                    "protobuzig: error: construct '{s}' is not supported (line {d}).\n",
                     .{ konstruo, linio },
                 );
                 return error.UnsupportedProtoConstruct;
@@ -175,8 +313,8 @@ fn kontroliNesubtenatajnKonstruojn(enhavo: []const u8) !void {
     }
 }
 
-/// True si 'teksto' empieza por la palabra 'vorto' (seguida de fin de linea o
-/// de un caracter no-identificador).
+/// True se 'teksto' komencigxas per la vorto 'vorto' (sekvata de fino de linio
+/// aux de ne-identiga signo).
 fn komencePerVorto(teksto: []const u8, vorto: []const u8) bool {
     if (!std.mem.startsWith(u8, teksto, vorto)) return false;
     if (teksto.len == vorto.len) return true;
@@ -227,21 +365,20 @@ fn nudiKomentaijnLinojn(input: []const u8) []const u8 {
     var i: usize = 0;
     while (i < input.len) {
         if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '/') {
-            // comentario de linea: descartar hasta '\n' (el '\n' se copia
-            // en la siguiente iteracion: las lineas no se fusionan).
+            // Kommento de linio: forjxeti gxis '\n' (la '\n' kopiigxas en la
+            // sekva iteracio: la linioj ne kungluigxas).
             while (i < input.len and input[i] != '\n') : (i += 1) {}
             continue;
         }
         if (i + 1 < input.len and input[i] == '/' and input[i + 1] == '*') {
-            // comentario de bloque (F5, parte): descartar hasta '*''/',
-            // conservando los '\n' para no descuadrar los numeros de linea
-            // de los diagnosticos posteriores.
+            // Bloka komento (F5, parto): forjxeti gxis '*''/', konservante la
+            // '\n'-ojn por ne mislokigi la linio-numerojn de la diagnozoj.
             i += 2;
             while (i + 1 < input.len and !(input[i] == '*' and input[i + 1] == '/')) {
                 if (input[i] == '\n') out.append(shpa, '\n') catch {};
                 i += 1;
             }
-            i += 2; // consumir '*' '/' (si no cerro, termina el bucle)
+            i += 2; // konsumi '*' '/' (se ne fermigxis, la buklo finigxas)
             continue;
         }
         out.append(shpa, input[i]) catch {};
@@ -268,7 +405,7 @@ fn presiProtoDosieron(ast: prs.ProtoFile) void {
     }
     dbgPrint("\n", .{});
 
-    // Enums fuera de mensajes
+    // Enumoj ekster mesagxoj
     dbgPrint("Enums:\n", .{});
     for (ast.enums) |en| {
         dbgPrint("  Enum: {s}\n", .{en.name});
@@ -299,7 +436,7 @@ fn presiProtoDosieron(ast: prs.ProtoFile) void {
             }
         }
 
-        // Enums dentro de mensaje
+        // Enumoj en mesagxo
         for (msg.internal_enums) |en| {
             dbgPrint("    - Enum: {s}\n", .{en.name});
             for (en.values) |v| {
@@ -307,7 +444,7 @@ fn presiProtoDosieron(ast: prs.ProtoFile) void {
             }
         }
 
-        // Mensajes dentro de mensaje
+        // Mesagxoj en mesagxo
         for (msg.internal_msgs) |imsg| {
             dbgPrint("    - Message: {s}\n", .{imsg.name});
             for (imsg.fields) |field| {

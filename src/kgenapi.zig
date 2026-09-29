@@ -1,7 +1,7 @@
 const std = @import("std");
 
-// Ajusta este import si en tu arbol el modulo del parser se llama de otra forma.
-// La idea es usar el mismo alias/tipo que en kgeneratoro.zig.
+// Adaptu cxi tiun importon se en via arbo la parser-modulo nomigxas alie.
+// La ideo estas uzi la saman aliason/tipon kiel en kgeneratoro.zig.
 const prs = @import("mecha_prs.zig");
 const pf = prs.ProtoFile;
 
@@ -12,26 +12,26 @@ const api_auks = @import("kgapi_auks.zig");
 // kgenapi.zig
 // ============================================================================
 //
-// Generador de API segura para tipos generados por ProtobuZig.
+// Generilo de sekura API por tipoj generitaj de ProtobuZig.
 //
-// Fase intermedia prevista:
+// Antauxvidita meza fazo:
 //
 //   cctrol.zig
-//       Tipos raw actuales generados por kgeneratoro.zig.
+//       Nunaj raw-tipoj generitaj de kgeneratoro.zig.
 //
 //   cctrol_api.zig
-//       Wrappers seguros sobre los tipos raw actuales.
+//       Sekuraj wrapper-oj super la nunaj raw-tipoj.
 //
-// Fase final posible:
+// Ebla fina fazo:
 //
 //   cctrol_impl.zig
-//       Tipos raw renombrados a *_impl.
+//       Raw-tipoj renomitaj al *_impl.
 //
 //   cctrol.zig
-//       Wrappers publicos definitivos.
+//       Difinitivaj publikaj wrapper-oj.
 //
-// Este modulo NO debe sustituir a kgeneratoro.zig.
-// Este modulo genera una capa adicional.
+// Cxi tiu modulo NE devas anstatauxi kgeneratoro.zig.
+// Cxi tiu modulo generas plian tavolon.
 //
 // ============================================================================
 
@@ -40,7 +40,7 @@ const ApiGenError = error{
 };
 
 // ============================================================================
-// API PUBLICA DEL MODULO
+// PUBLIKA API DE LA MODULO
 // ============================================================================
 
 pub fn generiZigAPI(
@@ -131,7 +131,7 @@ pub fn generiZigAPI(
 }
 
 // ============================================================================
-// NOMBRES DE FICHEROS
+// NOMOJ DE DOSIEROJ
 // ============================================================================
 
 fn akiriProtoBaseName(
@@ -171,7 +171,7 @@ fn akiriApiFileName(
 }
 
 // ============================================================================
-// CABECERA DEL FICHERO API
+// KAPLINIO DE LA API-DOSIERO
 // ============================================================================
 
 fn skribiDosieranKaplinion(
@@ -186,25 +186,25 @@ fn skribiDosieranKaplinion(
         \\// {s}
         \\// ============================================================================
         \\//
-        \\// Fichero generado por ProtobuZig / kgenapi.zig.
+        \\// Dosiero generita de ProtobuZig / kgenapi.zig.
         \\//
-        \\// Proto base:
+        \\// Baza proto:
         \\//   {s}
         \\//
-        \\// Raw generado:
+        \\// Generita raw:
         \\//   {s}
         \\//
-        \\// Este fichero contiene wrappers/API segura sobre el raw generado.
+        \\// Cxi tiu dosiero enhavas wrapper-ojn (sekura API) super la raw.
         \\//
-        \\// Fase intermedia:
-        \\//   - el fichero raw mantiene los tipos actuales.
-        \\//   - este fichero genera wrappers seguros encima.
+        \\// Meza fazo:
+        \\//   - la raw-dosiero konservas la nunajn tipojn.
+        \\//   - cxi tiu dosiero generas sekurajn wrapper-ojn supre.
         \\//
-        \\// Fase final posible:
-        \\//   - el fichero raw pasara a *_impl.zig.
-        \\//   - este fichero o su equivalente pasara a ser la API publica principal.
+        \\// Ebla fina fazo:
+        \\//   - la raw-dosiero pasos al *_impl.zig.
+        \\//   - cxi tiu dosiero aux gia ekvivalento farigxos cefa publika API.
         \\//
-        \\// No editar a mano salvo para depuracion.
+        \\// Ne redaktu mane krom por sencimigado.
         \\// ============================================================================
         \\
         \\
@@ -222,11 +222,11 @@ fn skribiRawNamespaceExpr(
     const package_name = ast_proto_dosiero.package_name orelse "";
 
     if (package_name.len == 0) {
-        // Sin package el raw NO abre namespace: sus tipos viven en el nivel
-        // superior del fichero raw (no en un namespace con el nombre del
-        // fichero). Referenciar RawFile.<fichero> generaba una api que no
-        // compilaba ("has no member named 'r8'"), y solo se veia con un proto
-        // sin package (F8, detectado con internaltests/protos/r8.proto).
+        // Sen package la raw NE malfermas nomspacon: gxiaj tipoj vivas en la
+        // supra nivelo de la raw-dosiero (ne en nomspaco kun la nomo de la
+        // dosiero). Referenci RawFile.<dosiero> generis api-on kiu ne
+        // kompilis ("has no member named 'r8'"), kaj tio vidigxis nur per
+        // proto sen package (F8, detektita per internaltests/protos/r8.proto).
         return try allocator.dupe(u8, "RawFile");
     }
 
@@ -249,7 +249,7 @@ fn skribiRawNamespaceExpr(
 }
 
 // ============================================================================
-// IMPORTS DEL FICHERO API
+// IMPORTOJ DE LA API-DOSIERO
 // ============================================================================
 fn skribiRawImportojn(
     allocator: std.mem.Allocator,
@@ -264,9 +264,9 @@ fn skribiRawImportojn(
     );
     defer allocator.free(raw_namespace_expr);
 
-    // El nombre base del fichero .proto puede no valer como identificador Zig
-    // ("my-proto", "2fa", "test"...): el alias *_impl usa el nombre saneado, o
-    // el fichero api generado no compila (F9).
+    // La baza nomo de la .proto-dosiero povas ne validi kiel Zig-identigilo
+    // ("my-proto", "2fa", "test"...): la aliaso *_impl uzas la saneigitan
+    // nomon, aux la generita api-dosiero ne kompilas (F9).
     const impl_nomo = try api_auks.implNomon(allocator, proto_base_name);
     defer allocator.free(impl_nomo);
 
@@ -278,17 +278,17 @@ fn skribiRawImportojn(
         \\pub const TekstaFormato = RawFile.TekstaFormato;
         \\pub const BinaraFormato = RawFile.BinaraFormato;
         \\
-        \\// Alias al namespace raw generado.
-        \\// En fase intermedia apunta al package actual del fichero raw.
+        \\// Aliaso al la generita raw-nomspaco.
+        \\// En la meza fazo gxi montras al la nuna package de la raw-dosiero.
         \\const Raw = {s};
         \\
-        \\// Alias intencionadamente llamado *_impl aunque en fase intermedia
-        \\// apunte al namespace raw actual.
+        \\// Aliaso intence nomita *_impl, kvankam en la meza fazo gxi
+        \\// montras al la nuna raw-nomspaco.
         \\//
-        \\// Fase intermedia:
+        \\// Meza fazo:
         \\//   const {s} = Raw;
         \\//
-        \\// Fase final:
+        \\// Fina fazo:
         \\//   const {s} = RawFile.<package>_impl;
         \\
         \\const {s} = Raw;
@@ -315,15 +315,15 @@ fn skribiEnumAliases(
 
     try buf.print(allocator,
         \\// ============================================================================
-        \\// ALIASES PUBLICOS A ENUMS RAW / IMPL
+        \\// PUBLIKAJ ALIASOJ AL RAW / IMPL-ENUMOJ
         \\// ============================================================================
         \\//
-        \\// Los enums no necesitan wrapper. Se reexportan desde el namespace raw/impl.
+        \\// Enum-oj ne bezonas wrapper-on. Ili reeksportigxas el raw/impl.
         \\//
-        \\// En fase intermedia:
+        \\// En la meza fazo:
         \\//   pub const TipoPanel = cctrol_impl.TipoPanel;
         \\//
-        \\// En fase final:
+        \\// En la fina fazo:
         \\//   pub const TipoPanel = cctrol_impl.TipoPanel;
         \\//
         \\
@@ -349,7 +349,7 @@ fn skribiEnumAliases(
 }
 
 // ============================================================================
-// SECCION INICIAL DEL API
+// KOMENCA SEKCIO DE LA API
 // ============================================================================
 
 fn skribiApiKomencanSekcion(
@@ -361,26 +361,26 @@ fn skribiApiKomencanSekcion(
 
     try buf.print(allocator,
         \\// ============================================================================
-        \\// API SEGURA
+        \\// SEKURA API
         \\// ============================================================================
         \\//
-        \\// Objetivo:
+        \\// Celo:
         \\//
-        \\//   - ocultar el acceso directo a campos owned siempre que sea posible.
-        \\//   - exponer setters/builders/getters controlados.
-        \\//   - ofrecer nombres publicos en ingles para operaciones generales:
+        \\//   - kasxi la rektan aliron al owned-kampoj kiam eble.
+        \\//   - montri kontrolitajn setter-ojn/builder-ojn/getter-ojn.
+        \\//   - proponi publikajn nomojn en la angla por generalaj operacioj:
         \\//       serializeToBin
         \\//       deserializeFromBin
         \\//       writeToText
         \\//       readFromText
         \\//
-        \\// Reglas previstas:
+        \\// Antauxviditaj reguloj:
         \\//
-        \\//   - append de repeated message hace copia profunda.
-        \\//   - no se expone appendOwned como API publica inicial.
-        \\//   - getXAt(index) devuelve copia owned.
-        \\//   - el usuario debe llamar deinit() sobre copias devueltas.
-        \\//   - no se exponen slices repeated internos como API principal.
+        \\//   - append de repeated message faras profundan kopion.
+        \\//   - appendOwned ne estas montrata kiel komenca publika API.
+        \\//   - getXAt(index) redonas owned-kopion.
+        \\//   - la uzanto devas voki deinit() sur redonitajn kopiojn.
+        \\//   - internaj repeated slices ne estas montrataj kiel cefa API.
         \\//
         \\
         \\
@@ -388,18 +388,18 @@ fn skribiApiKomencanSekcion(
 }
 
 // ============================================================================
-// WRAPPERS DE MENSAJE
+// WRAPPER-OJ DE MESAGXO
 // ============================================================================
 //
-// Esta funcion sera el punto principal del generador API.
+// Cxi tiu funkcio estos la cefa punkto de la API-generilo.
 //
-// Primera version prevista:
-//   - recorrer mensajes top-level.
-//   - generar un wrapper por mensaje.
-//   - cada wrapper contendra:
+// Antauxvidita unua versio:
+//   - trakuri supranivelajn mesagxojn.
+//   - generi unu wrapper-on por mesagxo.
+//   - cxiu wrapper enhavos:
 //       impl: Raw.<Message>
 //
-//   - funciones iniciales:
+//   - komencajn funkciojn:
 //       initDefault()
 //       deinit()
 //       serializeToBin()
@@ -407,14 +407,14 @@ fn skribiApiKomencanSekcion(
 //       writeToText()
 //       readFromText()
 //
-// Despues:
-//   - setters para required string/bytes.
-//   - set/clear para optional string/bytes.
-//   - append para repeated.
-//   - getCount/getAt para repeated.
+// Poste:
+//   - setter-ojn por required string/bytes.
+//   - set/clear por optional string/bytes.
+//   - append por repeated.
+//   - getCount/getAt por repeated.
 //
-// De momento se deja una salida estructural para que el fichero generado compile
-// y para fijar el punto de extension.
+// Provizore oni lasas strukturan eliron por ke la generita dosiero kompilu
+// kaj por fiksi la etendopunkton.
 //
 
 fn skribiApiWrappers(
@@ -450,16 +450,16 @@ fn skribiImplAliases(
 ) !void {
     try buf.print(allocator,
         \\// ============================================================================
-        \\// ALIASES INTERNOS A TIPOS RAW / IMPL
+        \\// INTERNAJ ALIASOJ AL RAW / IMPL-TIPOJ
         \\// ============================================================================
         \\//
-        \\// Estos aliases permiten que el cuerpo de los wrappers no dependa de si
-        \\// estamos en fase intermedia o fase final.
+        \\// Cxi tiuj aliasoj ebligas, ke la korpo de la wrapper-oj ne dependu
+        \\// de tio, cxu ni estas en la meza aux fina fazo.
         \\//
-        \\// Fase intermedia:
+        \\// Meza fazo:
         \\//   EstMeteoImpl = cctrol_impl.EstMeteo
         \\//
-        \\// Fase final:
+        \\// Fina fazo:
         \\//   EstMeteoImpl = cctrol_impl.EstMeteo_impl
         \\//
         \\
@@ -488,18 +488,18 @@ fn skribiImplAliases(
 fn skribiCloneImplHelper(allocator: std.mem.Allocator, buf: *std.ArrayList(u8)) !void {
     try buf.print(allocator,
         \\// ============================================================================
-        \\// HELPERS PRIVADOS DE COPIA PROFUNDA
+        \\// PRIVATAJ HELPILOJ DE PROFUNDA KOPIO
         \\// ============================================================================
         \\//
-        \\// cloneImpl() realiza una copia profunda usando el camino binario generado.
+        \\// cloneImpl() faras profundan kopion per la generita binara vojo.
         \\//
-        \\// Estrategia inicial:
+        \\// Komenca strategio:
         \\//
         \\//   clone = seriigiAlBin(.BF_PROTOBUF) + deseriigiElBin(.BF_PROTOBUF)
         \\//
-        \\// Esta version prioriza simplicidad y seguridad de ownership.
-        \\// Si seriigi/deseriigi tiene un bug, debe corregirse en ProtobuZig,
-        \\// porque afecta tambien al uso normal de mensajes en K6Bus.
+        \\// Cxi tiu versio prioritatas simplecon kaj sekurecon de ownership.
+        \\// Se seriigi/deseriigi havas cimon, gxi riparigxu en ProtobuZig,
+        \\// cxar gxi trafas ankaux la normalan uzon de mesagxoj en K6Bus.
         \\//
         \\
         \\fn cloneImpl(comptime T: type, allocator: std.mem.Allocator, src: *const T) !T {{
@@ -520,14 +520,14 @@ fn skribiWrapperStructs(
 ) !void {
     try buf.print(allocator,
         \\// ============================================================================
-        \\// WRAPPERS PUBLICOS
+        \\// PUBLIKAJ WRAPPER-OJ
         \\// ============================================================================
         \\//
-        \\// De momento cada wrapper solo contiene:
+        \\// Provizore cxiu wrapper enhavas nur:
         \\//
         \\//   impl: TipoImpl
         \\//
-        \\// En los siguientes pasos se generaran:
+        \\// En la sekvaj pasxoj generigxos:
         \\//
         \\//   - initDefault()
         \\//   - deinit()
@@ -535,7 +535,7 @@ fn skribiWrapperStructs(
         \\//   - deserializeFromBin()
         \\//   - writeToText()
         \\//   - readFromText()
-        \\//   - setters/getters/builders seguros
+        \\//   - sekuraj setter-oj/getter-oj/builder-oj
         \\//
         \\
     , .{});
@@ -1849,7 +1849,7 @@ fn skribiOneofStringOrBytesFieldAccessors(allocator: std.mem.Allocator, buf: *st
 }
 
 // ============================================================================
-// CIERRE DEL FICHERO API
+// FERMO DE LA API-DOSIERO
 // ============================================================================
 
 fn skribiApiFinon(
@@ -1858,7 +1858,7 @@ fn skribiApiFinon(
 ) !void {
     try buf.print(allocator,
         \\// ============================================================================
-        \\// FIN API SEGURA
+        \\// FINO DE LA SEKURA API
         \\// ============================================================================
         \\
     , .{});

@@ -41,7 +41,7 @@ pub fn generiZigKodon(
     var zig_verkisto = zig_dosiero.writer(&zig_buffero);
     verkisto = &zig_verkisto.interface;
 
-    // La tuta kodoj por generiĝas ĉiuij:
+    // La tuta kodo generigxas cxi tie:
     try skribiKaplinion(proto);
     const tabs = try skribiIniPakaghon(proto.package_name);
     try skribiEnums(proto.enums, "");
@@ -78,8 +78,8 @@ fn skribiKaplinion(proto: *pf) !void {
     , .{});
 
     for (proto.imports) |imp| {
-        // imp puede venir con comillas desde el parser: "Msg.proto".
-        // Normalizamos aqui para no romper defaults string que tambien usan quoted_string.
+        // imp povas veni kun citiloj el la analizilo: "Msg.proto".
+        // Ni normaligas gxin, por ne rompi la defauxltojn de quoted_string.
         var import_name = imp;
         if (import_name.len >= 2 and import_name[0] == '"' and import_name[import_name.len - 1] == '"') {
             import_name = import_name[1 .. import_name.len - 1];
@@ -130,16 +130,16 @@ fn skribiEnums(enums: []prs.Enum, ind: []const u8) !void {
 /////////////////////////////////////
 /// OneOf - Generado de Protobuf Text
 /////////////////////////////////////
-/// Genera el codigo de escritura Protobuf Text de un oneof.
-/// Importante:
-/// - En Protobuf Text, el oneof no se escribe como contenedor.
-/// - Se escribe directamente la alternativa activa.
-/// - Ejemplo:
+/// Generas la skriban kodon Protobuf Text de unu oneof.
+/// Gravajxoj:
+/// - En Protobuf Text, la oneof ne skribigxas kiel ujo.
+/// - Oni skribas rekte la aktivan alternativon.
+/// - Ekzemplo:
 ///     mcast {
 ///         mcast_address: "239.255.0.1"
 ///         port: 40069
 ///     }
-/// - .none no se escribe.
+/// - .none ne skribigxas.
 fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     try verkisto.print(
         \\{s}    switch (self.{s}) {{
@@ -249,7 +249,7 @@ fn skribiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     });
 }
 
-/// Genera escritura Protobuf Text para todos los oneofs de un mensaje.
+/// Generas skribadon Protobuf Text por cxiuj oneof-oj de mesagxo.
 fn skribiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
     for (msg.oneofs) |oneof_decl| {
         try skribiPBTekstoOneOf(oneof_decl, ind);
@@ -257,18 +257,18 @@ fn skribiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
 }
 
 /////////////////////////////////////
-/// OneOf - Lectura Protobuf Text
+/// OneOf - Legado de Protobuf Text
 /////////////////////////////////////
-/// Genera las ramas de lectura Protobuf Text para un oneof.
-/// En Protobuf Text, el oneof no aparece como contenedor.
-/// La alternativa aparece directamente:
+/// Generas la legajn brancxojn Protobuf Text por unu oneof.
+/// En Protobuf Text, la oneof ne aperas kiel ujo.
+/// La alternativo aperas rekte:
 ///     mcast {
 ///         ...
 ///     }
-/// Por tanto se detecta por tok == "mcast", "bcast", etc.
-/// Regla:
-/// Si aparece mas de una alternativa del mismo oneof, gana la ultima.
-/// Antes de asignar una nueva alternativa, liberamos la anterior.
+/// Do oni detektas gxin per tok == "mcast", "bcast", ktp.
+/// Regulo:
+/// Se aperas pli ol unu alternativo de la sama oneof, gajnas la lasta.
+/// Antaux ol asigni novan alternativon, ni liberigas la antauxan.
 fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
 
@@ -278,8 +278,8 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
             "{s}_{s}_val",
             .{ oneof_decl.name, field.name },
         ) catch unreachable;
-            // L2: free eliminado - el arena de generacion (arenoFini) libera
-            // los temporales; un free a mitad no-cola seria no-op en el arena.
+            // L2: free forigita - la generada areno (arenoFini) liberigas
+            // la provizorajn valorojn; free meze de vico estus no-op tie.
 
         switch (field.field_type_enum) {
             .TYPE_MESSAGE => {
@@ -404,7 +404,7 @@ fn skribiLegiPBTekstoOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     }
 }
 
-/// Genera lectura Protobuf Text para todos los oneofs de un mensaje.
+/// Generas legadon Protobuf Text por cxiuj oneof-oj de mesagxo.
 fn skribiLegiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
     for (msg.oneofs) |oneof_decl| {
         try skribiLegiPBTekstoOneOf(oneof_decl, ind);
@@ -414,23 +414,23 @@ fn skribiLegiPBTekstoOneOfs(msg: prs.Message, ind: []const u8) !void {
 /////////////////////////////////////
 /// OneOf - Generado de union(enum)
 /////////////////////////////////////
-/// Genera los tipos Zig asociados a los oneof de un mensaje.
-/// Ejemplo protobuf:
+/// Generas la Zig-tipojn ligitajn al la oneof-oj de mesagxo.
+/// Protobuf-ekzemplo:
 ///     oneof params {
 ///         MCastConfig mcast = 10;
 ///         BCastConfig bcast = 11;
 ///     }
-/// Salida Zig:
+/// Zig-eligo:
 ///     pub const Params = union(enum) {
 ///         none: void,
 ///         mcast: MCastConfig,
 ///         bcast: BCastConfig,
 ///     };
-/// Nota importante:
-/// - El nombre del oneof se transforma a PascalCase.
-/// - La alternativa "none" no existe en protobuf.
-/// - "none" es una convencion interna para que initDefault() tenga un estado
-///   explicito y seguro.
+/// Grava noto:
+/// - La nomo de la oneof transformigxas al PascalCase.
+/// - La alternativo "none" ne ekzistas en protobuf.
+/// - "none" estas interna konvencio, por ke initDefault() havu
+///   eksplicitan kaj sekuran staton.
 fn skribiOneOfUnion(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
 
@@ -462,7 +462,7 @@ fn skribiOneOfUnion(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     , .{ind});
 }
 
-/// Genera todos los union(enum) oneof definidos dentro de un mensaje.
+/// Generas cxiujn union(enum) oneof difinitajn ene de mesagxo.
 fn skribiOneOfUnions(msg: prs.Message, ind: []const u8) !void {
     for (msg.oneofs) |oneof_decl| {
         try skribiOneOfUnion(oneof_decl, ind);
@@ -472,21 +472,21 @@ fn skribiOneOfUnions(msg: prs.Message, ind: []const u8) !void {
 /////////////////////////////////////
 /// OneOf - Generado de deinit helpers
 /////////////////////*///////////////
-/// Genera una funcion auxiliar por cada oneof del mensaje.
-/// Ejemplo:
+/// Generas helpan funkcion por cxiu oneof de la mesagxo.
+/// Ekzemplo:
 ///     fn deinitParams(self: *const T*ansportConfig, allocator: all.Allo*ator) void {
 ///         switch (s*lf.params) {
 ///             .none => {},
 ///             .mcast => |*v| v.deinit(allocator),
 ///         }
 ///     }
-/// Esta funcion se usa en dos sitios:
-/// - deinit() general del mensaje.
-/// - deseriigi(), antes de sobrescribir una alternativa oneof ya activa.
+/// Cxi tiu funkcio uzatas en du lokoj:
+/// - cxefa deinit() de la mesagxo.
+/// - deseriigi(), antaux ol superskribi jam aktivan oneof-alternativon.
 ///
-/// Razon protobuf:
-/// Si aparecen varias alternativas del mismo oneof en el wire, gana la ultima.
-/// Por tanto, al leer una nueva alternativa hay que liberar la anterior.
+/// Protobuf-kialo:
+/// Se aperas pluraj alternativoj de la sama oneof en la wire, gajnas la lasta.
+/// Do, legante novan alternativon, oni devas liberigi la antauxan.
 fn skribiOneOfDeinitHelper(msg: prs.Message, oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     const union_name = auks.mapiOneOfNomonAlZigTipo(oneof_decl.name);
 
@@ -551,7 +551,7 @@ fn skribiOneOfDeinitHelper(msg: prs.Message, oneof_decl: prs.OneOfDecl, ind: []c
     });
 }
 
-/// Genera todos los helpers *e deinit asociados a oneof dentro *e un mensaje.
+/// Generas cxiujn helpilojn de deinit ligitajn al oneof en mesagxo.
 fn skribiOneOfDeinitHelpers(msg: prs.Message, ind: []const u8) !void {
     for (msg.oneofs) |oneof_decl| {
         try skribiOneOfDeinitHelper(msg, oneof_decl, ind);
@@ -561,14 +561,14 @@ fn skribiOneOfDeinitHelpers(msg: prs.Message, ind: []const u8) !void {
 /////////////////////////////////////
 /// OneOf - Generado de seriigi()
 /////////////////////////////////////
-/// Genera el codigo de serializacion binaria de un oneof.
-/// Importante:
-/// - En protobuf, oneof no tiene wire-format propio.
-/// - Cada alternativa se codifica como si fuese un campo normal.
-/// - Solo se serializa la alternativa activa.
-/// - La alternativa .none no se serializa.
-/// Como EncodeBuffer escribe hacia atras, este bloque debe emitirse antes que
-/// los campos normales cuando los field numbers del oneof sean mayores.
+/// Generas la binaran serializan kodon de unu oneof.
+/// Gravajxoj:
+/// - En protobuf, oneof ne havas propran wire-format.
+/// - Cxiu alternativo kodigxas kvazaux ordinara kampo.
+/// - Nur la aktiva alternativo serialigxas.
+/// - La alternativo .none ne serialigxas.
+/// CXar EncodeBuffer skribas malantauxen, tiu bloko devas eligi antaux la
+/// normalaj kampoj, kiam la field number-oj de la oneof estas pli grandaj.
 fn skribiSeriigiOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     try verkisto.print(
         \\{s}    switch (self.{s}) {{
@@ -671,7 +671,7 @@ fn skribiSeriigiOneOf(oneof_decl: prs.OneOfDecl, ind: []const u8) !void {
     , .{ind});
 }
 
-/// Genera serializacion para todos los oneofs de un mensaje.
+/// Generas serializadon por cxiuj oneof-oj de mesagxo.
 fn skribiSeriigiOneOfs(msg: prs.Message, ind: []const u8) !void {
     for (msg.oneofs) |oneof_decl| {
         try skribiSeriigiOneOf(oneof_decl, ind);
@@ -891,7 +891,7 @@ fn skribiDeseriigiOneOfBranches(
     }
 }
 
-/// Genera las ramas de deserializacion de todos los oneofs de un mensaje.
+/// Generas la deserializajn brancxojn de cxiuj oneof-oj de mesagxo.
 fn skribiDeseriigiOneOfs(
     msg: prs.Message,
     indent: []const u8,
@@ -919,8 +919,8 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
 
         // /////////////
         // Skribi oneof union(enum)
-        // Los oneof se generan como tipos internos del mensaje.
-        // Ejemplo:
+        // La oneof-oj generigxas kiel internaj tipoj de la mesagxo.
+        // Ekzemplo:
         //     pub const Params = union(enum) {
         //         none: void,
         //         mcast: MCastConfig,
@@ -937,11 +937,11 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
                 field.field_type_enum == .TYPE_STRING or
                 field.field_type_enum == .TYPE_BYTES;
 
-            // Si el campo es owned y deinit() lo va a liberar,
-            // no debemos generar defaults literales en la declaracion.
-            // Correcto:
+            // Se la kampo estas posedata kaj deinit() liberigos gxin,
+            // ni ne generu literalajn defauxltojn en la deklaro.
+            // Gxuste:
             //     mcast_address: []const u8,
-            // El valor por defecto owned se materializa en initDefault().
+            // La posedata defauxlta valoro materialigxas en initDefault().
             var default_for_decl: ?[]const u8 =
                 if (is_owned_string_or_bytes and field.default_value != null)
                     null
@@ -949,8 +949,8 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
                     field.default_value;
 
             var allocated_default_for_decl: ?[]const u8 = null;
-            // L2: el defer que liberaba s se ha eliminado - el arena de
-            // generacion (arenoFini) libera todos los temporales.
+            // L2: la defer, kiu liberigis s, forigigxis - la generada
+            // areno (arenoFini) liberigas cxiujn provizorajn valorojn.
 
             if (default_for_decl != null and field.field_type_enum == .TYPE_ENUM) {
                 allocated_default_for_decl =
@@ -978,9 +978,9 @@ fn skribiMesaghojn(messages: []prs.Message, ind: []const u8) !void {
 
         // /////////////
         // Skribi kampoj oneof
-        // Cada oneof se representa como un campo cuyo tipo es la union(enum)
-        // generada previamente dentro del mismo struct.
-        // Ejemplo:
+        // Cxiu oneof reprezentigxas kiel kampo, kies tipo estas union(enum)
+        // generita antauxe ene de la sama struct.
+        // Ekzemplo:
         //     pub const Params = union(enum) { ... };
         //     params: Params,
         for (msg.oneofs) |oneof_decl| {
@@ -1390,10 +1390,10 @@ fn skribiGeneralajnFunkciojn() !void {
         \\            }};
         \\        }},
         \\        .TF_JSON => {{
-        \\            // L1: parseFromSlice con arena es error-clean; en exito se
-        \\            // copia el valor a memoria del llamante con un round-trip
-        \\            // binario antes de liberar el arena (parseFromSliceLeaky
-        \\            // filtraba parcial en la ruta de error).
+        \\            // L1: parseFromSlice kun areno estas error-clean;
+        \\            // cxe sukceso oni kopias la valoron al memoro de la
+        \\            // vokanto per binara round-trip, antaux ol liberigi la
+        \\            // arenon (parseFromSliceLeaky likis parte erare).
         \\            var par = std.json.parseFromSlice(T, allocator, input, .{{ .ignore_unknown_fields = false, .allocate = .alloc_always }}) catch |err| {{
         \\                std.debug.print("eraro dun deseriigo: {{}}\n", .{{err}});
         \\                return err;
@@ -1440,12 +1440,12 @@ fn skribiGeneralajnFunkciojn() !void {
     , .{});
 
     try verkisto.print(
-        \\/// Tokenizador sencillo para Protobuf Text.
-        \\/// - Devuelve slices prestados del buffer original.
-        \\/// - Los literales entre comillas se devuelven sin las comillas.
-        \\/// - No interpreta todavia escapes como \\n, \\x01 o \\001.
-        \\/// - Reconoce {{ }} < > [ ] como tokens independientes.
-        \\/// - Ignora espacios, :, ',', ';' y comentarios iniciados por #.
+        \\/// Simpla tokenizilo por Protobuf Text.
+        \\/// - Redonas prunteprenitajn slice-ojn el la originala bufro.
+        \\/// - La literaloj inter citiloj redonigxas sen la citiloj.
+        \\/// - Ankoraux ne interpretas eskapojn kiel \\n, \\x01 aux \\001.
+        \\/// - Rekonas {{ }} < > [ ] kiel sendependajn token-ojn.
+        \\/// - Ignoras spacojn, :, ',', ';' kaj komentojn komencitajn per #.
         \\pub const CustomTokenizer = struct {{
         \\    buffer: []const u8,
         \\    index: usize,
@@ -1460,7 +1460,7 @@ fn skribiGeneralajnFunkciojn() !void {
         \\        return copy.next();
         \\    }}
         \\
-        \\    /// El slice devuelto apunta directamente al buffer original.
+        \\    /// La redonita slice montras rekte al la originala bufro.
         \\    pub fn next(self: *Self) ?[]const u8 {{
         \\        self.skipIgnored();
         \\        if (self.index >= self.buffer.len) {{ return null; }}
@@ -1671,8 +1671,8 @@ fn skribiGeneralajnFunkciojn() !void {
 /////////////////////////////////////
 /// Seriigi kaj Deseriigi Funkcioj:
 /// -Teksta formato: ZON, Protobuf, JSON
-// /     - skribiAlTeksto: generica por ZON, Protobuf, JSON
-// /     - legiElTeksto:  generica por ZON, Protobuf, JSON
+// /     - skribiAlTeksto: generala por ZON, Protobuf, JSON
+// /     - legiElTeksto:  generala por ZON, Protobuf, JSON
 // /     - skribiSkribiAlPBTeksto
 /// -Binara formato: Protobuf
 ///     - skribiSeriigi
@@ -2035,11 +2035,11 @@ fn skribiLegiElPBTeksto(msg: prs.Message, ind: []const u8) !void {
         , .{ ind, field.name });
 
         if (field.field_type_enum == .TYPE_MESSAGE) {
-            // F7: para un campo de tipo mensaje el "val" leido antes de la rama
-            // es la llave de apertura del sub-mensaje, y hasta ahora no se
-            // usaba: si el mensaje SOLO tenia campos de tipo mensaje, el
-            // generado no compilaba ("unused local constant"). Se valida aqui,
-            // igual que ya hacia el parser de texto de los oneof.
+            // F7: por kampo de tipo mesagxo la "val" legita antaux la brancxo
+            // estas la malferma krampo de la sub-mesagxo, kaj gxis nun ne
+            // uzatis: se la mesagxo havis NUR kampojn de tipo mesagxo,
+            // la generita kodo ne kompilis ("unused local constant"). Oni
+            // kontrolas gxin cxi tie, same kiel la teksta analizilo de oneof.
             try verkisto.print(
                 \\{s}            if( ! equal(u8, val, "{{" ) ) return error.InvalidFormat;
                 \\
@@ -2466,10 +2466,10 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
             , .{
                 ind, field.name, auks.mapiProtoTiponAlZig(field.field_type),
             });
-            // errdefer de la lista temporal: si la entrada se corta a mitad
-            // de un repeated (ahora los errores propagan con try), los items
-            // ya parseados no deben fugarse. Espejo del patron de los
-            // parsers de Protobuf Text.
+            // errdefer de la provizora listo: se la enigo rompigxas meze
+            // de repeated (nun la eraroj propagigxas per try), la jam
+            // analizitaj eroj ne devas fughi. Spegulo de la sxablono de la
+            // analiziloj de Protobuf Text.
             switch (field.field_type_enum) {
                 .TYPE_MESSAGE => {
                     try verkisto.print(
@@ -2676,9 +2676,9 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // L2: free eliminado - el arena de generacion (arenoFini)
-                    // libera los temporales; un free a mitad no-cola seria
-                    // no-op en el arena.
+                    // L2: free forigita - la generada areno (arenoFini)
+                    // liberigas la provizorajn valorojn; free meze de la
+                    // vico estus no-op en la areno.
 
                     try verkisto.print(
                         \\{s}        {{
@@ -2769,9 +2769,9 @@ fn skribiDeseriigi(msg: prs.Message, ind: []const u8) !void {
                         "tmp_{s}",
                         .{field.name},
                     );
-                    // L2: free eliminado - el arena de generacion (arenoFini)
-                    // libera los temporales; un free a mitad no-cola seria
-                    // no-op en el arena.
+                    // L2: free forigita - la generada areno (arenoFini)
+                    // liberigas la provizorajn valorojn; free meze de la
+                    // vico estus no-op en la areno.
 
                     try verkisto.print(
                         \\{s}        {{
@@ -3329,14 +3329,14 @@ fn skribiRepeatedNoDefaultVarLong(
 /// Konstruktoriloj
 /////////////////////////////////////
 ///
-/// ¿El temporal de initDefault() de este campo usa allocator?
+/// CXu la provizora valoro de cxi tiu kampo en initDefault() uzas allocator?
 ///
-/// ESPEJO EXACTO de las condiciones del bucle de temporales de abajo: si se
-/// cambia una, cambiar la otra (si no, el generado puede quedar con
-/// `allocator` sin usar = error de compilacion). Defecto detectado
-/// 2026-09-10 con un mensaje de solo campos opcionales: la deteccion antigua
-/// contaba cualquier string/bytes/message como uso de allocator, pero un
-/// campo OPTIONAL se inicializa a null (no asigna nada).
+/// TUTE SAMA SPEGULO de la kondicxoj de la malsupra bucle de provizoraj
+/// valoroj: se oni sxangxas unu, sxangxu ankaux la alian (alie la
+/// generita kodo povas resti kun `allocator` neuzata = kompila eraro).
+/// Difekto detektita 2026-09-10 per mesagxo kun nur optionalaj kampoj:
+/// la antauxa detekto kalkulis cxiun string/bytes/message kiel uzon de
+/// allocator, sed OPTIONAL-kampo iniciatigxas al null (gxi asignas nenion).
 fn kampoUzasAsignilonInitDefault(f: prs.Field) bool {
     if (f.label_enum == .LABEL_REPEATED) return true;
 
@@ -3344,12 +3344,12 @@ fn kampoUzasAsignilonInitDefault(f: prs.Field) bool {
         f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES;
 
     if (es_teksto) {
-        // default explicito owned, o required sin default (dupe de "").
+        // posedata eksplicita defauxlto, aux required sen defauxlto (dupe "").
         return f.default_value != null or f.label_enum != .LABEL_OPTIONAL;
     }
     if (f.field_type_enum == .TYPE_MESSAGE) {
-        // Solo el mensaje required se construye en initDefault; el optional
-        // queda a null.
+        // Nur la required-mesagxo konstruigxas en initDefault; la optionala
+        // restas null.
         return f.label_enum != .LABEL_OPTIONAL;
     }
     return false;
@@ -3358,7 +3358,7 @@ fn kampoUzasAsignilonInitDefault(f: prs.Field) bool {
 fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
 
     // -----------------------------------------
-    // Generar cabecera
+    // Generi la kapon
     // -----------------------------------------
     try verkisto.print(
         \\{s}pub fn initDefault(allocator: all.Allocator) !{s} {{
@@ -3367,7 +3367,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     , .{ ind, msg.name });
 
     // -----------------------------------------
-    // Detectar si se usa allocator (espejo del bucle de temporales)
+    // Detekti cxu oni uzas allocator (spegulo de la provizora bucle)
     // -----------------------------------------
     var uses_allocator = false;
     for (msg.fields) |f| {
@@ -3385,13 +3385,13 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Temporales con errdefer (L1): cada campo owned se prepara en una
-    // variable local ANTES del literal, con su errdefer, para que si falla
-    // una asignacion posterior no se fuguen las anteriores (dentro de un
-    // literal de struct no puede haber errdefers).
-    // Prefijo "mia_": evita que la local sombree declaraciones del contenedor
-    // (p.ej. un campo llamado "config" dentro del namespace k6bus.config).
-    // Mantener en sync con el bucle de campos de abajo.
+    // Provizoraj valoroj kun errdefer (L1): cxiu posedata kampo preparigxas
+    // en loka variablo ANTAUX la literalo, kun sia errdefer, por ke se
+    // posta asigno malsukcesas, la antauxaj ne fughu (ene de struct-
+    // literalo ne povas esti errdefer-oj).
+    // Prefikso "mia_": evitas, ke la loka ombru kontenerajn deklarojn
+    // (ekz. kampon nomatan "config" en la namespace k6bus.config).
+    // Tenu en sinkronio kun la bucle de kampoj malsupre.
     // -----------------------------------------
     for (msg.fields) |f| {
         // repeated
@@ -3404,7 +3404,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             continue;
         }
 
-        // string/bytes con default explicito (owned)
+        // string/bytes kun eksplicita defauxlto (posedata)
         if (f.default_value != null and
             (f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES))
         {
@@ -3417,7 +3417,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             continue;
         }
 
-        // message required
+        // required-mesagxo
         if (f.field_type_enum == .TYPE_MESSAGE and f.label_enum != .LABEL_OPTIONAL) {
             try verkisto.print(
                 \\{s}    const mia_{s} = try {s}.initDefault(allocator);
@@ -3433,7 +3433,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             continue;
         }
 
-        // string/bytes required sin default
+        // string/bytes required sen defauxlto
         if ((f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) and
             f.label_enum != .LABEL_OPTIONAL)
         {
@@ -3446,7 +3446,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Generar return
+    // Generi la return
     // -----------------------------------------
     try verkisto.print(
         \\{s}    return {s} {{
@@ -3454,11 +3454,11 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     , .{ ind, msg.name });
 
     // -----------------------------------------
-    // Campos
+    // Kampoj
     // -----------------------------------------
     for (msg.fields) |f| {
         // -------------------------
-        // repeated (usa temporal mia_)
+        // repeated (uzas provizoran variablon mia_)
         // -------------------------
         if (f.label_enum == .LABEL_REPEATED) {
             try verkisto.print(
@@ -3469,7 +3469,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         }
 
         // -------------------------
-        // tiene default explícito
+        // havas eksplicitan defauxlton
         // -------------------------
         if (f.default_value) |def| {
             // enum
@@ -3478,7 +3478,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                     \\{s}        .{s} = .{s},
                     \\
                 , .{ ind, f.name, def });
-                // string y bytes (usa temporal mia_)
+                // string kaj bytes (uzas provizoran variablon mia_)
             } else if (f.field_type_enum == .TYPE_STRING or
                 f.field_type_enum == .TYPE_BYTES)
             {
@@ -3486,7 +3486,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
                     \\{s}        .{s} = mia_{s},
                     \\
                 , .{ ind, f.name, f.name });
-                // resto de tipos
+                // ceteraj tipoj
             } else {
                 try verkisto.print(
                     \\{s}        .{s} = {s},
@@ -3497,7 +3497,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         }
 
         // -------------------------
-        // optional sin default
+        // optional sen defauxlto
         // -------------------------
         if (f.label_enum == .LABEL_OPTIONAL) {
             try verkisto.print(
@@ -3507,7 +3507,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
             continue;
         }
 
-        // message required (usa temporal mia_)
+        // required-mesagxo (uzas provizoran variablon mia_)
         if (f.field_type_enum == .TYPE_MESSAGE) {
             try verkisto.print(
                 \\{s}        .{s} = mia_{s},
@@ -3517,7 +3517,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         }
 
         // -------------------------
-        // required enum sin default
+        // required enum sen defauxlto
         // -------------------------
         if (f.field_type_enum == .TYPE_ENUM) {
             try verkisto.print(
@@ -3532,12 +3532,12 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
         }
 
         // -------------------------
-        // required sin default
+        // required sen defauxlto
         // -------------------------
         if (f.field_type_enum == .TYPE_STRING or
             f.field_type_enum == .TYPE_BYTES)
         {
-            // string/bytes required (usa temporal mia_)
+            // string/bytes required (uzas provizoran variablon mia_)
             try verkisto.print(
                 \\{s}        .{s} = mia_{s},
                 \\
@@ -3553,9 +3553,9 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     // -----------------------------------------
     // OneOfs
     // -----------------------------------------
-    // En protobuf, un oneof puede no tener ninguna alternativa activa.
-    // La variante "none" no existe en el .proto, es una convencion interna
-    // del codigo Zig generado para que initDefault() sea seguro y explicito.
+    // En protobuf, oneof povas havi neniun aktivan alternativon.
+    // La varianto "none" ne ekzistas en la .proto, gxi estas interna
+    // konvencio de la generita Zig-kodo, por ke initDefault() estu sekura.
     for (msg.oneofs) |oneof_decl| {
         try verkisto.print(
             \\{s}        .{s} = .{{ .none = {{}} }},
@@ -3567,7 +3567,7 @@ fn skribiInitDefault(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Cierre
+    // Fino
     // -----------------------------------------
     try verkisto.print(
         \\{s}    }};
@@ -3590,7 +3590,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     , .{ ind, msg.name });
 
     // -----------------------------------------
-    // Detectar si se usa allocator
+    // Detekti cxu oni uzas allocator
     // -----------------------------------------
     var uses_allocator = false;
     for (msg.fields) |f| {
@@ -3612,7 +3612,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Campos
+    // Kampoj
     // -----------------------------------------
     for (msg.fields) |f| {
         // -------------------------
@@ -3720,7 +3720,7 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     }
 
     // -----------------------------------------
-    // Cierre
+    // Fino
     // -----------------------------------------
     try verkisto.print(
         \\{s}}}
@@ -3732,14 +3732,14 @@ fn skribiDeInit(msg: prs.Message, ind: []const u8) !void {
     try verkisto.print("\n", .{});
 }
 
-/// Emite plenigiDefaultojn(): materializa los defaults proto OWNED de los
-/// optional string/bytes que hayan quedado en null tras un parseo ZON/JSON
-/// (std.zon.parse/std.json parten de los defaults de DECLARACION, no de
-/// initDefault), y recursiona en los mensajes anidados (required, optional
-/// presente, repeated y rama activa del oneof) para que el default "siempre
-/// este", igual que en Protobuf Text/binario (que parten de initDefault).
-/// Se emite para TODOS los mensajes (no-op cuando no hay nada que rellenar),
-/// porque legiTiponElTeksto() lo llama de forma generica.
+/// Eligigxas plenigiDefaultojn(): materialigas la proto-defauxltojn OWNED de la
+/// optional string/bytes, kiuj restis null post analizo de ZON/JSON
+/// (std.zon.parse/std.json startas de la DEKLARITAJ defauxltoj, ne de
+/// initDefault), kaj ripetas en la nestitaj mesagxoj (required, optional
+/// cxeesta, repeated kaj aktiva brancxo de la oneof), por ke la defauxlto
+/// "cxiam estu", same kiel en Protobuf Text/binara (kiuj startas de
+/// initDefault). Gxi eligigxas por CXiUJ mesagxoj (no-op kiam nenio
+/// plenigendas), cxar legiTiponElTeksto() vokas gxin generale.
 fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
     var has_work = false;
     for (msg.fields) |f| {
@@ -3778,9 +3778,9 @@ fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
             \\
         , .{ ind, ind });
     } else {
-        // Campos
+        // Kampoj
         for (msg.fields) |f| {
-            // recursar en mensajes anidados
+            // ripeti en nestitaj mesagxoj
             if (f.field_type_enum == .TYPE_MESSAGE) {
                 switch (f.label_enum) {
                     .LABEL_REQUIRED => {
@@ -3805,8 +3805,8 @@ fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
                 continue;
             }
 
-            // optional string/bytes con default proto owned: si quedo null
-            // (omitido en ZON/JSON), materializar el default.
+            // optional string/bytes kun posedata proto-defauxlto: se gxi
+            // restis null (preterlasita en ZON/JSON), materialigu gxin.
             if ((f.field_type_enum == .TYPE_STRING or f.field_type_enum == .TYPE_BYTES) and
                 f.label_enum == .LABEL_OPTIONAL)
             {
@@ -3819,7 +3819,7 @@ fn skribiPlenigiDefaultojn(msg: prs.Message, ind: []const u8) !void {
             }
         }
 
-        // Oneofs: recursar solo en la rama activa cuando es un mensaje
+        // Oneofs: ripeti nur en la aktiva brancxo, kiam gxi estas mesagxo
         for (msg.oneofs) |oo| {
             var oo_has_msg = false;
             for (oo.fields) |of| {

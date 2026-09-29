@@ -1,49 +1,49 @@
 const std = @import("std");
 
-// main.zig: codigo de USUARIO.
+// main.zig: kodo de UZANTO.
 //
-// Ejemplo generado por protobuzig --ws. Modificalo libremente para
-// poner la logica de tu problema: crear mensajes, rellenar campos,
-// escribir a fichero, cambiar de formato, etc.
+// Ekzemplo generita de protobuzig --ws. Modifu gxin libere por
+// meti la logikon de via problemo: krei mesagxojn, plenigi kampojn,
+// skribi al dosiero, sxangxi formaton, ktp.
 //
-// Lo generado vive en src/runtime:
+// La generitajxo vivas en src/runtime:
 //
-//     Ciudad.zig       implementacion RAW (uso interno; no la importes)
-//     Ciudad_api.zig   API SEGURA sobre el raw: usa ESTA
-//     encdec.zig         soporte de serializacion
+//     Ciudad.zig       RAW-implemento (interna uzo; ne importu gxin)
+//     Ciudad_api.zig   SEKURA API super la raw: uzu CXI TIU
+//     encdec.zig         subteno de seriajxo
 //
 //     const Ciudad = @import("runtime/Ciudad_api.zig");
 //
-// El namespace lleva el nombre del CONTRATO (el del fichero .proto) y el
-// mensaje de ejemplo es el PRIMER mensaje definido en el.
+// La nomspaco portas la nomon de la KONTRAKTO (tiun de la dosiero
+// .proto) kaj la ekzempla mesagxo estas la UNUA difinita en gxi.
 const Ciudad = @import("runtime/Ciudad_api.zig");
-const Estacion = Ciudad.Estacion;   // el primer mensaje del contrato
+const Estacion = Ciudad.Estacion;   // la unua mesagxo de la kontrakto
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const a = gpa.allocator();
 
-    // 1) Crea un objeto del mensaje del contrato.
+    // 1) Kreu objekton de la mesagxo de la kontrakto.
     var msg = try Estacion.initDefault(a);
     defer msg.deinit(a);
 
-    // Muestra en el primer campo ("nombre") usando la API segura: quita
-    // esto y pon tu logica.
+    // Montro en la unua kampo ("nombre") per la sekura API: forigu
+    // tion kaj metu vian logikon.
     try msg.setNombre(a, "valor de ejemplo");
 
 
-    // 2) Escribelo a fichero como Protobuf Text y leelo de vuelta.
+    // 2) Skribu gxin al dosiero kiel Protobuf Text kaj relegu gxin.
     try msg.writeToFile(a, "demo.txt", .TF_PROTOBUF);
     var desde_texto = try Estacion.readFromFile(a, "demo.txt", .TF_PROTOBUF);
     defer desde_texto.deinit(a);
 
-    // 3) Cambia de formato: binario Protocol Buffers, y leelo de vuelta.
+    // 3) Sxangxu formaton: binara Protocol Buffers, kaj relegu gxin.
     try msg.serializeToFile(a, "demo.pb", .BF_PROTOBUF);
     var desde_binario = try Estacion.deserializeFromFile(a, "demo.pb", .BF_PROTOBUF);
     defer desde_binario.deinit(a);
 
-    // 4) Muestra el contenido por consola.
+    // 4) Montru la enhavon sur la konzolo.
     const texto = try msg.writeToText(a, .TF_PROTOBUF);
     defer a.free(texto);
     std.debug.print("{s}\n", .{texto});
