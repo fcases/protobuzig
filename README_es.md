@@ -118,6 +118,20 @@ los ficheros generados.
 
 ---
 
+## Reglas de idioma (2026-09-29)
+
+- Comentarios: **K6Bus en ingles**, **ProtobuZig en esperanto**.
+- Textos de CLI y **mensajes de error y de aviso** del core: en **ingles**. Los
+  mensajes informativos (niveles info/trace) se quedan en el idioma en que esten.
+- Identificadores generados: la parte `_raw` en esperanto y la parte `_api` en
+  ingles; NO se traducen a mano.
+- Los ficheros generados que estan en el repo se regeneran con el generador
+  nuevo para que sus comentarios sigan la regla.
+- Los tres README (md/`_es`/`_en`) deben tener el MISMO contenido en los tres
+  idiomas: cualquier cambio en uno se refleja en los otros dos.
+
+---
+
 ## Estado (breve)
 
 Pendientes e historial: ver el TODO de K6Bus. Los tests internos (GPA, sin

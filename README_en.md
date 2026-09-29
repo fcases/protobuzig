@@ -117,6 +117,20 @@ the generated files.
 
 ---
 
+## Language rules (2026-09-29)
+
+- Comments: **K6Bus in English**, **ProtobuZig in Esperanto**.
+- CLI texts and the core **error and warning** messages: in **English**. Info
+  messages (info/trace levels) stay in whatever language they are in.
+- Generated identifiers: the `_raw` part in Esperanto and the `_api` part in
+  English; they are NOT translated by hand.
+- The generated files committed to the repo are regenerated with the new
+  generator so that their comments follow this rule.
+- The three README files (md/`_es`/`_en`) must hold the SAME content in the
+  three languages: any change in one is mirrored in the other two.
+
+---
+
 ## Status (brief)
 
 Pending items and history: see K6Bus's TODO. The internal tests (GPA, no

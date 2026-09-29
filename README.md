@@ -118,13 +118,15 @@ la generitajn dosierojn.
 
 ## Lingvaj reguloj (2026-09-29)
 
-- Komentoj de ProtobuZig: **Esperanto**. (K6Bus uzas la anglan por la siaj; la
-  konvencio estas skribita en `Directrices 14` de K6Bus.)
-- Identigiloj generitaj: la parto `_raw` en Esperanto kaj la parto `_api` en la
+- Komentoj: **K6Bus en la angla**, **ProtobuZig en Esperanto**.
+- Tekstoj de la CLI kaj **eraroj kaj avertoj** de la kerno: en la **angla**. La
+  informaj mesaĝoj (niveloj info/trace) restas en la lingvo en kiu ili estas.
+- Generitaj identigiloj: la parto `_raw` en Esperanto kaj la parto `_api` en la
   angla; oni NE tradukas ilin permane.
-- Tekstoj por la uzanto (helpo, eraroj, mesaĝoj de la ekzemploj): **la angla**.
-- La generitaj dosieroj kiuj estas enmetitaj en la deponejon regeneriĝas per la
+- La generitaj dosieroj kiuj estas enmetitaj en la deponejo regeneriĝas per la
   nova generatoro, por ke iliaj komentoj sekvu tiun ĉi regulon.
+- La tri README (md/`_es`/`_en`) devas havi la SAMAN enhavon en la tri lingvoj:
+  ĉiu ŝanĝo en unu speguliĝas en la aliaj du.
 
 ---
 
